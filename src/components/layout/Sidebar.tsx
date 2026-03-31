@@ -1,0 +1,144 @@
+import React from 'react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import {
+  LayoutDashboard, Users, Package, UserCheck, Warehouse,
+  Layers, Receipt, ClipboardList, BookOpen,
+  LogOut, ChevronLeft, Leaf, X,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
+import { useUIStore } from '@/store/ui.store'
+import { ROUTES } from '@/constants'
+import { Button } from '@/components/ui/button'
+
+interface NavItem {
+  label: string
+  href: string
+  icon: React.ElementType
+  group?: string
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { label: 'Dashboard',          href: ROUTES.DASHBOARD,             icon: LayoutDashboard },
+  // Maestros
+  { label: 'Agricultores',       href: ROUTES.AGRICULTORES,          icon: Users,         group: 'Maestros' },
+  { label: 'Productos',          href: ROUTES.PRODUCTOS,             icon: Package,       group: 'Maestros' },
+  { label: 'Personal de Campo',  href: ROUTES.PERSONAL,              icon: UserCheck,     group: 'Maestros' },
+  { label: 'Centros de Acopio',  href: ROUTES.CENTROS_ACOPIO,        icon: Warehouse,     group: 'Maestros' },
+  // Operaciones
+  { label: 'Lotes',              href: ROUTES.LOTES,                 icon: Layers,        group: 'Operaciones' },
+  { label: 'Actividades',        href: ROUTES.ACTIVIDADES_PERSONAL,  icon: ClipboardList, group: 'Operaciones' },
+  { label: 'Cubetas',            href: ROUTES.CUBETAS,               icon: Package,       group: 'Operaciones' },
+  // Liquidaciones
+  { label: 'Liq. Agricultores',  href: ROUTES.LIQUIDACIONES_AGRI,    icon: Receipt,       group: 'Liquidaciones' },
+  { label: 'Liq. Personal',      href: ROUTES.LIQUIDACIONES_PERSONAL,icon: BookOpen,      group: 'Liquidaciones' },
+]
+
+// Agrupar ítems
+const groups = ['', 'Maestros', 'Operaciones', 'Liquidaciones']
+
+interface SidebarProps {
+  onCloseMobile?: () => void
+}
+
+export function Sidebar({ onCloseMobile }: SidebarProps) {
+  const navigate = useNavigate()
+  const { sidebarOpen, setSidebarOpen } = useUIStore()
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    navigate(ROUTES.LOGIN)
+  }
+
+  return (
+    <aside
+      className={cn(
+        'flex flex-col h-full bg-[hsl(var(--sidebar))] text-[hsl(var(--sidebar-foreground))] transition-all duration-300',
+        sidebarOpen ? 'w-60' : 'w-16'
+      )}
+    >
+      {/* Header del sidebar */}
+      <div className="flex items-center justify-between px-4 h-16 border-b border-[hsl(var(--sidebar-border))] shrink-0">
+        {sidebarOpen && (
+          <div className="flex items-center gap-2 min-w-0">
+            <Leaf className="h-5 w-5 shrink-0 text-agro-green-light" />
+            <span className="font-bold text-sm truncate">AGRONESIS</span>
+          </div>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => {
+            setSidebarOpen(!sidebarOpen)
+            onCloseMobile?.()
+          }}
+          className="h-8 w-8 shrink-0 ml-auto text-[hsl(var(--sidebar-foreground)/0.8)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-accent-foreground))]"
+          aria-label={sidebarOpen ? 'Colapsar menú' : 'Expandir menú'}
+        >
+          {onCloseMobile ? (
+            <X className="h-4 w-4" />
+          ) : (
+            <ChevronLeft className={cn('h-4 w-4 transition-transform', !sidebarOpen && 'rotate-180')} />
+          )}
+        </Button>
+      </div>
+
+      {/* Navegación */}
+      <nav className="flex-1 overflow-y-auto py-3 scrollbar-thin">
+        {groups.map((group) => {
+          const items = group
+            ? NAV_ITEMS.filter((i) => i.group === group)
+            : NAV_ITEMS.filter((i) => !i.group)
+
+          return (
+            <div key={group || '__root'} className="mb-2">
+              {group && sidebarOpen && (
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--sidebar-foreground)/0.5)] px-4 mb-1 mt-2">
+                  {group}
+                </p>
+              )}
+              {items.map((item) => (
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  end={item.href === '/'}
+                  onClick={onCloseMobile}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 px-4 py-2.5 mx-1 rounded-md text-sm transition-colors',
+                      isActive
+                        ? 'bg-[hsl(var(--sidebar-accent))] text-[hsl(var(--sidebar-accent-foreground))] font-medium'
+                        : 'text-[hsl(var(--sidebar-foreground)/0.8)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-accent-foreground))]',
+                      !sidebarOpen && 'justify-center px-2'
+                    )
+                  }
+                  title={!sidebarOpen ? item.label : undefined}
+                >
+                  <item.icon className="h-5 w-5 shrink-0" />
+                  {sidebarOpen && <span className="truncate">{item.label}</span>}
+                </NavLink>
+              ))}
+            </div>
+          )
+        })}
+      </nav>
+
+      {/* Footer: cerrar sesión */}
+      <div className="border-t border-[hsl(var(--sidebar-border))] p-2 shrink-0">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={handleLogout}
+          className={cn(
+            'flex items-center gap-3 w-full px-3 py-2.5 rounded-md text-sm text-[hsl(var(--sidebar-foreground)/0.7)] hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-accent-foreground))] transition-colors',
+            !sidebarOpen && 'justify-center px-2'
+          )}
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          {sidebarOpen && <span>Cerrar sesión</span>}
+        </Button>
+      </div>
+    </aside>
+  )
+}

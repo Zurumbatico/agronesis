@@ -1,0 +1,270 @@
+import { useState } from 'react'
+import { Plus, Search, Pencil, Trash2, Phone, MapPin, LayoutGrid, List } from 'lucide-react'
+import { useAgricultores } from './hooks/useAgricultores'
+import { AgricultorForm } from './AgricultorForm'
+import { getAgricultor } from '@/services/agricultores.service'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { ErrorMessage } from '@/components/shared/ErrorMessage'
+import { LoadingPage, Spinner } from '@/components/shared/Spinner'
+import { EstadoActivoBadge } from '@/components/shared/StatusBadge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import type { Agricultor } from '@/types/models'
+import type { AgricultorFormData } from '@/utils/validators'
+
+function formatHectareas(value: number) {
+  return Number(value).toLocaleString('es-PE', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
+}
+
+export default function AgricultoresPage() {
+  const { agricultores, loading, error, reload, crear, actualizar, eliminar } = useAgricultores()
+  const [busqueda, setBusqueda] = useState('')
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [editando, setEditando] = useState<Agricultor | null>(null)
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [dialogLoading, setDialogLoading] = useState(false)
+  const [dialogError, setDialogError] = useState<string | null>(null)
+  const [vista, setVista] = useState<'cards' | 'lista'>('cards')
+
+  const filtrados = agricultores.filter((a) =>
+    `${a.nombre} ${a.apellido} ${a.codigo} ${a.dni ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
+  )
+
+  const abrirNuevo = () => {
+    setEditando(null)
+    setEditandoId(null)
+    setDialogError(null)
+    setDialogLoading(false)
+    setDialogOpen(true)
+  }
+
+  const abrirEditar = async (a: Agricultor) => {
+    setDialogOpen(true)
+    setEditando(null)
+    setEditandoId(a.id)
+    setDialogError(null)
+    setDialogLoading(true)
+
+    try {
+      const detalle = await getAgricultor(a.id)
+      setEditando(detalle)
+    } catch (e) {
+      setDialogError((e as Error).message)
+    } finally {
+      setDialogLoading(false)
+    }
+  }
+
+  const cerrar = () => {
+    setDialogOpen(false)
+    setEditando(null)
+    setEditandoId(null)
+    setDialogError(null)
+    setDialogLoading(false)
+  }
+
+  const handleSubmit = async (data: AgricultorFormData) => {
+    if (editandoId) await actualizar(editandoId, data)
+    else await crear(data)
+    cerrar()
+  }
+
+  const handleEliminar = async (id: string) => {
+    if (!confirm('¿Eliminar este agricultor? Esta acción no se puede deshacer.')) return
+    await eliminar(id)
+  }
+
+  if (loading) return <LoadingPage />
+  if (error) return <ErrorMessage message={error} onRetry={reload} />
+
+  return (
+    <div>
+      <PageHeader
+        title="Agricultores"
+        actions={
+          <Button onClick={abrirNuevo}>
+            <Plus className="h-4 w-4" /> Nuevo
+          </Button>
+        }
+      />
+
+      {/* Búsqueda */}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre, código o DNI..."
+            className="pl-9"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2 self-end sm:self-auto">
+          <Button
+            type="button"
+            size="sm"
+            variant={vista === 'cards' ? 'secondary' : 'outline'}
+            onClick={() => setVista('cards')}
+          >
+            <LayoutGrid className="h-4 w-4" /> Tarjetas
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={vista === 'lista' ? 'secondary' : 'outline'}
+            onClick={() => setVista('lista')}
+          >
+            <List className="h-4 w-4" /> Lista
+          </Button>
+        </div>
+      </div>
+
+      {/* Lista */}
+      {filtrados.length === 0 ? (
+        <EmptyState
+          title={busqueda ? 'Sin resultados' : 'No hay agricultores registrados'}
+          description={busqueda ? 'Prueba con otro término de búsqueda.' : 'Agrega el primer agricultor.'}
+          action={!busqueda ? <Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Agregar agricultor</Button> : undefined}
+        />
+      ) : vista === 'cards' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {filtrados.map((a) => (
+            <div key={a.id} className="bg-card border rounded-xl p-4 flex flex-col gap-3 hover:shadow-md transition-shadow">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">{a.apellido}, {a.nombre}</p>
+                  <p className="text-xs text-muted-foreground">{a.codigo}{a.dni ? ` · DNI: ${a.dni}` : ''}</p>
+                </div>
+                <EstadoActivoBadge estado={a.estado} />
+              </div>
+
+              <div className="rounded-lg bg-muted/40 px-3 py-2">
+                {a.hectareas && a.hectareas.length > 0 ? (
+                  <>
+                    <p className="text-xs font-medium text-foreground">
+                      Total: {formatHectareas(a.hectareas.reduce((acc, item) => acc + Number(item.hectareas || 0), 0))} ha
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground break-words">
+                      {a.hectareas
+                        .map((item) => `${item.producto?.nombre ?? 'Producto'}: ${formatHectareas(Number(item.hectareas || 0))} ha`)
+                        .join(' · ')}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Sin hectáreas registradas</p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                {a.telefono && (
+                  <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{a.telefono}</span>
+                )}
+                {a.ubicacion && (
+                  <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{a.ubicacion}</span>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-1 border-t">
+                <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(a)}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                </Button>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleEliminar(a.id)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-xl border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Agricultor</TableHead>
+                <TableHead>Contacto</TableHead>
+                <TableHead>Ubicación</TableHead>
+                <TableHead>Hectáreas</TableHead>
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtrados.map((a) => {
+                const totalHa = a.hectareas?.reduce((acc, item) => acc + Number(item.hectareas || 0), 0) ?? 0
+                const detalleHa = a.hectareas?.map((item) => `${item.producto?.nombre ?? 'Producto'}: ${formatHectareas(Number(item.hectareas || 0))} ha`).join(' · ') ?? ''
+
+                return (
+                  <TableRow key={a.id}>
+                    <TableCell>
+                      <p className="font-medium">{a.apellido}, {a.nombre}</p>
+                      <p className="text-xs text-muted-foreground">{a.codigo}{a.dni ? ` · DNI: ${a.dni}` : ''}</p>
+                    </TableCell>
+                    <TableCell>{a.telefono || '—'}</TableCell>
+                    <TableCell className="max-w-[260px] truncate">{a.ubicacion || '—'}</TableCell>
+                    <TableCell className="max-w-[360px]">
+                      {a.hectareas && a.hectareas.length > 0 ? (
+                        <div>
+                          <p className="text-xs font-medium">Total: {formatHectareas(totalHa)} ha</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{detalleHa}</p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Sin registro</p>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <EstadoActivoBadge estado={a.estado} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => abrirEditar(a)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleEliminar(a.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Dialog formulario */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editandoId ? 'Editar agricultor' : 'Nuevo agricultor'}</DialogTitle>
+          </DialogHeader>
+          {dialogLoading ? (
+            <div className="flex min-h-40 items-center justify-center">
+              <Spinner />
+            </div>
+          ) : dialogError ? (
+            <ErrorMessage message={dialogError} onRetry={editandoId ? () => {
+              const current = agricultores.find((a) => a.id === editandoId)
+              if (current) void abrirEditar(current)
+            } : undefined} />
+          ) : (
+            <AgricultorForm
+              defaultValues={editando ?? undefined}
+              onSubmit={handleSubmit}
+              onCancel={cerrar}
+              isEditing={!!editandoId}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
