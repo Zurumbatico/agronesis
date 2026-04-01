@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Search, Pencil, Trash2, LayoutGrid, List } from 'lucide-react'
 import { useProductos } from './hooks/useProductos'
 import { ProductoForm } from './ProductoForm'
@@ -8,6 +8,7 @@ import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CALIDAD_PRODUCTO_CONFIG, TIPO_PRODUCCION_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
@@ -20,10 +21,22 @@ export default function ProductosPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<Producto | null>(null)
   const [vista, setVista] = useState<'cards' | 'lista'>('lista')
+  const [paginaActual, setPaginaActual] = useState(1)
+  const [tamanoPagina, setTamanoPagina] = useState(12)
 
   const filtrados = productos.filter((p) =>
     `${p.nombre} ${p.codigo}`.toLowerCase().includes(busqueda.toLowerCase())
   )
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / tamanoPagina))
+  const paginaSegura = Math.min(paginaActual, totalPaginas)
+  const inicio = (paginaSegura - 1) * tamanoPagina
+  const fin = inicio + tamanoPagina
+  const paginados = filtrados.slice(inicio, fin)
+
+  useEffect(() => {
+    if (paginaActual > totalPaginas) setPaginaActual(totalPaginas)
+  }, [paginaActual, totalPaginas])
 
   const abrirNuevo = () => { setEditando(null); setDialogOpen(true) }
   const abrirEditar = (p: Producto) => { setEditando(p); setDialogOpen(true) }
@@ -54,9 +67,34 @@ export default function ProductosPage() {
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar..." className="pl-9" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+          <Input
+            placeholder="Buscar..."
+            className="pl-9"
+            value={busqueda}
+            onChange={(e) => {
+              setBusqueda(e.target.value)
+              setPaginaActual(1)
+            }}
+          />
         </div>
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          <Select
+            value={String(tamanoPagina)}
+            onValueChange={(value) => {
+              setTamanoPagina(Number(value))
+              setPaginaActual(1)
+            }}
+          >
+            <SelectTrigger className="w-[110px]">
+              <SelectValue placeholder="Tamano" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="6">6 / pag</SelectItem>
+              <SelectItem value="12">12 / pag</SelectItem>
+              <SelectItem value="24">24 / pag</SelectItem>
+              <SelectItem value="48">48 / pag</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             type="button"
             size="sm"
@@ -80,7 +118,7 @@ export default function ProductosPage() {
         <EmptyState title="Sin productos" action={!busqueda ? <Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Agregar</Button> : undefined} />
       ) : vista === 'cards' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {filtrados.map((p) => (
+          {paginados.map((p) => (
             <div key={p.id} className="bg-card border rounded-xl p-4 flex flex-col gap-2 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -112,7 +150,7 @@ export default function ProductosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtrados.map((p) => (
+              {paginados.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell>
                     <p className="font-medium">{p.nombre}</p>
@@ -135,6 +173,37 @@ export default function ProductosPage() {
               ))}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      {filtrados.length > 0 && (
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {inicio + 1}-{Math.min(fin, filtrados.length)} de {filtrados.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPaginaActual((prev) => Math.max(prev - 1, 1))}
+              disabled={paginaSegura === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Pagina {paginaSegura} de {totalPaginas}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPaginaActual((prev) => Math.min(prev + 1, totalPaginas))}
+              disabled={paginaSegura === totalPaginas}
+            >
+              Siguiente
+            </Button>
+          </div>
         </div>
       )}
 

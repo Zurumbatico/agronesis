@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Search, Pencil, Trash2, MapPin, User, List, LayoutGrid } from 'lucide-react'
 import { useCentrosAcopio } from './hooks/useCentrosAcopio'
 import { CentroAcopioForm } from './CentroAcopioForm'
@@ -9,6 +9,7 @@ import { LoadingPage } from '@/components/shared/Spinner'
 import { EstadoActivoBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { CentroAcopio } from '@/types/models'
@@ -20,10 +21,22 @@ export default function CentrosAcopioPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<CentroAcopio | null>(null)
   const [vista, setVista] = useState<'lista' | 'cards'>('lista')
+  const [paginaActual, setPaginaActual] = useState(1)
+  const [tamanoPagina, setTamanoPagina] = useState(12)
 
   const filtrados = centros.filter((c) =>
     `${c.nombre} ${c.codigo} ${c.responsable ?? ''} ${c.ubicacion ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
   )
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / tamanoPagina))
+  const paginaSegura = Math.min(paginaActual, totalPaginas)
+  const inicio = (paginaSegura - 1) * tamanoPagina
+  const fin = inicio + tamanoPagina
+  const paginados = filtrados.slice(inicio, fin)
+
+  useEffect(() => {
+    if (paginaActual > totalPaginas) setPaginaActual(totalPaginas)
+  }, [paginaActual, totalPaginas])
 
   const abrirNuevo = () => { setEditando(null); setDialogOpen(true) }
   const abrirEditar = (c: CentroAcopio) => { setEditando(c); setDialogOpen(true) }
@@ -53,10 +66,30 @@ export default function CentrosAcopioPage() {
             placeholder="Buscar por nombre, código..."
             className="pl-9"
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
+            onChange={(e) => {
+              setBusqueda(e.target.value)
+              setPaginaActual(1)
+            }}
           />
         </div>
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          <Select
+            value={String(tamanoPagina)}
+            onValueChange={(value) => {
+              setTamanoPagina(Number(value))
+              setPaginaActual(1)
+            }}
+          >
+            <SelectTrigger className="w-[110px]">
+              <SelectValue placeholder="Tamano" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="6">6 / pag</SelectItem>
+              <SelectItem value="12">12 / pag</SelectItem>
+              <SelectItem value="24">24 / pag</SelectItem>
+              <SelectItem value="48">48 / pag</SelectItem>
+            </SelectContent>
+          </Select>
           <Button type="button" size="sm" variant={vista === 'lista' ? 'secondary' : 'outline'} onClick={() => setVista('lista')}>
             <List className="h-4 w-4" /> Lista
           </Button>
@@ -85,7 +118,7 @@ export default function CentrosAcopioPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtrados.map((c) => (
+              {paginados.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell>
                     <p className="font-medium">{c.nombre}</p>
@@ -111,7 +144,7 @@ export default function CentrosAcopioPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {filtrados.map((c) => (
+          {paginados.map((c) => (
             <div key={c.id} className="bg-card border rounded-xl p-4 flex flex-col gap-2 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-2">
                 <div>
@@ -130,6 +163,37 @@ export default function CentrosAcopioPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {filtrados.length > 0 && (
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {inicio + 1}-{Math.min(fin, filtrados.length)} de {filtrados.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPaginaActual((prev) => Math.max(prev - 1, 1))}
+              disabled={paginaSegura === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Pagina {paginaSegura} de {totalPaginas}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPaginaActual((prev) => Math.min(prev + 1, totalPaginas))}
+              disabled={paginaSegura === totalPaginas}
+            >
+              Siguiente
+            </Button>
+          </div>
         </div>
       )}
 
