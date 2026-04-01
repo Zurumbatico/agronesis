@@ -20,9 +20,12 @@ export function PersonalForm({ defaultValues, onSubmit, onCancel, isEditing }: P
   const normalizedDefaults: Partial<PersonalFormInput> = {
     estado: 'activo',
     tipo: 'clasificador',
+    fecha_alta: new Date().toISOString().slice(0, 10),
     ...defaultValues,
     dni: defaultValues?.dni ?? '',
     telefono: defaultValues?.telefono ?? '',
+    numero_cuenta: defaultValues?.numero_cuenta ?? '',
+    fecha_alta: defaultValues?.fecha_alta ?? new Date().toISOString().slice(0, 10),
   }
 
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<PersonalFormInput>({
@@ -62,6 +65,12 @@ export function PersonalForm({ defaultValues, onSubmit, onCancel, isEditing }: P
         </FormField>
         <FormField label="Teléfono" error={errors.telefono?.message}>
           <Input placeholder="987 654 321" {...register('telefono')} />
+        </FormField>
+        <FormField label="N° cuenta" error={errors.numero_cuenta?.message}>
+          <Input placeholder="0011-0234-0001234567" {...register('numero_cuenta')} />
+        </FormField>
+        <FormField label="Fecha de alta" error={errors.fecha_alta?.message} required>
+          <Input type="date" {...register('fecha_alta')} />
         </FormField>
         <FormField label="Tipo" error={errors.tipo?.message} required>
           <Controller name="tipo" control={control} render={({ field }) => (

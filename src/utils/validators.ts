@@ -64,33 +64,18 @@ export const agricultorSchema = z.object({
   apellido:  nombreSchema,
   dni:       dniSchema,
   telefono:  telefonoSchema,
+  numero_cuenta: z.string().max(50, 'Máximo 50 caracteres').optional().or(z.literal('')).transform((v) => v || null),
+  fecha_alta: z.string().min(1, 'Ingrese la fecha de alta'),
   ubicacion: z.string().max(200).optional().or(z.literal('')).transform((v) => v || null),
   estado:    z.enum(['activo', 'inactivo']),
-  hectareas: z.array(agricultorHectareaSchema).default([]),
-}).superRefine((data, ctx) => {
-  const productos = new Map<string, number>()
-
-  data.hectareas.forEach((item, index) => {
-    const prevIndex = productos.get(item.producto_id)
-    if (prevIndex !== undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Cada producto solo puede registrarse una vez',
-        path: ['hectareas', index, 'producto_id'],
-      })
-    }
-
-    productos.set(item.producto_id, index)
-  })
 })
 
 export const productoSchema = z.object({
-  codigo:         codigoSchema,
-  nombre:         nombreSchema,
-  tipo:           z.enum(['holantao', 'snow_peas', 'otro']),
-  unidad_medida:  z.enum(['kg', 'caja', 'cubeta']),
-  precio_base_kg: precioSchema,
-  estado:         z.enum(['activo', 'inactivo']),
+  codigo:          codigoSchema,
+  nombre:          nombreSchema,
+  variedad:        z.enum(['snow_peas', 'sugar']),
+  calidad:         z.enum(['cat1', 'cat2']),
+  tipo_produccion: z.enum(['organico', 'convencional']),
 })
 
 export const personalCampoSchema = z.object({
@@ -99,6 +84,8 @@ export const personalCampoSchema = z.object({
   apellido:       nombreSchema,
   dni:            dniSchema,
   telefono:       telefonoSchema,
+  numero_cuenta:  z.string().max(50, 'Máximo 50 caracteres').optional().or(z.literal('')).transform((v) => v || null),
+  fecha_alta:     z.string().min(1, 'Ingrese la fecha de alta'),
   tipo:           z.enum(['clasificador', 'cosechador', 'empacador', 'supervisor']),
   tarifa_destajo: precioSchema,
   estado:         z.enum(['activo', 'inactivo']),

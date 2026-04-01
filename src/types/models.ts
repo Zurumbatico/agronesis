@@ -9,6 +9,8 @@ export interface Agricultor extends BaseEntity {
   apellido: string
   dni: string | null
   telefono: string | null
+  numero_cuenta: string | null
+  fecha_alta: string
   ubicacion: string | null
   estado: EstadoActivo
   hectareas?: AgricultorHectarea[]
@@ -30,16 +32,16 @@ export type AgricultorHectareaUpdate = Partial<AgricultorHectareaInsert>
 // ─────────────────────────────────────────────
 // PRODUCTO
 // ─────────────────────────────────────────────
-export type TipoProducto = 'holantao' | 'snow_peas' | 'otro'
-export type UnidadMedida = 'kg' | 'caja' | 'cubeta'
+export type VariedadProducto = 'snow_peas' | 'sugar'
+export type CalidadProducto = 'cat1' | 'cat2'
+export type TipoProduccion = 'organico' | 'convencional'
 
 export interface Producto extends BaseEntity {
   codigo: string
   nombre: string
-  tipo: TipoProducto
-  unidad_medida: UnidadMedida
-  precio_base_kg: number
-  estado: EstadoActivo
+  variedad: VariedadProducto
+  calidad: CalidadProducto
+  tipo_produccion: TipoProduccion
 }
 
 export type ProductoInsert = Omit<Producto, keyof BaseEntity>
@@ -56,6 +58,8 @@ export interface PersonalCampo extends BaseEntity {
   apellido: string
   dni: string | null
   telefono: string | null
+  numero_cuenta: string | null
+  fecha_alta: string
   tipo: TipoPersonal
   tarifa_destajo: number
   estado: EstadoActivo

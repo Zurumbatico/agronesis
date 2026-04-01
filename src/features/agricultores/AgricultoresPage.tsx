@@ -17,13 +17,6 @@ import {
 import type { Agricultor } from '@/types/models'
 import type { AgricultorFormData } from '@/utils/validators'
 
-function formatHectareas(value: number) {
-  return Number(value).toLocaleString('es-PE', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })
-}
-
 export default function AgricultoresPage() {
   const { agricultores, loading, error, reload, crear, actualizar, eliminar } = useAgricultores()
   const [busqueda, setBusqueda] = useState('')
@@ -32,10 +25,10 @@ export default function AgricultoresPage() {
   const [editandoId, setEditandoId] = useState<string | null>(null)
   const [dialogLoading, setDialogLoading] = useState(false)
   const [dialogError, setDialogError] = useState<string | null>(null)
-  const [vista, setVista] = useState<'cards' | 'lista'>('cards')
+  const [vista, setVista] = useState<'cards' | 'lista'>('lista')
 
   const filtrados = agricultores.filter((a) =>
-    `${a.nombre} ${a.apellido} ${a.codigo} ${a.dni ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
+    `${a.nombre} ${a.apellido} ${a.codigo} ${a.dni ?? ''} ${a.numero_cuenta ?? ''} ${a.fecha_alta ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
   )
 
   const abrirNuevo = () => {
@@ -111,18 +104,18 @@ export default function AgricultoresPage() {
           <Button
             type="button"
             size="sm"
-            variant={vista === 'cards' ? 'secondary' : 'outline'}
-            onClick={() => setVista('cards')}
-          >
-            <LayoutGrid className="h-4 w-4" /> Tarjetas
-          </Button>
-          <Button
-            type="button"
-            size="sm"
             variant={vista === 'lista' ? 'secondary' : 'outline'}
             onClick={() => setVista('lista')}
           >
             <List className="h-4 w-4" /> Lista
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={vista === 'cards' ? 'secondary' : 'outline'}
+            onClick={() => setVista('cards')}
+          >
+            <LayoutGrid className="h-4 w-4" /> Tarjetas
           </Button>
         </div>
       </div>
@@ -146,26 +139,12 @@ export default function AgricultoresPage() {
                 <EstadoActivoBadge estado={a.estado} />
               </div>
 
-              <div className="rounded-lg bg-muted/40 px-3 py-2">
-                {a.hectareas && a.hectareas.length > 0 ? (
-                  <>
-                    <p className="text-xs font-medium text-foreground">
-                      Total: {formatHectareas(a.hectareas.reduce((acc, item) => acc + Number(item.hectareas || 0), 0))} ha
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground break-words">
-                      {a.hectareas
-                        .map((item) => `${item.producto?.nombre ?? 'Producto'}: ${formatHectareas(Number(item.hectareas || 0))} ha`)
-                        .join(' · ')}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Sin hectáreas registradas</p>
-                )}
-              </div>
-
               <div className="flex flex-col gap-1 text-sm text-muted-foreground">
                 {a.telefono && (
                   <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{a.telefono}</span>
+                )}
+                {a.numero_cuenta && (
+                  <span>N° cuenta: {a.numero_cuenta}</span>
                 )}
                 {a.ubicacion && (
                   <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{a.ubicacion}</span>
@@ -189,52 +168,42 @@ export default function AgricultoresPage() {
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead>Agricultor</TableHead>
+                <TableHead>DNI</TableHead>
                 <TableHead>Contacto</TableHead>
+                <TableHead>N° cuenta</TableHead>
+                <TableHead>Fecha alta</TableHead>
                 <TableHead>Ubicación</TableHead>
-                <TableHead>Hectáreas</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtrados.map((a) => {
-                const totalHa = a.hectareas?.reduce((acc, item) => acc + Number(item.hectareas || 0), 0) ?? 0
-                const detalleHa = a.hectareas?.map((item) => `${item.producto?.nombre ?? 'Producto'}: ${formatHectareas(Number(item.hectareas || 0))} ha`).join(' · ') ?? ''
-
-                return (
-                  <TableRow key={a.id}>
-                    <TableCell>
-                      <p className="font-medium">{a.apellido}, {a.nombre}</p>
-                      <p className="text-xs text-muted-foreground">{a.codigo}{a.dni ? ` · DNI: ${a.dni}` : ''}</p>
-                    </TableCell>
-                    <TableCell>{a.telefono || '—'}</TableCell>
-                    <TableCell className="max-w-[260px] truncate">{a.ubicacion || '—'}</TableCell>
-                    <TableCell className="max-w-[360px]">
-                      {a.hectareas && a.hectareas.length > 0 ? (
-                        <div>
-                          <p className="text-xs font-medium">Total: {formatHectareas(totalHa)} ha</p>
-                          <p className="text-xs text-muted-foreground line-clamp-2">{detalleHa}</p>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">Sin registro</p>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <EstadoActivoBadge estado={a.estado} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => abrirEditar(a)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleEliminar(a.id)}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
+              {filtrados.map((a) => (
+                <TableRow key={a.id}>
+                  <TableCell>
+                    <p className="font-medium">{a.apellido}, {a.nombre}</p>
+                    <p className="text-xs text-muted-foreground">{a.codigo}</p>
+                  </TableCell>
+                  <TableCell>{a.dni || '—'}</TableCell>
+                  <TableCell>{a.telefono || '—'}</TableCell>
+                  <TableCell>{a.numero_cuenta || '—'}</TableCell>
+                  <TableCell>{a.fecha_alta || '—'}</TableCell>
+                  <TableCell className="max-w-[260px] truncate">{a.ubicacion || '—'}</TableCell>
+                  <TableCell>
+                    <EstadoActivoBadge estado={a.estado} />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => abrirEditar(a)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleEliminar(a.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>

@@ -20,6 +20,8 @@ export interface Database {
           apellido: string
           dni: string | null
           telefono: string | null
+          numero_cuenta: string | null
+          fecha_alta: string
           ubicacion: string | null
           estado: 'activo' | 'inactivo'
         }
@@ -35,10 +37,9 @@ export interface Database {
           created_by: string
           codigo: string
           nombre: string
-          tipo: 'holantao' | 'snow_peas' | 'otro'
-          unidad_medida: 'kg' | 'caja' | 'cubeta'
-          precio_base_kg: number
-          estado: 'activo' | 'inactivo'
+          variedad: 'snow_peas' | 'sugar'
+          calidad: 'cat1' | 'cat2'
+          tipo_produccion: 'organico' | 'convencional'
         }
         Insert: Omit<Database['public']['Tables']['productos']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['productos']['Insert']>
@@ -69,6 +70,8 @@ export interface Database {
           apellido: string
           dni: string | null
           telefono: string | null
+          numero_cuenta: string | null
+          fecha_alta: string
           tipo: 'clasificador' | 'cosechador' | 'empacador' | 'supervisor'
           tarifa_destajo: number
           estado: 'activo' | 'inactivo'

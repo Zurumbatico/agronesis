@@ -1,6 +1,7 @@
 create extension if not exists pgcrypto;
 
 create sequence if not exists public.agricultores_codigo_seq;
+create sequence if not exists public.productos_codigo_seq;
 
 create or replace function public.generate_agricultor_codigo()
 returns text
@@ -42,6 +43,36 @@ begin
 end;
 $$;
 
+create or replace function public.generate_producto_codigo()
+returns text
+language plpgsql
+as $$
+begin
+  return 'PROD-' || lpad(nextval('public.productos_codigo_seq')::text, 6, '0');
+end;
+$$;
+
+create or replace function public.set_producto_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  -- El codigo siempre se define en backend para evitar inconsistencias del frontend.
+  new.codigo := public.generate_producto_codigo();
+  return new;
+end;
+$$;
+
+create or replace function public.protect_producto_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := old.codigo;
+  return new;
+end;
+$$;
+
 create table if not exists public.agricultores (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -52,12 +83,17 @@ create table if not exists public.agricultores (
   apellido text not null,
   dni text null,
   telefono text null,
+  numero_cuenta text null,
+  fecha_alta date not null default current_date,
   ubicacion text null,
   estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
 );
 
 do $$
 begin
+  alter table public.agricultores add column if not exists numero_cuenta text null;
+  alter table public.agricultores add column if not exists fecha_alta date not null default current_date;
+
   if exists (
     select 1 from information_schema.columns
     where table_schema = 'public' and table_name = 'agricultores' and column_name = 'direccion'
@@ -76,13 +112,39 @@ create table if not exists public.productos (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
-  codigo text not null unique,
+  codigo text not null unique default public.generate_producto_codigo(),
   nombre text not null,
-  tipo text not null check (tipo in ('holantao', 'snow_peas', 'otro')),
-  unidad_medida text not null check (unidad_medida in ('kg', 'caja', 'cubeta')),
-  precio_base_kg numeric(12,2) not null default 0,
-  estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
+  variedad text not null default 'snow_peas' check (variedad in ('snow_peas', 'sugar')),
+  calidad text not null default 'cat1' check (calidad in ('cat1', 'cat2')),
+  tipo_produccion text not null default 'convencional' check (tipo_produccion in ('organico', 'convencional'))
 );
+
+alter table public.productos
+  add column if not exists variedad text not null default 'snow_peas';
+alter table public.productos
+  add column if not exists calidad text not null default 'cat1';
+alter table public.productos
+  add column if not exists tipo_produccion text not null default 'convencional';
+alter table public.productos
+  drop column if exists estado;
+
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'productos' and column_name = 'tipo'
+  ) then
+    update public.productos
+      set variedad = case
+        when tipo in ('holantao', 'snow_peas') then 'snow_peas'
+        else 'sugar'
+      end
+    where variedad is null or variedad not in ('snow_peas', 'sugar');
+  end if;
+end;
+$$;
+
+alter table public.productos alter column codigo set default public.generate_producto_codigo();
 
 create table if not exists public.agricultor_producto_hectareas (
   id uuid primary key default gen_random_uuid(),
@@ -147,10 +209,15 @@ create table if not exists public.personal_campo (
   apellido text not null,
   dni text null,
   telefono text null,
+  numero_cuenta text null,
+  fecha_alta date not null default current_date,
   tipo text not null check (tipo in ('clasificador', 'cosechador', 'empacador', 'supervisor')),
   tarifa_destajo numeric(12,2) not null default 0,
   estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
 );
+
+alter table public.personal_campo add column if not exists numero_cuenta text null;
+alter table public.personal_campo add column if not exists fecha_alta date not null default current_date;
 
 create table if not exists public.centros_acopio (
   id uuid primary key default gen_random_uuid(),
@@ -310,6 +377,15 @@ drop trigger if exists trg_agricultores_codigo on public.agricultores;
 create trigger trg_agricultores_codigo before insert on public.agricultores for each row execute function public.set_agricultor_codigo();
 
 alter table public.agricultores alter column codigo set default public.generate_agricultor_codigo();
+
+drop trigger if exists trg_productos_updated_at on public.productos;
+create trigger trg_productos_updated_at before update on public.productos for each row execute function public.set_updated_at();
+
+drop trigger if exists trg_productos_protect_codigo on public.productos;
+create trigger trg_productos_protect_codigo before update on public.productos for each row execute function public.protect_producto_codigo();
+
+drop trigger if exists trg_productos_codigo on public.productos;
+create trigger trg_productos_codigo before insert on public.productos for each row execute function public.set_producto_codigo();
 
 do $$
 declare

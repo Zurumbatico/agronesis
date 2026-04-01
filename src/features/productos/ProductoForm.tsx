@@ -16,60 +16,75 @@ interface ProductoFormProps {
 export function ProductoForm({ defaultValues, onSubmit, onCancel, isEditing }: ProductoFormProps) {
   const { register, handleSubmit, control, formState: { errors, isSubmitting } } = useForm<ProductoFormData>({
     resolver: zodResolver(productoSchema),
-    defaultValues: { estado: 'activo', unidad_medida: 'kg', tipo: 'holantao', ...defaultValues },
+    defaultValues: { codigo: defaultValues?.codigo ?? 'AUTO', variedad: 'snow_peas', calidad: 'cat1', tipo_produccion: 'convencional', ...defaultValues },
   })
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Código" error={errors.codigo?.message} required>
-          <Input placeholder="PROD-001" {...register('codigo')} />
-        </FormField>
-
-        <FormField label="Estado" error={errors.estado?.message} required>
-          <Controller name="estado" control={control} render={({ field }) => (
-            <Select onValueChange={field.onChange} value={field.value}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="activo">Activo</SelectItem>
-                <SelectItem value="inactivo">Inactivo</SelectItem>
-              </SelectContent>
-            </Select>
-          )} />
+          {isEditing ? (
+            <>
+              <Input
+                value={defaultValues?.codigo ?? ''}
+                disabled
+                placeholder="PROD-000001"
+                className="cursor-not-allowed border-dashed bg-muted text-muted-foreground disabled:opacity-100"
+              />
+              <Input type="hidden" {...register('codigo')} />
+            </>
+          ) : (
+            <>
+              <Input
+                readOnly
+                aria-disabled="true"
+                value=""
+                placeholder="Se asigna automáticamente al guardar"
+                className="cursor-not-allowed border-dashed bg-muted text-muted-foreground placeholder:text-muted-foreground/90"
+              />
+              <Input type="hidden" {...register('codigo')} />
+            </>
+          )}
         </FormField>
 
         <FormField label="Nombre" error={errors.nombre?.message} required className="sm:col-span-2">
           <Input placeholder="Nombre del producto" {...register('nombre')} />
         </FormField>
 
-        <FormField label="Tipo" error={errors.tipo?.message} required>
-          <Controller name="tipo" control={control} render={({ field }) => (
+        <FormField label="Variedad" error={errors.variedad?.message} required>
+          <Controller name="variedad" control={control} render={({ field }) => (
             <Select onValueChange={field.onChange} value={field.value}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="holantao">Holantao</SelectItem>
                 <SelectItem value="snow_peas">Snow Peas</SelectItem>
-                <SelectItem value="otro">Otro</SelectItem>
+                <SelectItem value="sugar">Sugar</SelectItem>
               </SelectContent>
             </Select>
           )} />
         </FormField>
 
-        <FormField label="Unidad de medida" error={errors.unidad_medida?.message} required>
-          <Controller name="unidad_medida" control={control} render={({ field }) => (
+        <FormField label="Calidad" error={errors.calidad?.message} required>
+          <Controller name="calidad" control={control} render={({ field }) => (
             <Select onValueChange={field.onChange} value={field.value}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="kg">Kilogramo (kg)</SelectItem>
-                <SelectItem value="caja">Caja</SelectItem>
-                <SelectItem value="cubeta">Cubeta</SelectItem>
+                <SelectItem value="cat1">CAT 1</SelectItem>
+                <SelectItem value="cat2">CAT 2</SelectItem>
               </SelectContent>
             </Select>
           )} />
         </FormField>
 
-        <FormField label="Precio base (S/. / kg)" error={errors.precio_base_kg?.message} required className="sm:col-span-2">
-          <Input type="number" step="0.01" min="0" placeholder="0.00" {...register('precio_base_kg', { valueAsNumber: true })} />
+        <FormField label="Tipo de producción" error={errors.tipo_produccion?.message} required className="sm:col-span-2">
+          <Controller name="tipo_produccion" control={control} render={({ field }) => (
+            <Select onValueChange={field.onChange} value={field.value}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="organico">Organico</SelectItem>
+                <SelectItem value="convencional">Convencional</SelectItem>
+              </SelectContent>
+            </Select>
+          )} />
         </FormField>
       </div>
 

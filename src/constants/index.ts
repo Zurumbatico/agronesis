@@ -21,10 +21,19 @@ export const ESTADO_LIQUIDACION_CONFIG = {
   pagada:     { label: 'Pagada',     color: 'bg-green-100 text-green-800' },
 } as const
 
-export const TIPO_PRODUCTO_CONFIG = {
-  holantao:   { label: 'Holantao'   },
-  snow_peas:  { label: 'Snow Peas'  },
-  otro:       { label: 'Otro'       },
+export const VARIEDAD_PRODUCTO_CONFIG = {
+  snow_peas:   { label: 'Snow Peas' },
+  sugar:       { label: 'Sugar' },
+} as const
+
+export const CALIDAD_PRODUCTO_CONFIG = {
+  cat1: { label: 'CAT 1' },
+  cat2: { label: 'CAT 2' },
+} as const
+
+export const TIPO_PRODUCCION_CONFIG = {
+  organico: { label: 'Organico' },
+  convencional: { label: 'Convencional' },
 } as const
 
 export const TIPO_PERSONAL_CONFIG = {
