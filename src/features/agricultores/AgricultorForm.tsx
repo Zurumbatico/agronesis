@@ -22,7 +22,6 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
   const normalizedDefaults = useMemo<Partial<AgricultorFormInput>>(() => ({
     estado: 'activo',
     codigo: defaultValues?.codigo ?? 'AUTO',
-    fecha_alta: new Date().toISOString().slice(0, 10),
     ...defaultValues,
     dni: defaultValues?.dni ?? '',
     telefono: defaultValues?.telefono ?? '',
