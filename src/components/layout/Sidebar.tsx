@@ -1,8 +1,8 @@
 import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Users, Package, UserCheck, Warehouse,
-  Layers, Receipt, ClipboardList, BookOpen,
+  LayoutDashboard, Users, Package, Warehouse,
+  Layers, Receipt,
   LogOut, ChevronLeft, Leaf, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -23,15 +23,12 @@ const NAV_ITEMS: NavItem[] = [
   // Maestros
   { label: 'Agricultores',       href: ROUTES.AGRICULTORES,          icon: Users,         group: 'Maestros' },
   { label: 'Productos',          href: ROUTES.PRODUCTOS,             icon: Package,       group: 'Maestros' },
-  { label: 'Personal de Campo',  href: ROUTES.PERSONAL,              icon: UserCheck,     group: 'Maestros' },
   { label: 'Centros de Acopio',  href: ROUTES.CENTROS_ACOPIO,        icon: Warehouse,     group: 'Maestros' },
   // Operaciones
   { label: 'Lotes',              href: ROUTES.LOTES,                 icon: Layers,        group: 'Operaciones' },
-  { label: 'Actividades',        href: ROUTES.ACTIVIDADES_PERSONAL,  icon: ClipboardList, group: 'Operaciones' },
   { label: 'Cubetas',            href: ROUTES.CUBETAS,               icon: Package,       group: 'Operaciones' },
   // Liquidaciones
   { label: 'Liq. Agricultores',  href: ROUTES.LIQUIDACIONES_AGRI,    icon: Receipt,       group: 'Liquidaciones' },
-  { label: 'Liq. Personal',      href: ROUTES.LIQUIDACIONES_PERSONAL,icon: BookOpen,      group: 'Liquidaciones' },
 ]
 
 // Agrupar ítems

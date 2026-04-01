@@ -108,6 +108,8 @@ export interface Database {
           centro_acopio_id: string
           fecha_ingreso: string
           peso_bruto_kg: number
+          peso_tara_kg: number
+          peso_neto_kg: number
           num_cubetas: number
           observaciones: string | null
           estado: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'en_despacho' | 'despachado' | 'liquidado'
@@ -123,14 +125,23 @@ export interface Database {
           updated_at: string
           created_by: string
           lote_id: string
-          personal_id: string
+          personal_id: string | null
           categoria: 'primera' | 'segunda' | 'descarte'
           peso_kg: number
           num_cajas: number
           fecha_clasificacion: string
           observaciones: string | null
         }
-        Insert: Omit<Database['public']['Tables']['clasificaciones']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: {
+          created_by: string
+          lote_id: string
+          personal_id?: string | null
+          categoria: 'primera' | 'segunda' | 'descarte'
+          peso_kg: number
+          num_cajas: number
+          fecha_clasificacion: string
+          observaciones: string | null
+        }
         Update: Partial<Database['public']['Tables']['clasificaciones']['Insert']>
         Relationships: []
       }

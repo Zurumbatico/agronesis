@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { usePersonal } from '@/features/personal/hooks/usePersonal'
 import { useAuthStore } from '@/store/auth.store'
 import { formatPeso } from '@/utils/formatters'
 import { calcularPesoTotalClasificado, validarPesoClasificacion } from '@/utils/business-rules'
@@ -27,7 +26,6 @@ export default function ClasificarLotePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuthStore()
-  const { personal } = usePersonal()
   const [lote, setLote] = useState<Lote | null>(null)
   const [clasificaciones, setClasificaciones] = useState<Clasificacion[]>([])
   const [loading, setLoading] = useState(true)
@@ -59,7 +57,7 @@ export default function ClasificarLotePage() {
     if (!lote || !user) return
 
     const pesoYa = calcularPesoTotalClasificado(clasificaciones)
-    const errPeso = validarPesoClasificacion(lote.peso_bruto_kg, pesoYa, data.peso_kg)
+    const errPeso = validarPesoClasificacion(lote.peso_neto_kg, pesoYa, data.peso_kg)
     if (errPeso) { setErrorPeso(errPeso); return }
 
     setErrorPeso(null)
@@ -86,7 +84,6 @@ export default function ClasificarLotePage() {
     navigate(`/lotes/${id}`)
   }
 
-  const personalActivo = personal.filter((p) => p.estado === 'activo')
   const pesoClasificado = calcularPesoTotalClasificado(clasificaciones)
 
   if (loading) return <LoadingPage />
@@ -110,7 +107,7 @@ export default function ClasificarLotePage() {
         <CardContent className="pt-4 grid grid-cols-3 gap-2 text-sm">
           <div><p className="text-muted-foreground text-xs">Peso bruto</p><p className="font-bold">{formatPeso(lote.peso_bruto_kg)}</p></div>
           <div><p className="text-muted-foreground text-xs">Clasificado</p><p className="font-bold text-agro-green">{formatPeso(pesoClasificado)}</p></div>
-          <div><p className="text-muted-foreground text-xs">Saldo</p><p className="font-bold">{formatPeso(lote.peso_bruto_kg - pesoClasificado)}</p></div>
+          <div><p className="text-muted-foreground text-xs">Saldo neto</p><p className="font-bold">{formatPeso(lote.peso_neto_kg - pesoClasificado)}</p></div>
         </CardContent>
       </Card>
 
@@ -122,19 +119,6 @@ export default function ClasificarLotePage() {
             <Input type="hidden" {...register('lote_id')} value={id} />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField label="Personal" error={errors.personal_id?.message} required>
-                <Controller name="personal_id" control={control} render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value ?? ''}>
-                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                    <SelectContent>
-                      {personalActivo.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.apellido}, {p.nombre}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )} />
-              </FormField>
-
               <FormField label="Categoría" error={errors.categoria?.message} required>
                 <Controller name="categoria" control={control} render={({ field }) => (
                   <Select onValueChange={field.onChange} value={field.value}>
@@ -182,8 +166,6 @@ export default function ClasificarLotePage() {
             {clasificaciones.map((c) => (
               <div key={c.id} className="flex items-center justify-between border rounded-lg px-3 py-2 text-sm">
                 <div>
-                  <span className="font-medium">{c.personal?.nombre} {c.personal?.apellido}</span>
-                  <span className="text-muted-foreground mx-2">·</span>
                   <CategoriaClasificacionBadge categoria={c.categoria} />
                 </div>
                 <div className="flex items-center gap-3">

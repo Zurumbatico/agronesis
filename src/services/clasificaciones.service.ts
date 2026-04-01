@@ -6,7 +6,7 @@ const TABLE = 'clasificaciones' as const
 export async function getClasificacionesPorLote(loteId: string): Promise<Clasificacion[]> {
   const { data, error } = await supabase
     .from(TABLE)
-    .select('*, personal:personal_campo(*)')
+    .select('*')
     .eq('lote_id', loteId)
     .order('fecha_clasificacion', { ascending: true })
 
@@ -21,7 +21,7 @@ export async function createClasificacion(
   const { data, error } = await supabase
     .from(TABLE)
     .insert({ ...input, created_by: userId })
-    .select('*, personal:personal_campo(*)')
+    .select('*')
     .single()
 
   if (error) throw new Error(error.message)

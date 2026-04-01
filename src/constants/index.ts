@@ -36,13 +36,6 @@ export const TIPO_PRODUCCION_CONFIG = {
   convencional: { label: 'Convencional' },
 } as const
 
-export const TIPO_PERSONAL_CONFIG = {
-  clasificador: { label: 'Clasificador' },
-  cosechador:   { label: 'Cosechador'   },
-  empacador:    { label: 'Empacador'    },
-  supervisor:   { label: 'Supervisor'   },
-} as const
-
 export const CATEGORIA_CLASIFICACION_CONFIG = {
   primera:  { label: 'Primera',  color: 'bg-green-100 text-green-800' },
   segunda:  { label: 'Segunda',  color: 'bg-yellow-100 text-yellow-800' },
@@ -58,13 +51,6 @@ export const DESTINO_DESPACHO_CONFIG = {
 export const TIPO_MOVIMIENTO_CUBETA_CONFIG = {
   entrega:     { label: 'Entrega',     color: 'bg-blue-100 text-blue-800' },
   devolucion:  { label: 'Devolución',  color: 'bg-green-100 text-green-800' },
-} as const
-
-export const TIPO_ACTIVIDAD_CONFIG = {
-  clasificacion: { label: 'Clasificación' },
-  cosecha:       { label: 'Cosecha'       },
-  empaque:       { label: 'Empaque'       },
-  carga:         { label: 'Carga'         },
 } as const
 
 // Transiciones válidas de estado de lote
@@ -87,9 +73,6 @@ export const ROUTES = {
   PRODUCTOS:                '/productos',
   PRODUCTOS_NUEVO:          '/productos/nuevo',
   PRODUCTOS_EDITAR:         '/productos/:id/editar',
-  PERSONAL:                 '/personal',
-  PERSONAL_NUEVO:           '/personal/nuevo',
-  PERSONAL_EDITAR:          '/personal/:id/editar',
   CENTROS_ACOPIO:           '/centros-acopio',
   CENTROS_ACOPIO_NUEVO:     '/centros-acopio/nuevo',
   CENTROS_ACOPIO_EDITAR:    '/centros-acopio/:id/editar',
@@ -101,9 +84,5 @@ export const ROUTES = {
   LIQUIDACIONES_AGRI:       '/liquidaciones/agricultores',
   LIQUIDACIONES_AGRI_NUEVA: '/liquidaciones/agricultores/nueva',
   LIQUIDACIONES_AGRI_DETALLE: '/liquidaciones/agricultores/:id',
-  ACTIVIDADES_PERSONAL:     '/actividades-personal',
-  LIQUIDACIONES_PERSONAL:   '/liquidaciones/personal',
-  LIQUIDACIONES_PERSONAL_NUEVA: '/liquidaciones/personal/nueva',
-  LIQUIDACIONES_PERSONAL_DETALLE: '/liquidaciones/personal/:id',
   CUBETAS:                  '/cubetas',
 } as const

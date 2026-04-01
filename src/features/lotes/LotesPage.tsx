@@ -12,10 +12,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ESTADO_LOTE_CONFIG } from '@/constants'
 import { formatFecha, formatPeso } from '@/utils/formatters'
 import type { LoteFormData } from '@/utils/validators'
-import type { EstadoLote } from '@/types/models'
+import type { EstadoLote, Lote } from '@/types/models'
 
 export default function LotesPage() {
   const { lotes, loading, error, reload, crear } = useLotes()
@@ -23,6 +24,7 @@ export default function LotesPage() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoLote | 'todos'>('todos')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [ticketLote, setTicketLote] = useState<Lote | null>(null)
 
   const filtrados = lotes.filter((l) => {
     const coincideBusqueda = `${l.codigo} ${l.agricultor?.nombre ?? ''} ${l.agricultor?.apellido ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
@@ -33,7 +35,7 @@ export default function LotesPage() {
   const handleSubmit = async (data: LoteFormData) => {
     const nuevo = await crear(data)
     setDialogOpen(false)
-    navigate(`/lotes/${nuevo.id}`)
+    setTicketLote(nuevo)
   }
 
   if (loading) return <LoadingPage />
@@ -90,7 +92,7 @@ export default function LotesPage() {
                   {l.agricultor?.apellido}, {l.agricultor?.nombre} · {l.producto?.nombre}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {l.centro_acopio?.nombre} · {formatFecha(l.fecha_ingreso)} · {formatPeso(l.peso_bruto_kg)}
+                  {l.centro_acopio?.nombre} · {formatFecha(l.fecha_ingreso)} · Bruto: {formatPeso(l.peso_bruto_kg)} · Neto: {formatPeso(l.peso_neto_kg)}
                 </p>
               </div>
               <Button variant="outline" size="sm" className="shrink-0" onClick={(e) => { e.stopPropagation(); navigate(`/lotes/${l.id}`) }}>
@@ -105,6 +107,70 @@ export default function LotesPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Registrar nuevo lote</DialogTitle></DialogHeader>
           <LoteForm onSubmit={handleSubmit} onCancel={() => setDialogOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(ticketLote)} onOpenChange={(open) => !open && setTicketLote(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Ticket de confirmación</DialogTitle></DialogHeader>
+          {ticketLote && (
+            <Card className="border-dashed">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Agronesis del Perú S.A.C.</CardTitle>
+                <p className="text-sm text-muted-foreground">Lote registrado correctamente</p>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Código</p>
+                  <p className="font-semibold">{ticketLote.codigo}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Agricultor</p>
+                  <p>{ticketLote.agricultor?.apellido}, {ticketLote.agricultor?.nombre}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Producto</p>
+                  <p>{ticketLote.producto?.nombre}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Bruto</p>
+                    <p className="font-medium">{formatPeso(ticketLote.peso_bruto_kg)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Tara</p>
+                    <p className="font-medium">{formatPeso(ticketLote.peso_tara_kg)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Neto</p>
+                    <p className="font-medium">{formatPeso(ticketLote.peso_neto_kg)}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Jabas</p>
+                    <p className="font-medium">{ticketLote.num_cubetas}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Fecha</p>
+                    <p className="font-medium">{formatFecha(ticketLote.fecha_ingreso)}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+                  <Button type="button" variant="outline" className="w-full" onClick={() => setTicketLote(null)}>
+                    Cerrar
+                  </Button>
+                  <Button type="button" className="w-full" onClick={() => {
+                    const loteId = ticketLote.id
+                    setTicketLote(null)
+                    navigate(`/lotes/${loteId}`)
+                  }}>
+                    Ver lote
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </DialogContent>
       </Dialog>
     </div>

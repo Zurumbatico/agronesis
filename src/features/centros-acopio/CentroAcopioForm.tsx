@@ -21,6 +21,7 @@ export function CentroAcopioForm({ defaultValues, onSubmit, onCancel, isEditing 
   const normalizedDefaults: Partial<CentroAcopioFormInput> = {
     estado: 'activo',
     ...defaultValues,
+    codigo: defaultValues?.codigo ?? 'AUTO',
     ubicacion: defaultValues?.ubicacion ?? '',
     responsable: defaultValues?.responsable ?? '',
   }
@@ -38,7 +39,28 @@ export function CentroAcopioForm({ defaultValues, onSubmit, onCancel, isEditing 
     <form onSubmit={handleSubmit(handleValidSubmit as any)} className="flex flex-col gap-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Código" error={errors.codigo?.message} required>
-          <Input placeholder="CA-001" {...register('codigo')} />
+          {isEditing ? (
+            <>
+              <Input
+                value={defaultValues?.codigo ?? ''}
+                disabled
+                placeholder="CA-000001"
+                className="cursor-not-allowed border-dashed bg-muted text-muted-foreground disabled:opacity-100"
+              />
+              <Input type="hidden" {...register('codigo')} />
+            </>
+          ) : (
+            <>
+              <Input
+                readOnly
+                aria-disabled="true"
+                value=""
+                placeholder="Se asigna automáticamente al guardar"
+                className="cursor-not-allowed border-dashed bg-muted text-muted-foreground placeholder:text-muted-foreground/90"
+              />
+              <Input type="hidden" {...register('codigo')} />
+            </>
+          )}
         </FormField>
         <FormField label="Estado" error={errors.estado?.message} required>
           <Controller name="estado" control={control} render={({ field }) => (

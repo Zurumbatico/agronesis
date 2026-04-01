@@ -78,19 +78,6 @@ export const productoSchema = z.object({
   tipo_produccion: z.enum(['organico', 'convencional']),
 })
 
-export const personalCampoSchema = z.object({
-  codigo:         codigoSchema,
-  nombre:         nombreSchema,
-  apellido:       nombreSchema,
-  dni:            dniSchema,
-  telefono:       telefonoSchema,
-  numero_cuenta:  z.string().max(50, 'Máximo 50 caracteres').optional().or(z.literal('')).transform((v) => v || null),
-  fecha_alta:     z.string().min(1, 'Ingrese la fecha de alta'),
-  tipo:           z.enum(['clasificador', 'cosechador', 'empacador', 'supervisor']),
-  tarifa_destajo: precioSchema,
-  estado:         z.enum(['activo', 'inactivo']),
-})
-
 export const centroAcopioSchema = z.object({
   codigo:      codigoSchema,
   nombre:      nombreSchema,
@@ -106,13 +93,35 @@ export const loteSchema = z.object({
   centro_acopio_id: z.string().uuid('Seleccione un centro de acopio'),
   fecha_ingreso:    z.string().min(1, 'Ingrese la fecha de ingreso'),
   peso_bruto_kg:    pesoKgSchema,
+  peso_tara_kg:     z
+    .number({ message: 'Ingrese un número válido' })
+    .nonnegative('La tara no puede ser negativa')
+    .max(50000, 'Peso fuera de rango (máx 50,000 kg)'),
+  peso_neto_kg:     pesoKgSchema,
   num_cubetas:      cantidadEnteraSchema,
   observaciones:    z.string().max(500).optional().or(z.literal('')).transform((v) => v || null),
+}).superRefine((data, ctx) => {
+  const pesoNetoEsperado = Number((data.peso_bruto_kg - data.peso_tara_kg).toFixed(2))
+
+  if (data.peso_tara_kg >= data.peso_bruto_kg) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['peso_tara_kg'],
+      message: 'La tara debe ser menor al peso bruto',
+    })
+  }
+
+  if (Math.abs(data.peso_neto_kg - pesoNetoEsperado) > 0.01) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['peso_neto_kg'],
+      message: 'El peso neto debe coincidir con peso bruto - tara',
+    })
+  }
 })
 
 export const clasificacionSchema = z.object({
   lote_id:             z.string().uuid(),
-  personal_id:         z.string().uuid('Seleccione personal'),
   categoria:           z.enum(['primera', 'segunda', 'descarte']),
   peso_kg:             pesoKgSchema,
   num_cajas:           cantidadEnteraSchema,
@@ -141,25 +150,13 @@ export const movimientoCubetaSchema = z.object({
   observaciones: z.string().max(500).optional().or(z.literal('')).transform((v) => v || null),
 })
 
-export const actividadPersonalSchema = z.object({
-  personal_id:       z.string().uuid('Seleccione personal'),
-  lote_id:           z.string().uuid('Seleccione un lote'),
-  tipo_actividad:    z.enum(['clasificacion', 'cosecha', 'empaque', 'carga']),
-  fecha:             z.string().min(1, 'Ingrese la fecha'),
-  cantidad_unidades: cantidadEnteraSchema.refine((v) => v > 0, 'Debe ser mayor a 0'),
-  tarifa_unitaria:   precioSchema,
-  observaciones:     z.string().max(500).optional().or(z.literal('')).transform((v) => v || null),
-})
-
 // ─────────────────────────────────────────────
 // TIPOS INFERIDOS DE SCHEMAS
 // ─────────────────────────────────────────────
 export type AgricultorFormData       = z.infer<typeof agricultorSchema>
 export type ProductoFormData         = z.infer<typeof productoSchema>
-export type PersonalCampoFormData    = z.infer<typeof personalCampoSchema>
 export type CentroAcopioFormData     = z.infer<typeof centroAcopioSchema>
 export type LoteFormData             = z.infer<typeof loteSchema>
 export type ClasificacionFormData    = z.infer<typeof clasificacionSchema>
 export type DespachoFormData         = z.infer<typeof despachoSchema>
 export type MovimientoCubetaFormData = z.infer<typeof movimientoCubetaSchema>
-export type ActividadPersonalFormData = z.infer<typeof actividadPersonalSchema>

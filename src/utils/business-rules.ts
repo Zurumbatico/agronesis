@@ -56,18 +56,18 @@ export function calcularPesoTotalClasificado(clasificaciones: Clasificacion[]): 
 }
 
 /**
- * Valida que el peso clasificado no supere el peso bruto del lote
+ * Valida que el peso clasificado no supere el peso neto del lote
  * Retorna null si es válido, o un mensaje de error
  */
 export function validarPesoClasificacion(
-  pesoBrutoKg: number,
+  pesoNetoKg: number,
   pesoYaClasificadoKg: number,
   nuevoPesoKg: number
 ): string | null {
   const totalResultante = pesoYaClasificadoKg + nuevoPesoKg
-  if (totalResultante > pesoBrutoKg * 1.05) {
+  if (totalResultante > pesoNetoKg * 1.05) {
     // Permitimos hasta 5% de diferencia por mermas
-    return `El peso clasificado (${totalResultante.toFixed(2)} kg) supera el peso bruto del lote (${pesoBrutoKg.toFixed(2)} kg)`
+    return `El peso clasificado (${totalResultante.toFixed(2)} kg) supera el peso neto del lote (${pesoNetoKg.toFixed(2)} kg)`
   }
   return null
 }

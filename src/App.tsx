@@ -9,19 +9,14 @@ import LoginPage from '@/features/auth/LoginPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
 import AgricultoresPage from '@/features/agricultores/AgricultoresPage'
 import ProductosPage from '@/features/productos/ProductosPage'
-import PersonalPage from '@/features/personal/PersonalPage'
 import CentrosAcopioPage from '@/features/centros-acopio/CentrosAcopioPage'
 import LotesPage from '@/features/lotes/LotesPage'
 import LoteDetallePage from '@/features/lotes/LoteDetallePage'
 import ClasificarLotePage from '@/features/lotes/ClasificarLotePage'
 import DespacharLotePage from '@/features/lotes/DespacharLotePage'
-import ActividadesPersonalPage from '@/features/actividades-personal/ActividadesPersonalPage.tsx'
 import LiquidacionesAgriPage from '@/features/liquidaciones-agri/LiquidacionesAgriPage'
 import NuevaLiquidacionAgriPage from '@/features/liquidaciones-agri/NuevaLiquidacionAgriPage'
 import DetalleLiquidacionAgriPage from '@/features/liquidaciones-agri/DetalleLiquidacionAgriPage.tsx'
-import LiquidacionesPersonalPage from '@/features/liquidaciones-personal/LiquidacionesPersonalPage'
-import NuevaLiquidacionPersonalPage from '@/features/liquidaciones-personal/NuevaLiquidacionPersonalPage'
-import DetalleLiquidacionPersonalPage from '@/features/liquidaciones-personal/DetalleLiquidacionPersonalPage'
 import CubetasPage from '@/features/cubetas/CubetasPage.tsx'
 
 function LoginRoute() {
@@ -45,20 +40,15 @@ export default function App() {
             <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
             <Route path={ROUTES.AGRICULTORES} element={<AgricultoresPage />} />
             <Route path={ROUTES.PRODUCTOS} element={<ProductosPage />} />
-            <Route path={ROUTES.PERSONAL} element={<PersonalPage />} />
             <Route path={ROUTES.CENTROS_ACOPIO} element={<CentrosAcopioPage />} />
             <Route path={ROUTES.LOTES} element={<LotesPage />} />
             <Route path={ROUTES.LOTES_DETALLE} element={<LoteDetallePage />} />
             <Route path={ROUTES.CLASIFICACIONES} element={<ClasificarLotePage />} />
             <Route path={ROUTES.DESPACHOS} element={<DespacharLotePage />} />
-            <Route path={ROUTES.ACTIVIDADES_PERSONAL} element={<ActividadesPersonalPage />} />
             <Route path={ROUTES.CUBETAS} element={<CubetasPage />} />
             <Route path={ROUTES.LIQUIDACIONES_AGRI} element={<LiquidacionesAgriPage />} />
             <Route path={ROUTES.LIQUIDACIONES_AGRI_NUEVA} element={<NuevaLiquidacionAgriPage />} />
             <Route path={ROUTES.LIQUIDACIONES_AGRI_DETALLE} element={<DetalleLiquidacionAgriPage />} />
-            <Route path={ROUTES.LIQUIDACIONES_PERSONAL} element={<LiquidacionesPersonalPage />} />
-            <Route path={ROUTES.LIQUIDACIONES_PERSONAL_NUEVA} element={<NuevaLiquidacionPersonalPage />} />
-            <Route path={ROUTES.LIQUIDACIONES_PERSONAL_DETALLE} element={<DetalleLiquidacionPersonalPage />} />
           </Route>
         </Route>
 

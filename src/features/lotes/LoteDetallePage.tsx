@@ -112,6 +112,8 @@ export default function LoteDetallePage() {
                 <div><p className="text-muted-foreground text-xs">Centro de acopio</p><p className="font-medium">{lote.centro_acopio?.nombre}</p></div>
                 <div><p className="text-muted-foreground text-xs">Fecha ingreso</p><p className="font-medium">{formatFecha(lote.fecha_ingreso)}</p></div>
                 <div><p className="text-muted-foreground text-xs">Peso bruto</p><p className="font-medium">{formatPeso(lote.peso_bruto_kg)}</p></div>
+                <div><p className="text-muted-foreground text-xs">Tara</p><p className="font-medium">{formatPeso(lote.peso_tara_kg)}</p></div>
+                <div><p className="text-muted-foreground text-xs">Peso neto</p><p className="font-medium">{formatPeso(lote.peso_neto_kg)}</p></div>
                 <div><p className="text-muted-foreground text-xs">Cubetas</p><p className="font-medium">{lote.num_cubetas}</p></div>
                 <div className="col-span-2"><p className="text-muted-foreground text-xs">Estado</p><div className="mt-0.5"><EstadoLoteBadge estado={lote.estado} /></div></div>
                 {lote.observaciones && <div className="col-span-2"><p className="text-muted-foreground text-xs">Observaciones</p><p>{lote.observaciones}</p></div>}
@@ -136,8 +138,7 @@ export default function LoteDetallePage() {
                 <div className="flex flex-col gap-1.5">
                   {clasificaciones.map((c) => (
                     <div key={c.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                      <span className="text-muted-foreground">{c.personal?.nombre} {c.personal?.apellido}</span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 ml-auto">
                         <CategoriaClasificacionBadge categoria={c.categoria} />
                         <span className="font-medium">{formatPeso(c.peso_kg)} · {c.num_cajas} cjs</span>
                       </div>

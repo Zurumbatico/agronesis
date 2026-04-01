@@ -2,6 +2,8 @@ create extension if not exists pgcrypto;
 
 create sequence if not exists public.agricultores_codigo_seq;
 create sequence if not exists public.productos_codigo_seq;
+create sequence if not exists public.lotes_codigo_seq;
+create sequence if not exists public.centros_acopio_codigo_seq;
 
 create or replace function public.generate_agricultor_codigo()
 returns text
@@ -64,6 +66,64 @@ end;
 $$;
 
 create or replace function public.protect_producto_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := old.codigo;
+  return new;
+end;
+$$;
+
+create or replace function public.generate_lote_codigo()
+returns text
+language plpgsql
+as $$
+begin
+  return 'LOT-' || to_char(current_date, 'YYYYMMDD') || '-' || lpad(nextval('public.lotes_codigo_seq')::text, 3, '0');
+end;
+$$;
+
+create or replace function public.set_lote_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := public.generate_lote_codigo();
+  return new;
+end;
+$$;
+
+create or replace function public.protect_lote_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := old.codigo;
+  return new;
+end;
+$$;
+
+create or replace function public.generate_centro_acopio_codigo()
+returns text
+language plpgsql
+as $$
+begin
+  return 'CA-' || lpad(nextval('public.centros_acopio_codigo_seq')::text, 6, '0');
+end;
+$$;
+
+create or replace function public.set_centro_acopio_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := public.generate_centro_acopio_codigo();
+  return new;
+end;
+$$;
+
+create or replace function public.protect_centro_acopio_codigo()
 returns trigger
 language plpgsql
 as $$
@@ -224,7 +284,7 @@ create table if not exists public.centros_acopio (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
-  codigo text not null unique,
+  codigo text not null unique default public.generate_centro_acopio_codigo(),
   nombre text not null,
   ubicacion text null,
   responsable text null,
@@ -236,16 +296,28 @@ create table if not exists public.lotes (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
-  codigo text not null unique,
+  codigo text not null unique default public.generate_lote_codigo(),
   agricultor_id uuid not null references public.agricultores(id) on delete restrict,
   producto_id uuid not null references public.productos(id) on delete restrict,
   centro_acopio_id uuid not null references public.centros_acopio(id) on delete restrict,
   fecha_ingreso date not null,
   peso_bruto_kg numeric(12,2) not null,
+  peso_tara_kg numeric(12,2) not null default 0 check (peso_tara_kg >= 0),
+  peso_neto_kg numeric(12,2) not null default 0 check (peso_neto_kg >= 0),
   num_cubetas integer not null default 0,
   observaciones text null,
   estado text not null default 'ingresado' check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'en_despacho', 'despachado', 'liquidado'))
 );
+
+alter table public.lotes alter column codigo set default public.generate_lote_codigo();
+alter table public.centros_acopio alter column codigo set default public.generate_centro_acopio_codigo();
+alter table public.lotes add column if not exists peso_tara_kg numeric(12,2) not null default 0;
+alter table public.lotes add column if not exists peso_neto_kg numeric(12,2);
+update public.lotes
+set peso_neto_kg = coalesce(peso_neto_kg, greatest(peso_bruto_kg - coalesce(peso_tara_kg, 0), 0))
+where peso_neto_kg is null;
+alter table public.lotes alter column peso_neto_kg set default 0;
+alter table public.lotes alter column peso_neto_kg set not null;
 
 create table if not exists public.clasificaciones (
   id uuid primary key default gen_random_uuid(),
@@ -253,13 +325,15 @@ create table if not exists public.clasificaciones (
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
   lote_id uuid not null references public.lotes(id) on delete cascade,
-  personal_id uuid not null references public.personal_campo(id) on delete restrict,
+  personal_id uuid references public.personal_campo(id) on delete restrict,
   categoria text not null check (categoria in ('primera', 'segunda', 'descarte')),
   peso_kg numeric(12,2) not null,
   num_cajas integer not null default 0,
   fecha_clasificacion date not null,
   observaciones text null
 );
+
+alter table public.clasificaciones alter column personal_id drop not null;
 
 create table if not exists public.despachos (
   id uuid primary key default gen_random_uuid(),
@@ -387,6 +461,12 @@ create trigger trg_productos_protect_codigo before update on public.productos fo
 drop trigger if exists trg_productos_codigo on public.productos;
 create trigger trg_productos_codigo before insert on public.productos for each row execute function public.set_producto_codigo();
 
+drop trigger if exists trg_lotes_protect_codigo on public.lotes;
+create trigger trg_lotes_protect_codigo before update on public.lotes for each row execute function public.protect_lote_codigo();
+
+drop trigger if exists trg_lotes_codigo on public.lotes;
+create trigger trg_lotes_codigo before insert on public.lotes for each row execute function public.set_lote_codigo();
+
 do $$
 declare
   v_max bigint;
@@ -403,6 +483,40 @@ begin
 end;
 $$;
 
+do $$
+declare
+  v_fecha_actual text := to_char(current_date, 'YYYYMMDD');
+  v_max bigint;
+begin
+  select coalesce(max(substring(codigo from '^LOT-' || v_fecha_actual || '-(\d+)$')::bigint), 0)
+  into v_max
+  from public.lotes
+  where codigo like 'LOT-' || v_fecha_actual || '-%';
+
+  if v_max = 0 then
+    perform setval('public.lotes_codigo_seq', 1, false);
+  else
+    perform setval('public.lotes_codigo_seq', v_max, true);
+  end if;
+end;
+$$;
+
+do $$
+declare
+  v_max bigint;
+begin
+  select coalesce(max(substring(codigo from '^CA-(\d+)$')::bigint), 0)
+  into v_max
+  from public.centros_acopio;
+
+  if v_max = 0 then
+    perform setval('public.centros_acopio_codigo_seq', 1, false);
+  else
+    perform setval('public.centros_acopio_codigo_seq', v_max, true);
+  end if;
+end;
+$$;
+
 drop trigger if exists trg_productos_updated_at on public.productos;
 create trigger trg_productos_updated_at before update on public.productos for each row execute function public.set_updated_at();
 
@@ -411,6 +525,12 @@ create trigger trg_agricultor_producto_hectareas_updated_at before update on pub
 
 drop trigger if exists trg_personal_campo_updated_at on public.personal_campo;
 create trigger trg_personal_campo_updated_at before update on public.personal_campo for each row execute function public.set_updated_at();
+
+drop trigger if exists trg_centros_acopio_protect_codigo on public.centros_acopio;
+create trigger trg_centros_acopio_protect_codigo before update on public.centros_acopio for each row execute function public.protect_centro_acopio_codigo();
+
+drop trigger if exists trg_centros_acopio_codigo on public.centros_acopio;
+create trigger trg_centros_acopio_codigo before insert on public.centros_acopio for each row execute function public.set_centro_acopio_codigo();
 
 drop trigger if exists trg_centros_acopio_updated_at on public.centros_acopio;
 create trigger trg_centros_acopio_updated_at before update on public.centros_acopio for each row execute function public.set_updated_at();

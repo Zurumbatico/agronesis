@@ -61,18 +61,10 @@ export function generarCodigo(prefijo: string): string {
   return `${prefijo}-${fecha}-${random}`
 }
 
-export function generarCodigoLote(): string {
-  return generarCodigo('LOT')
-}
-
 export function generarCodigoAgricultor(): string {
   return generarCodigo('AGRI')
 }
 
 export function generarCodigoLiquidacionAgri(): string {
   return generarCodigo('LIQAG')
-}
-
-export function generarCodigoLiquidacionPersonal(): string {
-  return generarCodigo('LIQPE')
 }
