@@ -8,7 +8,7 @@ import {
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/store/ui.store'
-import { ROUTES } from '@/constants'
+import { ROUTES, ENABLED_MODULES } from '@/constants'
 import { Button } from '@/components/ui/button'
 
 interface NavItem {
@@ -16,6 +16,7 @@ interface NavItem {
   href: string
   icon: React.ElementType
   group?: string
+  featureKey?: keyof typeof ENABLED_MODULES
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -27,7 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Centros de Acopio',  href: ROUTES.CENTROS_ACOPIO,        icon: Warehouse,     group: 'Maestros' },
   // Operaciones
   { label: 'Lotes',              href: ROUTES.LOTES,                 icon: Layers,        group: 'Operaciones' },
-  { label: 'Cubetas',            href: ROUTES.CUBETAS,               icon: Package,       group: 'Operaciones' },
+  { label: 'Cubetas',            href: ROUTES.CUBETAS,               icon: Package,       group: 'Operaciones', featureKey: 'CUBETAS' },
   // Liquidaciones
   { label: 'Liq. Agricultores',  href: ROUTES.LIQUIDACIONES_AGRI,    icon: Receipt,       group: 'Liquidaciones' },
 ]
@@ -85,9 +86,10 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
       {/* Navegación */}
       <nav className="flex-1 overflow-y-auto py-3 scrollbar-thin">
         {groups.map((group) => {
-          const items = group
+          const items = (group
             ? NAV_ITEMS.filter((i) => i.group === group)
             : NAV_ITEMS.filter((i) => !i.group)
+          ).filter((item) => (item.featureKey ? ENABLED_MODULES[item.featureKey] : true))
 
           return (
             <div key={group || '__root'} className="mb-2">

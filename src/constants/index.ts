@@ -87,3 +87,9 @@ export const ROUTES = {
   LIQUIDACIONES_AGRI_DETALLE: '/liquidaciones/agricultores/:id',
   CUBETAS:                  '/cubetas',
 } as const
+
+// Controla módulos habilitados en UI/ruteo.
+// Si un módulo está en false, se oculta del menú y redirige al home al abrir su URL.
+export const ENABLED_MODULES = {
+  CUBETAS: false,
+} as const

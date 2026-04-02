@@ -1,5 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { ROUTES } from '@/constants'
+import { ROUTES, ENABLED_MODULES } from '@/constants'
 import { useAuthInit } from '@/hooks/useAuthInit'
 import { useAuthStore } from '@/store/auth.store'
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
@@ -47,7 +47,10 @@ export default function App() {
             <Route path={ROUTES.LOTES_DETALLE} element={<LoteDetallePage />} />
             <Route path={ROUTES.CLASIFICACIONES} element={<ClasificarLotePage />} />
             <Route path={ROUTES.DESPACHOS} element={<DespacharLotePage />} />
-            <Route path={ROUTES.CUBETAS} element={<CubetasPage />} />
+            <Route
+              path={ROUTES.CUBETAS}
+              element={ENABLED_MODULES.CUBETAS ? <CubetasPage /> : <Navigate to={ROUTES.DASHBOARD} replace />}
+            />
             <Route path={ROUTES.LIQUIDACIONES_AGRI} element={<LiquidacionesAgriPage />} />
             <Route path={ROUTES.LIQUIDACIONES_AGRI_NUEVA} element={<NuevaLiquidacionAgriPage />} />
             <Route path={ROUTES.LIQUIDACIONES_AGRI_DETALLE} element={<DetalleLiquidacionAgriPage />} />
