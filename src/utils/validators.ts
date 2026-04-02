@@ -4,26 +4,37 @@ import { z } from 'zod'
 // SCHEMAS DE VALIDACIÓN REUTILIZABLES
 // ─────────────────────────────────────────────
 
+const nullableUpperTrim = (value: unknown) => {
+  if (value === '' || value == null) return null
+  if (typeof value !== 'string') return value
+  const normalized = value.trim().toUpperCase()
+  return normalized === '' ? null : normalized
+}
+
 export const dniSchema = z.preprocess(
-  (v) => (v === '' || v == null ? null : v),
+  (v) => (v === '' || v == null ? null : (typeof v === 'string' ? v.trim() : v)),
   z.string().regex(/^\d{8}$/, 'El DNI debe tener exactamente 8 dígitos').nullable()
 )
 
 export const telefonoSchema = z.preprocess(
-  (v) => (v === '' || v == null ? null : v),
+  (v) => (v === '' || v == null ? null : (typeof v === 'string' ? v.trim() : v)),
   z.string().regex(/^[0-9+\s()-]{7,15}$/, 'Teléfono inválido').nullable()
 )
 
 export const codigoSchema = z
   .string()
+  .trim()
   .min(2, 'El código debe tener al menos 2 caracteres')
   .max(30, 'El código no puede exceder 30 caracteres')
-  .regex(/^[A-Za-z0-9_-]+$/, 'Solo letras, números, guión o guión bajo')
+  .regex(/^[A-Z0-9_-]+$/, 'Solo letras, números, guión o guión bajo')
+  .transform((value) => value.toUpperCase())
 
 export const nombreSchema = z
   .string()
+  .trim()
   .min(2, 'Mínimo 2 caracteres')
   .max(100, 'Máximo 100 caracteres')
+  .transform((value) => value.toUpperCase())
 
 export const pesoKgSchema = z
   .number({ message: 'Ingrese un número válido' })
@@ -46,10 +57,7 @@ export const hectareasSchema = z
   .max(10000, 'Hectáreas fuera de rango')
 
 export const observacionesSchema = z
-  .string()
-  .max(500)
-  .nullish()
-  .transform((value) => value || null)
+  .preprocess(nullableUpperTrim, z.string().max(500).nullable())
 
 // ─────────────────────────────────────────────
 // SCHEMAS DE ENTIDADES
@@ -62,14 +70,14 @@ export const agricultorHectareaSchema = z.object({
 
 export const agricultorSchema = z.object({
   codigo:    codigoSchema,
-  nro_lote:  z.string().max(20, 'Maximo 20 caracteres').nullish().transform((v) => v || null),
+  nro_lote:  z.preprocess(nullableUpperTrim, z.string().max(20, 'Maximo 20 caracteres').nullable()),
   nombre:    nombreSchema,
   apellido:  nombreSchema,
   dni:       dniSchema,
   telefono:  telefonoSchema,
-  numero_cuenta: z.string().max(50, 'Maximo 50 caracteres').nullish().transform((v) => v || null),
+  numero_cuenta: z.preprocess(nullableUpperTrim, z.string().max(50, 'Maximo 50 caracteres').nullable()),
   fecha_alta: z.string().min(1, 'Ingrese la fecha de alta'),
-  ubicacion: z.string().max(200).nullish().transform((v) => v || null),
+  ubicacion: z.preprocess(nullableUpperTrim, z.string().max(200).nullable()),
   estado:    z.enum(['activo', 'inactivo']),
 })
 
@@ -79,9 +87,9 @@ export const acopiadorSchema = z.object({
   apellido:  nombreSchema,
   dni:       dniSchema,
   telefono:  telefonoSchema,
-  numero_cuenta: z.string().max(50, 'Maximo 50 caracteres').nullish().transform((v) => v || null),
+  numero_cuenta: z.preprocess(nullableUpperTrim, z.string().max(50, 'Maximo 50 caracteres').nullable()),
   fecha_alta: z.string().min(1, 'Ingrese la fecha de alta'),
-  ubicacion: z.string().max(200).nullish().transform((v) => v || null),
+  ubicacion: z.preprocess(nullableUpperTrim, z.string().max(200).nullable()),
   estado:    z.enum(['activo', 'inactivo']),
 })
 
@@ -96,8 +104,8 @@ export const productoSchema = z.object({
 export const centroAcopioSchema = z.object({
   codigo:      codigoSchema,
   nombre:      nombreSchema,
-  ubicacion:   z.string().max(200).nullish().transform((v) => v || null),
-  responsable: z.string().max(100).nullish().transform((v) => v || null),
+  ubicacion:   z.preprocess(nullableUpperTrim, z.string().max(200).nullable()),
+  responsable: z.preprocess(nullableUpperTrim, z.string().max(100).nullable()),
   estado:      z.enum(['activo', 'inactivo']),
 })
 
@@ -159,8 +167,8 @@ export const despachoSchema = z.object({
   lote_id:              z.string().uuid(),
   fecha_despacho:       z.string().min(1, 'Ingrese la fecha'),
   destino:              z.enum(['exportacion', 'mercado_local', 'planta_proceso']),
-  transportista:        z.string().max(100).optional().or(z.literal('')).transform((v) => v || null),
-  placa_vehiculo:       z.string().max(20).optional().or(z.literal('')).transform((v) => v || null),
+  transportista:        z.preprocess(nullableUpperTrim, z.string().max(100).nullable()),
+  placa_vehiculo:       z.preprocess(nullableUpperTrim, z.string().max(20).nullable()),
   num_cajas_despachadas: cantidadEnteraSchema,
   peso_neto_kg:         pesoKgSchema,
   precio_venta_kg:      precioSchema,
