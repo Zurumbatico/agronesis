@@ -98,7 +98,7 @@ export default function LotesPage() {
                   {l.agricultor?.apellido}, {l.agricultor?.nombre} · {l.producto?.nombre}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {l.centro_acopio?.nombre} · {formatFecha(l.fecha_ingreso)} · Bruto: {formatPeso(l.peso_bruto_kg)} · Neto: {formatPeso(l.peso_neto_kg)}
+                  {l.centro_acopio?.nombre} · {formatFecha(l.fecha_ingreso)} · N° JABAS: {l.num_cubetas} · Bruto: {formatPeso(l.peso_bruto_kg)} · Tara: {formatPeso(l.peso_tara_kg)} · Neto: {formatPeso(l.peso_neto_kg)}
                 </p>
               </div>
               <Button variant="outline" size="sm" className="shrink-0" onClick={(e) => { e.stopPropagation(); navigate(`/lotes/${l.id}`) }}>

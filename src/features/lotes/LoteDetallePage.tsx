@@ -80,6 +80,7 @@ export default function LoteDetallePage() {
     <div className="max-w-5xl mx-auto">
       <PageHeader
         title={`Lote ${lote.codigo}`}
+        description={`${lote.centro_acopio?.nombre ?? '-'} · ${formatFecha(lote.fecha_ingreso)} · N° JABAS: ${lote.num_cubetas} · Bruto: ${formatPeso(lote.peso_bruto_kg)} · Tara: ${formatPeso(lote.peso_tara_kg)} · Neto: ${formatPeso(lote.peso_neto_kg)}`}
         backHref={ROUTES.LOTES}
         actions={
           <div className="flex gap-2">
@@ -170,7 +171,7 @@ export default function LoteDetallePage() {
                     <p className="font-medium">{formatFecha(lote.fecha_ingreso)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Cubetas</p>
+                    <p className="text-xs text-muted-foreground">N° JABAS</p>
                     <p className="font-medium">{lote.num_cubetas}</p>
                   </div>
                 </section>
