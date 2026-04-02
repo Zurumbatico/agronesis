@@ -171,7 +171,7 @@ export default function LoteDetallePage() {
                     <p className="font-medium">{formatFecha(lote.fecha_ingreso)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">N° JABAS</p>
+                    <p className="text-xs text-muted-foreground">N° Jabas</p>
                     <p className="font-medium">{lote.num_cubetas}</p>
                   </div>
                 </section>
