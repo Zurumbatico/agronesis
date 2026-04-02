@@ -16,6 +16,7 @@ export interface Database {
           updated_at: string
           created_by: string
           codigo: string
+          nro_lote: string | null
           nombre: string
           apellido: string
           dni: string | null
@@ -27,6 +28,26 @@ export interface Database {
         }
         Insert: Omit<Database['public']['Tables']['agricultores']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['agricultores']['Insert']>
+        Relationships: []
+      }
+      acopiadores: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          codigo: string
+          nombre: string
+          apellido: string
+          dni: string | null
+          telefono: string | null
+          numero_cuenta: string | null
+          fecha_alta: string
+          ubicacion: string | null
+          estado: 'activo' | 'inactivo'
+        }
+        Insert: Omit<Database['public']['Tables']['acopiadores']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['acopiadores']['Insert']>
         Relationships: []
       }
       productos: {
@@ -41,7 +62,9 @@ export interface Database {
           calidad: 'cat1' | 'cat2'
           tipo_produccion: 'organico' | 'convencional'
         }
-        Insert: Omit<Database['public']['Tables']['productos']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<Database['public']['Tables']['productos']['Row'], 'id' | 'created_at' | 'updated_at' | 'codigo'> & {
+          codigo?: string
+        }
         Update: Partial<Database['public']['Tables']['productos']['Insert']>
         Relationships: []
       }
@@ -104,6 +127,8 @@ export interface Database {
           created_by: string
           codigo: string
           agricultor_id: string
+          acopiador_id: string | null
+          acopiador_agricultor_id: string | null
           producto_id: string
           centro_acopio_id: string
           fecha_ingreso: string

@@ -21,13 +21,17 @@ export function useLotes() {
 
   const crear = async (data: LoteFormData) => {
     if (!user) throw new Error('No autenticado')
-    const nuevo = await createLote(data as Parameters<typeof createLote>[0], user.id)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { acopiador_combined: _c, ...loteData } = data as any
+    const nuevo = await createLote(loteData as Parameters<typeof createLote>[0], user.id)
     setLotes((prev) => [nuevo, ...prev])
     return nuevo
   }
 
   const actualizar = async (id: string, data: Partial<LoteFormData>) => {
-    const actualizado = await updateLote(id, data as Parameters<typeof updateLote>[1])
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { acopiador_combined: _c, ...loteData } = data as any
+    const actualizado = await updateLote(id, loteData as Parameters<typeof updateLote>[1])
     setLotes((prev) => prev.map((l) => (l.id === id ? actualizado : l)))
     return actualizado
   }

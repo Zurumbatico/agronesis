@@ -25,9 +25,10 @@ export async function getProducto(id: string): Promise<Producto> {
 }
 
 export async function createProducto(input: ProductoInsert, userId: string): Promise<Producto> {
+  const { codigo: _codigo, ...payload } = input
   const { data, error } = await supabase
     .from(TABLE)
-    .insert({ ...input, created_by: userId })
+    .insert({ ...payload, created_by: userId })
     .select()
     .single()
 

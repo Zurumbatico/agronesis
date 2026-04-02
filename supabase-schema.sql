@@ -1,6 +1,7 @@
 create extension if not exists pgcrypto;
 
 create sequence if not exists public.agricultores_codigo_seq;
+create sequence if not exists public.acopiadores_codigo_seq;
 create sequence if not exists public.productos_codigo_seq;
 create sequence if not exists public.lotes_codigo_seq;
 create sequence if not exists public.centros_acopio_codigo_seq;
@@ -21,6 +22,35 @@ as $$
 begin
   -- El código siempre se define en backend para evitar inconsistencias del frontend.
   new.codigo := public.generate_agricultor_codigo();
+  return new;
+end;
+$$;
+
+create or replace function public.generate_acopiador_codigo()
+returns text
+language plpgsql
+as $$
+begin
+  return 'ACO-' || lpad(nextval('public.acopiadores_codigo_seq')::text, 6, '0');
+end;
+$$;
+
+create or replace function public.set_acopiador_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := public.generate_acopiador_codigo();
+  return new;
+end;
+$$;
+
+create or replace function public.protect_acopiador_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := old.codigo;
   return new;
 end;
 $$;
@@ -139,6 +169,7 @@ create table if not exists public.agricultores (
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
   codigo text not null unique default public.generate_agricultor_codigo(),
+  nro_lote text null,
   nombre text not null,
   apellido text not null,
   dni text null,
@@ -149,8 +180,28 @@ create table if not exists public.agricultores (
   estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
 );
 
+create table if not exists public.acopiadores (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  codigo text not null unique default public.generate_acopiador_codigo(),
+  nombre text not null,
+  apellido text not null,
+  dni text null,
+  telefono text null,
+  numero_cuenta text null,
+  fecha_alta date not null default current_date,
+  ubicacion text null,
+  estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
+);
+
+alter table public.acopiadores add column if not exists numero_cuenta text null;
+alter table public.acopiadores add column if not exists fecha_alta date not null default current_date;
+
 do $$
 begin
+  alter table public.agricultores add column if not exists nro_lote text null;
   alter table public.agricultores add column if not exists numero_cuenta text null;
   alter table public.agricultores add column if not exists fecha_alta date not null default current_date;
 
@@ -187,6 +238,10 @@ alter table public.productos
   add column if not exists tipo_produccion text not null default 'convencional';
 alter table public.productos
   drop column if exists estado;
+alter table public.productos
+  drop column if exists tipo;
+alter table public.productos
+  drop column if exists unidad_medida;
 
 do $$
 begin
@@ -298,6 +353,8 @@ create table if not exists public.lotes (
   created_by uuid not null references auth.users(id) on delete restrict,
   codigo text not null unique default public.generate_lote_codigo(),
   agricultor_id uuid not null references public.agricultores(id) on delete restrict,
+  acopiador_id uuid references public.acopiadores(id) on delete restrict,
+  acopiador_agricultor_id uuid references public.agricultores(id) on delete restrict,
   producto_id uuid not null references public.productos(id) on delete restrict,
   centro_acopio_id uuid not null references public.centros_acopio(id) on delete restrict,
   fecha_ingreso date not null,
@@ -311,10 +368,46 @@ create table if not exists public.lotes (
 
 alter table public.lotes alter column codigo set default public.generate_lote_codigo();
 alter table public.centros_acopio alter column codigo set default public.generate_centro_acopio_codigo();
+alter table public.lotes add column if not exists acopiador_id uuid;
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints tc
+    where tc.table_schema = 'public'
+      and tc.table_name = 'lotes'
+      and tc.constraint_name = 'lotes_acopiador_id_fkey'
+  ) then
+    alter table public.lotes
+      add constraint lotes_acopiador_id_fkey
+      foreign key (acopiador_id)
+      references public.acopiadores(id)
+      on delete restrict;
+  end if;
+end;
+$$;
+alter table public.lotes add column if not exists acopiador_agricultor_id uuid;
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints tc
+    where tc.table_schema = 'public'
+      and tc.table_name = 'lotes'
+      and tc.constraint_name = 'lotes_acopiador_agricultor_id_fkey'
+  ) then
+    alter table public.lotes
+      add constraint lotes_acopiador_agricultor_id_fkey
+      foreign key (acopiador_agricultor_id)
+      references public.agricultores(id)
+      on delete restrict;
+  end if;
+end;
+$$;
 alter table public.lotes add column if not exists peso_tara_kg numeric(12,2) not null default 0;
 alter table public.lotes add column if not exists peso_neto_kg numeric(12,2);
 update public.lotes
-set peso_neto_kg = coalesce(peso_neto_kg, greatest(peso_bruto_kg - coalesce(peso_tara_kg, 0), 0))
+set peso_neto_kg = coalesce(peso_neto_kg, greatest(peso_bruto_kg - coalesce(peso_tara_kg, 0) * coalesce(num_cubetas, 0), 0))
 where peso_neto_kg is null;
 alter table public.lotes alter column peso_neto_kg set default 0;
 alter table public.lotes alter column peso_neto_kg set not null;
@@ -422,6 +515,7 @@ create table if not exists public.movimientos_cubetas (
 );
 
 create index if not exists idx_agricultores_codigo on public.agricultores(codigo);
+create index if not exists idx_acopiadores_codigo on public.acopiadores(codigo);
 create index if not exists idx_productos_codigo on public.productos(codigo);
 create index if not exists idx_agricultor_producto_hectareas_agricultor_id on public.agricultor_producto_hectareas(agricultor_id);
 create index if not exists idx_agricultor_producto_hectareas_producto_id on public.agricultor_producto_hectareas(producto_id);
@@ -429,6 +523,8 @@ create index if not exists idx_personal_campo_codigo on public.personal_campo(co
 create index if not exists idx_centros_acopio_codigo on public.centros_acopio(codigo);
 create index if not exists idx_lotes_codigo on public.lotes(codigo);
 create index if not exists idx_lotes_agricultor_id on public.lotes(agricultor_id);
+create index if not exists idx_lotes_acopiador_id on public.lotes(acopiador_id);
+create index if not exists idx_lotes_acopiador_agricultor_id on public.lotes(acopiador_agricultor_id);
 create index if not exists idx_lotes_producto_id on public.lotes(producto_id);
 create index if not exists idx_lotes_centro_acopio_id on public.lotes(centro_acopio_id);
 create index if not exists idx_clasificaciones_lote_id on public.clasificaciones(lote_id);
@@ -451,6 +547,17 @@ drop trigger if exists trg_agricultores_codigo on public.agricultores;
 create trigger trg_agricultores_codigo before insert on public.agricultores for each row execute function public.set_agricultor_codigo();
 
 alter table public.agricultores alter column codigo set default public.generate_agricultor_codigo();
+
+drop trigger if exists trg_acopiadores_updated_at on public.acopiadores;
+create trigger trg_acopiadores_updated_at before update on public.acopiadores for each row execute function public.set_updated_at();
+
+drop trigger if exists trg_acopiadores_protect_codigo on public.acopiadores;
+create trigger trg_acopiadores_protect_codigo before update on public.acopiadores for each row execute function public.protect_acopiador_codigo();
+
+drop trigger if exists trg_acopiadores_codigo on public.acopiadores;
+create trigger trg_acopiadores_codigo before insert on public.acopiadores for each row execute function public.set_acopiador_codigo();
+
+alter table public.acopiadores alter column codigo set default public.generate_acopiador_codigo();
 
 drop trigger if exists trg_productos_updated_at on public.productos;
 create trigger trg_productos_updated_at before update on public.productos for each row execute function public.set_updated_at();
@@ -479,6 +586,22 @@ begin
     perform setval('public.agricultores_codigo_seq', 1, false);
   else
     perform setval('public.agricultores_codigo_seq', v_max, true);
+  end if;
+end;
+$$;
+
+do $$
+declare
+  v_max bigint;
+begin
+  select coalesce(max(substring(codigo from '^ACO-(\d+)$')::bigint), 0)
+  into v_max
+  from public.acopiadores;
+
+  if v_max = 0 then
+    perform setval('public.acopiadores_codigo_seq', 1, false);
+  else
+    perform setval('public.acopiadores_codigo_seq', v_max, true);
   end if;
 end;
 $$;
@@ -560,6 +683,7 @@ drop trigger if exists trg_movimientos_cubetas_updated_at on public.movimientos_
 create trigger trg_movimientos_cubetas_updated_at before update on public.movimientos_cubetas for each row execute function public.set_updated_at();
 
 alter table public.agricultores enable row level security;
+alter table public.acopiadores enable row level security;
 alter table public.productos enable row level security;
 alter table public.agricultor_producto_hectareas enable row level security;
 alter table public.personal_campo enable row level security;
@@ -575,6 +699,9 @@ alter table public.movimientos_cubetas enable row level security;
 
 drop policy if exists agricultores_authenticated_all on public.agricultores;
 create policy agricultores_authenticated_all on public.agricultores for all to authenticated using (true) with check (auth.uid() is not null);
+
+drop policy if exists acopiadores_authenticated_all on public.acopiadores;
+create policy acopiadores_authenticated_all on public.acopiadores for all to authenticated using (true) with check (auth.uid() is not null);
 
 drop policy if exists productos_authenticated_all on public.productos;
 create policy productos_authenticated_all on public.productos for all to authenticated using (true) with check (auth.uid() is not null);

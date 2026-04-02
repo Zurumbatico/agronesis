@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',          href: ROUTES.DASHBOARD,             icon: LayoutDashboard },
   // Maestros
   { label: 'Agricultores',       href: ROUTES.AGRICULTORES,          icon: Users,         group: 'Maestros' },
+  { label: 'Acopiadores',        href: ROUTES.ACOPIADORES,           icon: Users,         group: 'Maestros' },
   { label: 'Productos',          href: ROUTES.PRODUCTOS,             icon: Package,       group: 'Maestros' },
   { label: 'Centros de Acopio',  href: ROUTES.CENTROS_ACOPIO,        icon: Warehouse,     group: 'Maestros' },
   // Operaciones

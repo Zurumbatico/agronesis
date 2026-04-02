@@ -8,6 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import LoginPage from '@/features/auth/LoginPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
 import AgricultoresPage from '@/features/agricultores/AgricultoresPage'
+import AcopiadoresPage from '@/features/acopiadores/AcopiadoresPage'
 import ProductosPage from '@/features/productos/ProductosPage'
 import CentrosAcopioPage from '@/features/centros-acopio/CentrosAcopioPage'
 import LotesPage from '@/features/lotes/LotesPage'
@@ -39,6 +40,7 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
             <Route path={ROUTES.AGRICULTORES} element={<AgricultoresPage />} />
+            <Route path={ROUTES.ACOPIADORES} element={<AcopiadoresPage />} />
             <Route path={ROUTES.PRODUCTOS} element={<ProductosPage />} />
             <Route path={ROUTES.CENTROS_ACOPIO} element={<CentrosAcopioPage />} />
             <Route path={ROUTES.LOTES} element={<LotesPage />} />

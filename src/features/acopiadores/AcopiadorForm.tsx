@@ -2,28 +2,27 @@ import { useEffect, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { agricultorSchema, type AgricultorFormData } from '@/utils/validators'
+import { acopiadorSchema, type AcopiadorFormData } from '@/utils/validators'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FormField } from '@/components/shared/FormField'
 
-type AgricultorFormInput = z.input<typeof agricultorSchema>
+type AcopiadorFormInput = z.input<typeof acopiadorSchema>
 
-interface AgricultorFormProps {
-  defaultValues?: Partial<AgricultorFormData>
-  onSubmit: (data: AgricultorFormData) => Promise<void>
+interface AcopiadorFormProps {
+  defaultValues?: Partial<AcopiadorFormData>
+  onSubmit: (data: AcopiadorFormData) => Promise<void>
   onCancel: () => void
   isEditing?: boolean
 }
 
-export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }: AgricultorFormProps) {
-  const normalizedDefaults = useMemo<Partial<AgricultorFormInput>>(() => ({
+export function AcopiadorForm({ defaultValues, onSubmit, onCancel, isEditing }: AcopiadorFormProps) {
+  const normalizedDefaults = useMemo<Partial<AcopiadorFormInput>>(() => ({
     estado: 'activo',
     codigo: defaultValues?.codigo ?? 'AUTO',
     ...defaultValues,
-    nro_lote: defaultValues?.nro_lote ?? '',
     dni: defaultValues?.dni ?? '',
     telefono: defaultValues?.telefono ?? '',
     numero_cuenta: defaultValues?.numero_cuenta ?? '',
@@ -37,8 +36,8 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
     control,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<AgricultorFormInput>({
-    resolver: zodResolver(agricultorSchema) as any,
+  } = useForm<AcopiadorFormInput>({
+    resolver: zodResolver(acopiadorSchema) as any,
     defaultValues: normalizedDefaults,
   })
 
@@ -46,20 +45,20 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
     reset(normalizedDefaults)
   }, [normalizedDefaults, reset])
 
-  const handleValidSubmit = async (data: AgricultorFormInput) => {
-    await onSubmit(agricultorSchema.parse(data) as AgricultorFormData)
+  const handleValidSubmit = async (data: AcopiadorFormInput) => {
+    await onSubmit(acopiadorSchema.parse(data) as AcopiadorFormData)
   }
 
   return (
     <form onSubmit={handleSubmit(handleValidSubmit as any)} className="flex flex-col gap-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Código" error={errors.codigo?.message} required>
+        <FormField label="Codigo" error={errors.codigo?.message} required>
           {isEditing ? (
             <>
               <Input
                 value={defaultValues?.codigo ?? ''}
                 disabled
-                placeholder="AGRI-000001"
+                placeholder="ACO-000001"
                 className="cursor-not-allowed border-dashed bg-muted text-muted-foreground disabled:opacity-100"
               />
               <Input type="hidden" {...register('codigo')} />
@@ -70,7 +69,7 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
                 readOnly
                 aria-disabled="true"
                 value=""
-                placeholder="Se asigna automáticamente al guardar"
+                placeholder="Se asigna automaticamente al guardar"
                 className="cursor-not-allowed border-dashed bg-muted text-muted-foreground placeholder:text-muted-foreground/90"
               />
               <Input type="hidden" {...register('codigo')} />
@@ -98,10 +97,6 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
           <Input placeholder="Juan" {...register('nombre')} />
         </FormField>
 
-        <FormField label="Nro de lote" error={errors.nro_lote?.message}>
-          <Input placeholder="Ej: 2KEA" maxLength={20} {...register('nro_lote')} />
-        </FormField>
-
         <FormField label="Apellido" error={errors.apellido?.message} required>
           <Input placeholder="Quispe" {...register('apellido')} />
         </FormField>
@@ -110,7 +105,7 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
           <Input placeholder="12345678" maxLength={8} {...register('dni')} />
         </FormField>
 
-        <FormField label="Teléfono" error={errors.telefono?.message}>
+        <FormField label="Telefono" error={errors.telefono?.message}>
           <Input placeholder="987 654 321" {...register('telefono')} />
         </FormField>
 
@@ -121,11 +116,10 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
         <FormField label="Fecha de alta" error={errors.fecha_alta?.message} required>
           <Input type="date" {...register('fecha_alta')} />
         </FormField>
-
       </div>
 
-      <FormField label="Ubicación" error={errors.ubicacion?.message}>
-        <Textarea placeholder="Sector, dirección o referencia..." rows={2} {...register('ubicacion')} />
+      <FormField label="Ubicacion" error={errors.ubicacion?.message}>
+        <Textarea placeholder="Sector, direccion o referencia..." rows={2} {...register('ubicacion')} />
       </FormField>
 
       <div className="flex gap-3 justify-end pt-2">
@@ -133,7 +127,7 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
           Cancelar
         </Button>
         <Button type="submit" loading={isSubmitting}>
-          {isEditing ? 'Guardar cambios' : 'Registrar agricultor'}
+          {isEditing ? 'Guardar cambios' : 'Registrar acopiador'}
         </Button>
       </div>
     </form>

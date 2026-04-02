@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AcopiadorPicker } from '@/components/shared/AcopiadorPicker'
 import { FormField } from '@/components/shared/FormField'
 import { useAgricultores } from '@/features/agricultores/hooks/useAgricultores'
+import { useAcopiadores } from '@/features/acopiadores/hooks/useAcopiadores'
 import { useProductos } from '@/features/productos/hooks/useProductos'
 import { useCentrosAcopio } from '@/features/centros-acopio/hooks/useCentrosAcopio'
 import { format } from 'date-fns'
@@ -24,15 +26,24 @@ interface LoteFormProps {
 
 export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteFormProps) {
   const { agricultores } = useAgricultores()
+  const { acopiadores } = useAcopiadores()
   const { productos } = useProductos()
   const { centros } = useCentrosAcopio()
 
   const normalizedDefaults = useMemo<Partial<LoteFormInput>>(() => ({
     codigo: defaultValues?.codigo ?? 'AUTO',
+    agricultor_id: defaultValues?.agricultor_id ?? '',
+    acopiador_combined: defaultValues?.acopiador_agricultor_id
+      ? `agri:${defaultValues.acopiador_agricultor_id}`
+      : defaultValues?.acopiador_id
+      ? `aco:${defaultValues.acopiador_id}`
+      : '',
+    producto_id: defaultValues?.producto_id ?? '',
+    centro_acopio_id: defaultValues?.centro_acopio_id ?? '',
     fecha_ingreso: defaultValues?.fecha_ingreso ?? format(new Date(), 'yyyy-MM-dd'),
-    peso_tara_kg: defaultValues?.peso_tara_kg ?? 0,
+    peso_tara_kg: defaultValues?.peso_tara_kg,
     peso_neto_kg: defaultValues?.peso_neto_kg ?? 0,
-    num_cubetas: defaultValues?.num_cubetas ?? 0,
+    num_cubetas: defaultValues?.num_cubetas,
     ...defaultValues,
     observaciones: defaultValues?.observaciones ?? '',
   }), [defaultValues])
@@ -48,20 +59,24 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
 
   const pesoBruto = watch('peso_bruto_kg')
   const pesoTara = watch('peso_tara_kg')
+  const numCubetas = watch('num_cubetas')
 
   useEffect(() => {
     const bruto = Number.isFinite(pesoBruto) ? Number(pesoBruto) : 0
-    const tara = Number.isFinite(pesoTara) ? Number(pesoTara) : 0
-    const neto = Math.max(bruto - tara, 0)
+    const taraJaba = Number.isFinite(pesoTara) ? Number(pesoTara) : 0
+    const jabas = Number.isFinite(numCubetas) ? Number(numCubetas) : 0
+    const neto = Math.max(bruto - taraJaba * jabas, 0)
     setValue('peso_neto_kg', Number(neto.toFixed(2)), { shouldValidate: true, shouldDirty: true })
-  }, [pesoBruto, pesoTara, setValue])
+  }, [pesoBruto, pesoTara, numCubetas, setValue])
 
   const agricultoresActivos = agricultores.filter((a) => a.estado === 'activo')
+  const acopiadoresActivos = acopiadores.filter((a) => a.estado === 'activo')
   const productosActivos = productos
   const centrosActivos = centros.filter((c) => c.estado === 'activo')
 
   const handleValidSubmit = async (data: LoteFormInput) => {
-    await onSubmit(loteSchema.parse(data) as LoteFormData)
+    const { acopiador_combined: _c, ...rest } = loteSchema.parse(data) as any
+    await onSubmit(rest as LoteFormData)
   }
 
   return (
@@ -98,7 +113,13 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
 
         <FormField label="Agricultor" error={errors.agricultor_id?.message} required className="sm:col-span-2">
           <Controller name="agricultor_id" control={control} render={({ field }) => (
-            <Select onValueChange={field.onChange} value={field.value}>
+            <Select
+              onValueChange={(value) => {
+                field.onChange(value)
+                setValue('acopiador_combined', `agri:${value}`)
+              }}
+              value={field.value ?? ''}
+            >
               <SelectTrigger><SelectValue placeholder="Seleccionar agricultor..." /></SelectTrigger>
               <SelectContent>
                 {agricultoresActivos.map((a) => (
@@ -109,9 +130,26 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
           )} />
         </FormField>
 
+        <FormField
+          label="Acopiador"
+          error={errors.acopiador_combined?.message}
+          required
+          className="sm:col-span-2"
+        >
+          <Controller name="acopiador_combined" control={control} render={({ field }) => (
+            <AcopiadorPicker
+              value={field.value ?? ''}
+              onChange={field.onChange}
+              agricultores={agricultoresActivos}
+              acopiadores={acopiadoresActivos}
+              error={!!errors.acopiador_combined}
+            />
+          )} />
+        </FormField>
+
         <FormField label="Producto" error={errors.producto_id?.message} required>
           <Controller name="producto_id" control={control} render={({ field }) => (
-            <Select onValueChange={field.onChange} value={field.value}>
+            <Select onValueChange={field.onChange} value={field.value ?? ''}>
               <SelectTrigger><SelectValue placeholder="Seleccionar producto..." /></SelectTrigger>
               <SelectContent>
                 {productosActivos.map((p) => (
@@ -124,7 +162,7 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
 
         <FormField label="Centro de acopio" error={errors.centro_acopio_id?.message} required>
           <Controller name="centro_acopio_id" control={control} render={({ field }) => (
-            <Select onValueChange={field.onChange} value={field.value}>
+            <Select onValueChange={field.onChange} value={field.value ?? ''}>
               <SelectTrigger><SelectValue placeholder="Seleccionar centro..." /></SelectTrigger>
               <SelectContent>
                 {centrosActivos.map((c) => (
@@ -139,8 +177,16 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
           <Input type="number" step="0.01" min="0.01" placeholder="0.00" {...register('peso_bruto_kg', { valueAsNumber: true })} />
         </FormField>
 
-        <FormField label="Tara (kg)" error={errors.peso_tara_kg?.message} required>
-          <Input type="number" step="0.01" min="0" placeholder="0.00" {...register('peso_tara_kg', { valueAsNumber: true })} />
+        <FormField label="Tara por jaba (kg)" error={errors.peso_tara_kg?.message} required>
+          <Input
+            type="number"
+            step="0.01"
+            min="0"
+            placeholder="0"
+            {...register('peso_tara_kg', {
+              setValueAs: (value) => value === '' ? 0 : Number(value),
+            })}
+          />
         </FormField>
 
         <FormField label="Peso neto (kg)" error={errors.peso_neto_kg?.message} required>
@@ -155,7 +201,15 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
         </FormField>
 
         <FormField label="N° jabas" error={errors.num_cubetas?.message} required>
-          <Input type="number" min="0" step="1" placeholder="0" {...register('num_cubetas', { valueAsNumber: true })} />
+          <Input
+            type="number"
+            min="0"
+            step="1"
+            placeholder="0"
+            {...register('num_cubetas', {
+              setValueAs: (value) => value === '' ? 0 : Number(value),
+            })}
+          />
         </FormField>
       </div>
 

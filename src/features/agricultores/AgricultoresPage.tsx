@@ -31,7 +31,7 @@ export default function AgricultoresPage() {
   const [tamanoPagina, setTamanoPagina] = useState(12)
 
   const filtrados = agricultores.filter((a) =>
-    `${a.nombre} ${a.apellido} ${a.codigo} ${a.dni ?? ''} ${a.numero_cuenta ?? ''} ${a.fecha_alta ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
+    `${a.nombre} ${a.apellido} ${a.codigo} ${a.nro_lote ?? ''} ${a.dni ?? ''} ${a.numero_cuenta ?? ''} ${a.fecha_alta ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
   )
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / tamanoPagina))
@@ -78,9 +78,13 @@ export default function AgricultoresPage() {
   }
 
   const handleSubmit = async (data: AgricultorFormData) => {
-    if (editandoId) await actualizar(editandoId, data)
-    else await crear(data)
-    cerrar()
+    try {
+      if (editandoId) await actualizar(editandoId, data)
+      else await crear(data)
+      cerrar()
+    } catch (e) {
+      setDialogError((e as Error).message)
+    }
   }
 
   const handleEliminar = async (id: string) => {
@@ -173,6 +177,9 @@ export default function AgricultoresPage() {
               </div>
 
               <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+                {a.nro_lote && (
+                  <span>Nro lote: {a.nro_lote}</span>
+                )}
                 {a.telefono && (
                   <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{a.telefono}</span>
                 )}
@@ -202,6 +209,7 @@ export default function AgricultoresPage() {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Agricultor</TableHead>
                 <TableHead>DNI</TableHead>
+                <TableHead>Nro lote</TableHead>
                 <TableHead>Contacto</TableHead>
                 <TableHead>N° cuenta</TableHead>
                 <TableHead>Fecha alta</TableHead>
@@ -218,6 +226,7 @@ export default function AgricultoresPage() {
                     <p className="text-xs text-muted-foreground">{a.codigo}</p>
                   </TableCell>
                   <TableCell>{a.dni || '—'}</TableCell>
+                  <TableCell>{a.nro_lote || '—'}</TableCell>
                   <TableCell>{a.telefono || '—'}</TableCell>
                   <TableCell>{a.numero_cuenta || '—'}</TableCell>
                   <TableCell>{a.fecha_alta || '—'}</TableCell>

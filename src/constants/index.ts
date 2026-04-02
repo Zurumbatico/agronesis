@@ -70,6 +70,7 @@ export const ROUTES = {
   AGRICULTORES:             '/agricultores',
   AGRICULTORES_NUEVO:       '/agricultores/nuevo',
   AGRICULTORES_EDITAR:      '/agricultores/:id/editar',
+  ACOPIADORES:              '/acopiadores',
   PRODUCTOS:                '/productos',
   PRODUCTOS_NUEVO:          '/productos/nuevo',
   PRODUCTOS_EDITAR:         '/productos/:id/editar',

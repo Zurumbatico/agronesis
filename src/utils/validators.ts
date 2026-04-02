@@ -4,19 +4,15 @@ import { z } from 'zod'
 // SCHEMAS DE VALIDACIÓN REUTILIZABLES
 // ─────────────────────────────────────────────
 
-export const dniSchema = z
-  .string()
-  .regex(/^\d{8}$/, 'El DNI debe tener exactamente 8 dígitos')
-  .optional()
-  .or(z.literal(''))
-  .transform((v) => v || null)
+export const dniSchema = z.preprocess(
+  (v) => (v === '' || v == null ? null : v),
+  z.string().regex(/^\d{8}$/, 'El DNI debe tener exactamente 8 dígitos').nullable()
+)
 
-export const telefonoSchema = z
-  .string()
-  .regex(/^[0-9+\s()-]{7,15}$/, 'Teléfono inválido')
-  .optional()
-  .or(z.literal(''))
-  .transform((v) => v || null)
+export const telefonoSchema = z.preprocess(
+  (v) => (v === '' || v == null ? null : v),
+  z.string().regex(/^[0-9+\s()-]{7,15}$/, 'Teléfono inválido').nullable()
+)
 
 export const codigoSchema = z
   .string()
@@ -49,6 +45,12 @@ export const hectareasSchema = z
   .positive('Las hectáreas deben ser mayores a 0')
   .max(10000, 'Hectáreas fuera de rango')
 
+export const observacionesSchema = z
+  .string()
+  .max(500)
+  .nullish()
+  .transform((value) => value || null)
+
 // ─────────────────────────────────────────────
 // SCHEMAS DE ENTIDADES
 // ─────────────────────────────────────────────
@@ -60,13 +62,26 @@ export const agricultorHectareaSchema = z.object({
 
 export const agricultorSchema = z.object({
   codigo:    codigoSchema,
+  nro_lote:  z.string().max(20, 'Maximo 20 caracteres').nullish().transform((v) => v || null),
   nombre:    nombreSchema,
   apellido:  nombreSchema,
   dni:       dniSchema,
   telefono:  telefonoSchema,
-  numero_cuenta: z.string().max(50, 'Máximo 50 caracteres').optional().or(z.literal('')).transform((v) => v || null),
+  numero_cuenta: z.string().max(50, 'Maximo 50 caracteres').nullish().transform((v) => v || null),
   fecha_alta: z.string().min(1, 'Ingrese la fecha de alta'),
-  ubicacion: z.string().max(200).optional().or(z.literal('')).transform((v) => v || null),
+  ubicacion: z.string().max(200).nullish().transform((v) => v || null),
+  estado:    z.enum(['activo', 'inactivo']),
+})
+
+export const acopiadorSchema = z.object({
+  codigo:    codigoSchema,
+  nombre:    nombreSchema,
+  apellido:  nombreSchema,
+  dni:       dniSchema,
+  telefono:  telefonoSchema,
+  numero_cuenta: z.string().max(50, 'Maximo 50 caracteres').nullish().transform((v) => v || null),
+  fecha_alta: z.string().min(1, 'Ingrese la fecha de alta'),
+  ubicacion: z.string().max(200).nullish().transform((v) => v || null),
   estado:    z.enum(['activo', 'inactivo']),
 })
 
@@ -81,16 +96,17 @@ export const productoSchema = z.object({
 export const centroAcopioSchema = z.object({
   codigo:      codigoSchema,
   nombre:      nombreSchema,
-  ubicacion:   z.string().max(200).optional().or(z.literal('')).transform((v) => v || null),
-  responsable: z.string().max(100).optional().or(z.literal('')).transform((v) => v || null),
+  ubicacion:   z.string().max(200).nullish().transform((v) => v || null),
+  responsable: z.string().max(100).nullish().transform((v) => v || null),
   estado:      z.enum(['activo', 'inactivo']),
 })
 
 export const loteSchema = z.object({
-  codigo:           codigoSchema,
-  agricultor_id:    z.string().uuid('Seleccione un agricultor'),
-  producto_id:      z.string().uuid('Seleccione un producto'),
-  centro_acopio_id: z.string().uuid('Seleccione un centro de acopio'),
+  codigo:             codigoSchema,
+  agricultor_id:      z.string().uuid('Seleccione un agricultor'),
+  acopiador_combined: z.string().min(1, 'Seleccione un acopiador'),
+  producto_id:        z.string().uuid('Seleccione un producto'),
+  centro_acopio_id:   z.string().uuid('Seleccione un centro de acopio'),
   fecha_ingreso:    z.string().min(1, 'Ingrese la fecha de ingreso'),
   peso_bruto_kg:    pesoKgSchema,
   peso_tara_kg:     z
@@ -99,15 +115,16 @@ export const loteSchema = z.object({
     .max(50000, 'Peso fuera de rango (máx 50,000 kg)'),
   peso_neto_kg:     pesoKgSchema,
   num_cubetas:      cantidadEnteraSchema,
-  observaciones:    z.string().max(500).optional().or(z.literal('')).transform((v) => v || null),
+  observaciones:    observacionesSchema,
 }).superRefine((data, ctx) => {
-  const pesoNetoEsperado = Number((data.peso_bruto_kg - data.peso_tara_kg).toFixed(2))
+  const totalTara = Number((data.peso_tara_kg * data.num_cubetas).toFixed(2))
+  const pesoNetoEsperado = Number((data.peso_bruto_kg - totalTara).toFixed(2))
 
-  if (data.peso_tara_kg >= data.peso_bruto_kg) {
+  if (totalTara >= data.peso_bruto_kg) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['peso_tara_kg'],
-      message: 'La tara debe ser menor al peso bruto',
+      message: 'La tara total (tara × jabas) debe ser menor al peso bruto',
     })
   }
 
@@ -115,8 +132,17 @@ export const loteSchema = z.object({
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['peso_neto_kg'],
-      message: 'El peso neto debe coincidir con peso bruto - tara',
+      message: 'El peso neto debe coincidir con peso bruto - (tara × jabas)',
     })
+  }
+}).transform((data) => {
+  const colonIdx = data.acopiador_combined.indexOf(':')
+  const type  = data.acopiador_combined.slice(0, colonIdx)
+  const refId = data.acopiador_combined.slice(colonIdx + 1)
+  return {
+    ...data,
+    acopiador_id:            type === 'aco'  ? refId : null,
+    acopiador_agricultor_id: type === 'agri' ? refId : null,
   }
 })
 
@@ -126,7 +152,7 @@ export const clasificacionSchema = z.object({
   peso_kg:             pesoKgSchema,
   num_cajas:           cantidadEnteraSchema,
   fecha_clasificacion: z.string().min(1, 'Ingrese la fecha'),
-  observaciones:       z.string().max(500).optional().or(z.literal('')).transform((v) => v || null),
+  observaciones:       observacionesSchema,
 })
 
 export const despachoSchema = z.object({
@@ -138,7 +164,7 @@ export const despachoSchema = z.object({
   num_cajas_despachadas: cantidadEnteraSchema,
   peso_neto_kg:         pesoKgSchema,
   precio_venta_kg:      precioSchema,
-  observaciones:        z.string().max(500).optional().or(z.literal('')).transform((v) => v || null),
+  observaciones:        observacionesSchema,
 })
 
 export const movimientoCubetaSchema = z.object({
@@ -147,13 +173,14 @@ export const movimientoCubetaSchema = z.object({
   tipo:          z.enum(['entrega', 'devolucion']),
   cantidad:      cantidadEnteraSchema.refine((v) => v > 0, 'La cantidad debe ser mayor a 0'),
   fecha:         z.string().min(1, 'Ingrese la fecha'),
-  observaciones: z.string().max(500).optional().or(z.literal('')).transform((v) => v || null),
+  observaciones: observacionesSchema,
 })
 
 // ─────────────────────────────────────────────
 // TIPOS INFERIDOS DE SCHEMAS
 // ─────────────────────────────────────────────
 export type AgricultorFormData       = z.infer<typeof agricultorSchema>
+export type AcopiadorFormData        = z.infer<typeof acopiadorSchema>
 export type ProductoFormData         = z.infer<typeof productoSchema>
 export type CentroAcopioFormData     = z.infer<typeof centroAcopioSchema>
 export type LoteFormData             = z.infer<typeof loteSchema>

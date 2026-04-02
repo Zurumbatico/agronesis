@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ESTADO_LOTE_CONFIG } from '@/constants'
+import { CALIDAD_PRODUCTO_CONFIG, ESTADO_LOTE_CONFIG, TIPO_PRODUCCION_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
 import { formatFecha, formatPeso } from '@/utils/formatters'
 import type { LoteFormData } from '@/utils/validators'
 import type { EstadoLote, Lote } from '@/types/models'
@@ -24,18 +24,24 @@ export default function LotesPage() {
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoLote | 'todos'>('todos')
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [dialogError, setDialogError] = useState<string | null>(null)
   const [ticketLote, setTicketLote] = useState<Lote | null>(null)
 
   const filtrados = lotes.filter((l) => {
-    const coincideBusqueda = `${l.codigo} ${l.agricultor?.nombre ?? ''} ${l.agricultor?.apellido ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
+    const coincideBusqueda = `${l.codigo} ${l.agricultor?.nombre ?? ''} ${l.agricultor?.apellido ?? ''} ${l.acopiador?.nombre ?? ''} ${l.acopiador?.apellido ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
     const coincideEstado = filtroEstado === 'todos' || l.estado === filtroEstado
     return coincideBusqueda && coincideEstado
   })
 
   const handleSubmit = async (data: LoteFormData) => {
-    const nuevo = await crear(data)
-    setDialogOpen(false)
-    setTicketLote(nuevo)
+    try {
+      const nuevo = await crear(data)
+      setDialogError(null)
+      setDialogOpen(false)
+      setTicketLote(nuevo)
+    } catch (e) {
+      setDialogError((e as Error).message)
+    }
   }
 
   if (loading) return <LoadingPage />
@@ -46,7 +52,7 @@ export default function LotesPage() {
       <PageHeader
         title="Lotes"
         description={`${lotes.length} registrados`}
-        actions={<Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4" /> Nuevo lote</Button>}
+        actions={<Button onClick={() => { setDialogError(null); setDialogOpen(true) }}><Plus className="h-4 w-4" /> Nuevo lote</Button>}
       />
 
       {/* Filtros */}
@@ -73,7 +79,7 @@ export default function LotesPage() {
         <EmptyState
           title="Sin lotes"
           description="Registra el primer lote del día."
-          action={<Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4" /> Nuevo lote</Button>}
+          action={<Button onClick={() => { setDialogError(null); setDialogOpen(true) }}><Plus className="h-4 w-4" /> Nuevo lote</Button>}
         />
       ) : (
         <div className="flex flex-col gap-2">
@@ -106,7 +112,8 @@ export default function LotesPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Registrar nuevo lote</DialogTitle></DialogHeader>
-          <LoteForm onSubmit={handleSubmit} onCancel={() => setDialogOpen(false)} />
+          {dialogError && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{dialogError}</p>}
+          <LoteForm onSubmit={handleSubmit} onCancel={() => { setDialogError(null); setDialogOpen(false) }} />
         </DialogContent>
       </Dialog>
 
@@ -127,10 +134,27 @@ export default function LotesPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Agricultor</p>
                   <p>{ticketLote.agricultor?.apellido}, {ticketLote.agricultor?.nombre}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Nro. lote: {ticketLote.agricultor?.nro_lote || '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Acopiador</p>
+                  <p>{ticketLote.acopiador?.apellido}, {ticketLote.acopiador?.nombre}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Producto</p>
-                  <p>{ticketLote.producto?.nombre}</p>
+                  {ticketLote.producto ? (
+                    <div className="space-y-1">
+                      <p className="font-medium">{ticketLote.producto.nombre}</p>
+                      <p className="text-xs text-muted-foreground">Codigo: {ticketLote.producto.codigo}</p>
+                      <p className="text-xs text-muted-foreground">Variedad: {VARIEDAD_PRODUCTO_CONFIG[ticketLote.producto.variedad].label}</p>
+                      <p className="text-xs text-muted-foreground">Calidad: {CALIDAD_PRODUCTO_CONFIG[ticketLote.producto.calidad].label}</p>
+                      <p className="text-xs text-muted-foreground">Tipo: {TIPO_PRODUCCION_CONFIG[ticketLote.producto.tipo_produccion].label}</p>
+                    </div>
+                  ) : (
+                    <p>-</p>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div>

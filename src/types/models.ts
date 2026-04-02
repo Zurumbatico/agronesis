@@ -5,6 +5,7 @@ import type { BaseEntity, EstadoActivo, UUID } from './common'
 // ─────────────────────────────────────────────
 export interface Agricultor extends BaseEntity {
   codigo: string
+  nro_lote: string | null
   nombre: string
   apellido: string
   dni: string | null
@@ -18,6 +19,21 @@ export interface Agricultor extends BaseEntity {
 
 export type AgricultorInsert = Omit<Agricultor, keyof BaseEntity | 'hectareas'>
 export type AgricultorUpdate = Partial<AgricultorInsert>
+
+export interface Acopiador extends BaseEntity {
+  codigo: string
+  nombre: string
+  apellido: string
+  dni: string | null
+  telefono: string | null
+  numero_cuenta: string | null
+  fecha_alta: string
+  ubicacion: string | null
+  estado: EstadoActivo
+}
+
+export type AcopiadorInsert = Omit<Acopiador, keyof BaseEntity>
+export type AcopiadorUpdate = Partial<AcopiadorInsert>
 
 export interface AgricultorHectarea extends BaseEntity {
   agricultor_id: UUID
@@ -75,6 +91,8 @@ export type EstadoLote =
 export interface Lote extends BaseEntity {
   codigo: string
   agricultor_id: UUID
+  acopiador_id: UUID | null
+  acopiador_agricultor_id: UUID | null
   producto_id: UUID
   centro_acopio_id: UUID
   fecha_ingreso: string           // ISO date
@@ -86,11 +104,13 @@ export interface Lote extends BaseEntity {
   estado: EstadoLote
   // relaciones (join)
   agricultor?: Agricultor
+  acopiador?: Acopiador
+  acopiador_agricultor?: Agricultor
   producto?: Producto
   centro_acopio?: CentroAcopio
 }
 
-export type LoteInsert = Omit<Lote, keyof BaseEntity | 'agricultor' | 'producto' | 'centro_acopio'>
+export type LoteInsert = Omit<Lote, keyof BaseEntity | 'agricultor' | 'acopiador' | 'acopiador_agricultor' | 'producto' | 'centro_acopio'>
 export type LoteUpdate = Partial<LoteInsert>
 
 // ─────────────────────────────────────────────

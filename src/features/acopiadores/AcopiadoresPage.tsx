@@ -1,32 +1,32 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Pencil, Trash2, LayoutGrid, List } from 'lucide-react'
-import { useProductos } from './hooks/useProductos'
-import { ProductoForm } from './ProductoForm'
+import { Plus, Search, Pencil, Trash2, Phone, MapPin, LayoutGrid, List } from 'lucide-react'
+import { useAcopiadores } from './hooks/useAcopiadores'
+import { AcopiadorForm } from './AcopiadorForm'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { LoadingPage } from '@/components/shared/Spinner'
+import { EstadoActivoBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { CALIDAD_PRODUCTO_CONFIG, TIPO_PRODUCCION_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
-import type { Producto } from '@/types/models'
-import type { ProductoFormData } from '@/utils/validators'
+import type { Acopiador } from '@/types/models'
+import type { AcopiadorFormData } from '@/utils/validators'
 
-export default function ProductosPage() {
-  const { productos, loading, error, reload, crear, actualizar, eliminar } = useProductos()
+export default function AcopiadoresPage() {
+  const { acopiadores, loading, error, reload, crear, actualizar, eliminar } = useAcopiadores()
   const [busqueda, setBusqueda] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editando, setEditando] = useState<Producto | null>(null)
+  const [editando, setEditando] = useState<Acopiador | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [vista, setVista] = useState<'cards' | 'lista'>('lista')
   const [paginaActual, setPaginaActual] = useState(1)
   const [tamanoPagina, setTamanoPagina] = useState(12)
 
-  const filtrados = productos.filter((p) =>
-    `${p.nombre} ${p.codigo}`.toLowerCase().includes(busqueda.toLowerCase())
+  const filtrados = acopiadores.filter((a) =>
+    `${a.nombre} ${a.apellido} ${a.codigo} ${a.dni ?? ''} ${a.telefono ?? ''} ${a.ubicacion ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
   )
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / tamanoPagina))
@@ -40,10 +40,10 @@ export default function ProductosPage() {
   }, [paginaActual, totalPaginas])
 
   const abrirNuevo = () => { setEditando(null); setDialogError(null); setDialogOpen(true) }
-  const abrirEditar = (p: Producto) => { setEditando(p); setDialogError(null); setDialogOpen(true) }
+  const abrirEditar = (a: Acopiador) => { setEditando(a); setDialogError(null); setDialogOpen(true) }
   const cerrar = () => { setDialogOpen(false); setEditando(null); setDialogError(null) }
 
-  const handleSubmit = async (data: ProductoFormData) => {
+  const handleSubmit = async (data: AcopiadorFormData) => {
     try {
       if (editando) await actualizar(editando.id, data)
       else await crear(data)
@@ -53,19 +53,14 @@ export default function ProductosPage() {
     }
   }
 
-  const handleEliminar = async (id: string) => {
-    if (!confirm('¿Eliminar este producto?')) return
-    await eliminar(id)
-  }
-
   if (loading) return <LoadingPage />
   if (error) return <ErrorMessage message={error} onRetry={reload} />
 
   return (
     <div>
       <PageHeader
-        title="Productos"
-        description={`${productos.length} registrados`}
+        title="Acopiadores"
+        description={`${acopiadores.length} registrados`}
         actions={<Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Nuevo</Button>}
       />
 
@@ -120,24 +115,29 @@ export default function ProductosPage() {
       </div>
 
       {filtrados.length === 0 ? (
-        <EmptyState title="Sin productos" action={!busqueda ? <Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Agregar</Button> : undefined} />
+        <EmptyState title="Sin acopiadores" action={!busqueda ? <Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Agregar</Button> : undefined} />
       ) : vista === 'cards' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {paginados.map((p) => (
-            <div key={p.id} className="bg-card border rounded-xl p-4 flex flex-col gap-2 hover:shadow-md transition-shadow">
+          {paginados.map((a) => (
+            <div key={a.id} className="bg-card border rounded-xl p-4 flex flex-col gap-2 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="font-semibold">{p.nombre}</p>
-                  <p className="text-xs text-muted-foreground">{p.codigo} · {VARIEDAD_PRODUCTO_CONFIG[p.variedad].label}</p>
+                  <p className="font-semibold">{a.apellido}, {a.nombre}</p>
+                  <p className="text-xs text-muted-foreground">{a.codigo}</p>
                 </div>
+                <EstadoActivoBadge estado={a.estado} />
               </div>
-              <div className="text-sm text-muted-foreground flex flex-wrap gap-3">
-                <span>Calidad: <strong className="text-foreground">{CALIDAD_PRODUCTO_CONFIG[p.calidad].label}</strong></span>
-                <span>Produccion: <strong className="text-foreground">{TIPO_PRODUCCION_CONFIG[p.tipo_produccion].label}</strong></span>
+              <div className="text-sm text-muted-foreground flex flex-col gap-0.5">
+                {a.telefono && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{a.telefono}</span>}
+                {a.ubicacion && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{a.ubicacion}</span>}
               </div>
               <div className="flex gap-2 pt-2 border-t">
-                <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(p)}><Pencil className="h-3.5 w-3.5 mr-1" /> Editar</Button>
-                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleEliminar(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(a)}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                </Button>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este acopiador?')) eliminar(a.id) }}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
           ))}
@@ -147,29 +147,29 @@ export default function ProductosPage() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Producto</TableHead>
-                <TableHead>Variedad</TableHead>
-                <TableHead>Calidad</TableHead>
-                <TableHead>Produccion</TableHead>
+                <TableHead>Acopiador</TableHead>
+                <TableHead>DNI</TableHead>
+                <TableHead>Telefono</TableHead>
+                <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginados.map((p) => (
-                <TableRow key={p.id}>
+              {paginados.map((a) => (
+                <TableRow key={a.id}>
                   <TableCell>
-                    <p className="font-medium">{p.nombre}</p>
-                    <p className="text-xs text-muted-foreground">{p.codigo}</p>
+                    <p className="font-medium">{a.apellido}, {a.nombre}</p>
+                    <p className="text-xs text-muted-foreground">{a.codigo}</p>
                   </TableCell>
-                  <TableCell>{VARIEDAD_PRODUCTO_CONFIG[p.variedad].label}</TableCell>
-                  <TableCell>{CALIDAD_PRODUCTO_CONFIG[p.calidad].label}</TableCell>
-                  <TableCell>{TIPO_PRODUCCION_CONFIG[p.tipo_produccion].label}</TableCell>
+                  <TableCell>{a.dni || '—'}</TableCell>
+                  <TableCell>{a.telefono || '—'}</TableCell>
+                  <TableCell><EstadoActivoBadge estado={a.estado} /></TableCell>
                   <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => abrirEditar(p)}>
-                        <Pencil className="h-3.5 w-3.5" />
+                    <div className="flex justify-end gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => abrirEditar(a)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleEliminar(p.id)}>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este acopiador?')) eliminar(a.id) }}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -212,11 +212,11 @@ export default function ProductosPage() {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) cerrar(); else setDialogOpen(true) }}>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>{editando ? 'Editar producto' : 'Nuevo producto'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editando ? 'Editar acopiador' : 'Nuevo acopiador'}</DialogTitle></DialogHeader>
           {dialogError && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{dialogError}</p>}
-          <ProductoForm defaultValues={editando ?? undefined} onSubmit={handleSubmit} onCancel={cerrar} isEditing={!!editando} />
+          <AcopiadorForm defaultValues={editando ?? undefined} onSubmit={handleSubmit} onCancel={cerrar} isEditing={!!editando} />
         </DialogContent>
       </Dialog>
     </div>

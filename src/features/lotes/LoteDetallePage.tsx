@@ -10,7 +10,13 @@ import { EstadoLoteBadge, CategoriaClasificacionBadge } from '@/components/share
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoteTimeline } from './LoteTimeline'
-import { ROUTES, DESTINO_DESPACHO_CONFIG } from '@/constants'
+import {
+  ROUTES,
+  DESTINO_DESPACHO_CONFIG,
+  VARIEDAD_PRODUCTO_CONFIG,
+  CALIDAD_PRODUCTO_CONFIG,
+  TIPO_PRODUCCION_CONFIG,
+} from '@/constants'
 import { formatFecha, formatPeso, formatMoneda } from '@/utils/formatters'
 import { calcularTotalesClasificacion } from '@/utils/business-rules'
 import { siguienteEstadoLote } from '@/utils/business-rules'
@@ -40,7 +46,8 @@ export default function LoteDetallePage() {
     } catch (e) {
       setError((e as Error).message)
     } finally {
-      setLoading(false) }
+      setLoading(false)
+    }
   }
 
   useEffect(() => { cargar() }, [id])
@@ -63,6 +70,11 @@ export default function LoteDetallePage() {
 
   const totalesClasif = calcularTotalesClasificacion(clasificaciones)
   const siguienteEstado = siguienteEstadoLote(lote.estado)
+  const acopiadorNombre = lote.acopiador
+    ? `${lote.acopiador.apellido}, ${lote.acopiador.nombre}`
+    : lote.acopiador_agricultor
+      ? `${lote.acopiador_agricultor.apellido}, ${lote.acopiador_agricultor.nombre}`
+      : '-'
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -106,17 +118,87 @@ export default function LoteDetallePage() {
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-base">Información general</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div><p className="text-muted-foreground text-xs">Agricultor</p><p className="font-medium">{lote.agricultor?.apellido}, {lote.agricultor?.nombre}</p></div>
-                <div><p className="text-muted-foreground text-xs">Producto</p><p className="font-medium">{lote.producto?.nombre}</p></div>
-                <div><p className="text-muted-foreground text-xs">Centro de acopio</p><p className="font-medium">{lote.centro_acopio?.nombre}</p></div>
-                <div><p className="text-muted-foreground text-xs">Fecha ingreso</p><p className="font-medium">{formatFecha(lote.fecha_ingreso)}</p></div>
-                <div><p className="text-muted-foreground text-xs">Peso bruto</p><p className="font-medium">{formatPeso(lote.peso_bruto_kg)}</p></div>
-                <div><p className="text-muted-foreground text-xs">Tara</p><p className="font-medium">{formatPeso(lote.peso_tara_kg)}</p></div>
-                <div><p className="text-muted-foreground text-xs">Peso neto</p><p className="font-medium">{formatPeso(lote.peso_neto_kg)}</p></div>
-                <div><p className="text-muted-foreground text-xs">Cubetas</p><p className="font-medium">{lote.num_cubetas}</p></div>
-                <div className="col-span-2"><p className="text-muted-foreground text-xs">Estado</p><div className="mt-0.5"><EstadoLoteBadge estado={lote.estado} /></div></div>
-                {lote.observaciones && <div className="col-span-2"><p className="text-muted-foreground text-xs">Observaciones</p><p>{lote.observaciones}</p></div>}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <section className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Personas</p>
+                    <EstadoLoteBadge estado={lote.estado} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Agricultor</p>
+                    <p className="font-medium">{lote.agricultor?.apellido}, {lote.agricultor?.nombre}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Nro. lote agricultor</p>
+                    <p className="font-medium">{lote.agricultor?.nro_lote || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Acopiador</p>
+                    <p className="font-medium">{acopiadorNombre}</p>
+                  </div>
+                </section>
+
+                <section className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Producto</p>
+                  {lote.producto ? (
+                    <div className="space-y-1">
+                      <p className="font-semibold leading-tight">{lote.producto.nombre}</p>
+                      <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-xs">
+                        <p className="text-muted-foreground">Código</p>
+                        <p>{lote.producto.codigo}</p>
+                        <p className="text-muted-foreground">Variedad</p>
+                        <p>{VARIEDAD_PRODUCTO_CONFIG[lote.producto.variedad].label}</p>
+                        <p className="text-muted-foreground">Calidad</p>
+                        <p>{CALIDAD_PRODUCTO_CONFIG[lote.producto.calidad].label}</p>
+                        <p className="text-muted-foreground">Tipo</p>
+                        <p>{TIPO_PRODUCCION_CONFIG[lote.producto.tipo_produccion].label}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="font-medium">-</p>
+                  )}
+                </section>
+
+                <section className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Logística</p>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Centro de acopio</p>
+                    <p className="font-medium">{lote.centro_acopio?.nombre}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Fecha ingreso</p>
+                    <p className="font-medium">{formatFecha(lote.fecha_ingreso)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Cubetas</p>
+                    <p className="font-medium">{lote.num_cubetas}</p>
+                  </div>
+                </section>
+
+                <section className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Pesos</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-md bg-background p-2 border">
+                      <p className="text-[11px] text-muted-foreground">Bruto</p>
+                      <p className="font-semibold">{formatPeso(lote.peso_bruto_kg)}</p>
+                    </div>
+                    <div className="rounded-md bg-background p-2 border">
+                      <p className="text-[11px] text-muted-foreground">Tara</p>
+                      <p className="font-semibold">{formatPeso(lote.peso_tara_kg)}</p>
+                    </div>
+                    <div className="rounded-md bg-background p-2 border">
+                      <p className="text-[11px] text-muted-foreground">Neto</p>
+                      <p className="font-semibold text-primary">{formatPeso(lote.peso_neto_kg)}</p>
+                    </div>
+                  </div>
+                </section>
+
+                {lote.observaciones && (
+                  <section className="md:col-span-2 rounded-lg border bg-muted/20 p-3">
+                    <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Observaciones</p>
+                    <p className="mt-1">{lote.observaciones}</p>
+                  </section>
+                )}
               </div>
             </CardContent>
           </Card>
