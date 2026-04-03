@@ -104,7 +104,10 @@ export default function LoteDetallePage() {
               </Button>
             )}
             {(lote.estado === 'clasificado' || lote.estado === 'en_despacho') && (
-              <Button variant="outline" onClick={() => navigate(`/lotes/${id}/despachar`)}>
+              <Button
+                className="bg-agro-green hover:bg-agro-green/90 text-white font-semibold shadow-sm"
+                onClick={() => navigate(`/lotes/${id}/despachar`)}
+              >
                 Despachar
               </Button>
             )}

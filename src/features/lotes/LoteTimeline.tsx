@@ -20,6 +20,7 @@ export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
       {PASOS.map((paso, i) => {
         const completado = i < indexActual
         const activo = i === indexActual
+        const esPasoDespacho = paso === 'en_despacho'
         const { label } = ESTADO_LOTE_CONFIG[paso]
 
         return (
@@ -28,9 +29,11 @@ export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
             <div className="flex flex-col items-center">
               <div className={cn(
                 'flex items-center justify-center w-8 h-8 rounded-full border-2 shrink-0 transition-colors',
-                completado && 'bg-primary border-primary text-primary-foreground',
-                activo && 'bg-agro-green border-agro-green text-white',
-                !completado && !activo && 'border-border bg-background text-muted-foreground'
+                completado && 'bg-emerald-600 border-emerald-600 text-white',
+                esPasoDespacho && !completado && !activo && 'border-sky-300 bg-sky-50 text-sky-500',
+                activo && 'bg-amber-500 border-amber-500 text-white',
+                activo && esPasoDespacho && 'bg-sky-600 border-sky-600 text-white',
+                !completado && !activo && 'border-slate-300 bg-slate-50 text-slate-400'
               )}>
                 {completado ? (
                   <CheckCircle2 className="h-4 w-4" />
@@ -41,7 +44,7 @@ export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
                 )}
               </div>
               {i < PASOS.length - 1 && (
-                <div className={cn('w-0.5 h-6 mt-0.5', completado ? 'bg-primary' : 'bg-border')} />
+                <div className={cn('w-0.5 h-6 mt-0.5', completado ? 'bg-emerald-500' : 'bg-slate-200')} />
               )}
             </div>
 
@@ -49,8 +52,11 @@ export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
             <div className="pt-1 pb-4">
               <p className={cn(
                 'text-sm font-medium',
-                activo && 'text-agro-green font-semibold',
-                !completado && !activo && 'text-muted-foreground'
+                completado && 'text-emerald-700',
+                activo && 'text-amber-700 font-semibold',
+                esPasoDespacho && !completado && !activo && 'text-sky-700',
+                activo && esPasoDespacho && 'text-sky-700 font-semibold',
+                !completado && !activo && 'text-slate-500'
               )}>
                 {label}
               </p>

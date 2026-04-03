@@ -206,7 +206,7 @@ export default function AgricultoresPage() {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Agricultor</TableHead>
                 <TableHead>DNI</TableHead>
-                <TableHead>Contacto</TableHead>
+                <TableHead>Teléfono</TableHead>
                 <TableHead>N° cuenta</TableHead>
                 <TableHead>Fecha alta</TableHead>
                 <TableHead>Ubicación</TableHead>
