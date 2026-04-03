@@ -31,7 +31,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ totalLotes: 0, totalKgClasificado: 0, totalDespachos: 0, personalActivo: 0 })
   const [kgSemana, setKgSemana] = useState<{ semana: string; kg: number }[]>([])
-  const [cajasPorProducto, setCajasPorProducto] = useState<{ producto: string; primera: number; segunda: number; descarte: number }[]>([])
+  const [kgPorProducto, setKgPorProducto] = useState<{ producto: string; kg: number }[]>([])
 
   useEffect(() => {
     const cargar = async () => {
@@ -40,15 +40,15 @@ export default function DashboardPage() {
         const [{ count: totalLotes }, { count: totalDespachos }, { count: personalActivo }] = await Promise.all([
           supabase.from('lotes').select('*', { count: 'exact', head: true }),
           supabase.from('despachos').select('*', { count: 'exact', head: true }),
-          supabase.from('personal_campo').select('*', { count: 'exact', head: true }).eq('estado', 'activo'),
+          supabase.from('colaboradores').select('*', { count: 'exact', head: true }).eq('estado', 'activo'),
         ])
 
         const { data: clasificaciones } = await supabase
           .from('clasificaciones')
-          .select('peso_kg, fecha_clasificacion, categoria, lote:lotes(producto:productos(nombre))')
+          .select('peso_bueno_kg, fecha_clasificacion, lote:lotes(producto:productos(nombre))')
           .order('fecha_clasificacion', { ascending: true })
 
-        const totalKgClasificado = (clasificaciones ?? []).reduce((acc: number, c: any) => acc + (c.peso_kg ?? 0), 0)
+        const totalKgClasificado = (clasificaciones ?? []).reduce((acc: number, c: any) => acc + (c.peso_bueno_kg ?? 0), 0)
 
         setStats({
           totalLotes: totalLotes ?? 0,
@@ -63,24 +63,20 @@ export default function DashboardPage() {
           if (!c.fecha_clasificacion) continue
           const d = new Date(c.fecha_clasificacion)
           const semana = `S${Math.ceil(d.getDate() / 7)}-${d.toLocaleString('es', { month: 'short' })}`
-          semanas.set(semana, (semanas.get(semana) ?? 0) + (c.peso_kg ?? 0))
+          semanas.set(semana, (semanas.get(semana) ?? 0) + (c.peso_bueno_kg ?? 0))
         }
         const kgArr = Array.from(semanas.entries())
           .slice(-8)
           .map(([semana, kg]) => ({ semana, kg: Math.round(kg * 100) / 100 }))
         setKgSemana(kgArr)
 
-        // cajas por producto
-        const prodMap = new Map<string, { primera: number; segunda: number; descarte: number }>()
+        // kg buenos por producto
+        const prodMap = new Map<string, number>()
         for (const c of (clasificaciones ?? []) as any[]) {
           const prod = (c.lote?.producto?.nombre ?? 'Sin producto')
-          if (!prodMap.has(prod)) prodMap.set(prod, { primera: 0, segunda: 0, descarte: 0 })
-          const entry = prodMap.get(prod)!
-          if (c.categoria === 'primera') entry.primera += c.num_cajas ?? 0
-          else if (c.categoria === 'segunda') entry.segunda += c.num_cajas ?? 0
-          else if (c.categoria === 'descarte') entry.descarte += c.num_cajas ?? 0
+          prodMap.set(prod, (prodMap.get(prod) ?? 0) + (c.peso_bueno_kg ?? 0))
         }
-        setCajasPorProducto(Array.from(prodMap.entries()).map(([producto, v]) => ({ producto, ...v })))
+        setKgPorProducto(Array.from(prodMap.entries()).map(([producto, kg]) => ({ producto, kg: Math.round(kg * 100) / 100 })))
       } catch (e) {
         console.error('Dashboard error:', e)
       } finally {
@@ -131,28 +127,26 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Cajas por producto y categoría */}
-      {cajasPorProducto.length > 0 && (
+      {/* Kg buenos por producto */}
+      {kgPorProducto.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Cajas clasificadas por producto</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Kg buenos por producto</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={cajasPorProducto} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+              <BarChart data={kgPorProducto} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="producto" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
+                <Tooltip formatter={((v: unknown) => [`${Number(v ?? 0)} kg`, 'Kg buenos']) as any} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="primera" name="Primera" fill="#22c55e" />
-                <Bar dataKey="segunda" name="Segunda" fill="#84cc16" />
-                <Bar dataKey="descarte" name="Descarte" fill="#f87171" />
+                <Bar dataKey="kg" name="Kg buenos" fill="#22c55e" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
       )}
 
-      {kgSemana.length === 0 && cajasPorProducto.length === 0 && (
+      {kgSemana.length === 0 && kgPorProducto.length === 0 && (
         <Card>
           <CardContent className="pt-6 pb-6 text-center text-muted-foreground text-sm">
             Registra lotes y clasificaciones para ver los gráficos del dashboard.

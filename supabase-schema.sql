@@ -366,26 +366,6 @@ begin
 end;
 $$;
 
-create table if not exists public.personal_campo (
-  id uuid primary key default gen_random_uuid(),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  created_by uuid not null references auth.users(id) on delete restrict,
-  codigo text not null unique,
-  nombre text not null,
-  apellido text not null,
-  dni text null,
-  telefono text null,
-  numero_cuenta text null,
-  fecha_alta date not null default current_date,
-  tipo text not null check (tipo in ('clasificador', 'cosechador', 'empacador', 'supervisor')),
-  tarifa_destajo numeric(12,2) not null default 0,
-  estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
-);
-
-alter table public.personal_campo add column if not exists numero_cuenta text null;
-alter table public.personal_campo add column if not exists fecha_alta date not null default current_date;
-
 create table if not exists public.centros_acopio (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -472,10 +452,7 @@ create table if not exists public.clasificaciones (
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
   lote_id uuid not null references public.lotes(id) on delete cascade,
-  personal_id uuid references public.personal_campo(id) on delete restrict,
-  categoria text not null check (categoria in ('primera', 'segunda', 'descarte')),
-  peso_kg numeric(12,2) not null,
-  num_cajas integer not null default 0,
+  peso_bueno_kg numeric(12,2) not null default 0,
   fecha_clasificacion date not null,
   observaciones text null
 );
@@ -524,35 +501,6 @@ create table if not exists public.liquidacion_agri_detalle (
   subtotal numeric(12,2) not null
 );
 
-create table if not exists public.actividades_personal (
-  id uuid primary key default gen_random_uuid(),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  created_by uuid not null references auth.users(id) on delete restrict,
-  personal_id uuid not null references public.personal_campo(id) on delete restrict,
-  lote_id uuid not null references public.lotes(id) on delete restrict,
-  tipo_actividad text not null check (tipo_actividad in ('clasificacion', 'cosecha', 'empaque', 'carga')),
-  fecha date not null,
-  cantidad_unidades integer not null default 0,
-  tarifa_unitaria numeric(12,2) not null default 0,
-  total numeric(12,2) not null default 0,
-  observaciones text null
-);
-
-create table if not exists public.liquidaciones_personal (
-  id uuid primary key default gen_random_uuid(),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  created_by uuid not null references auth.users(id) on delete restrict,
-  codigo text not null unique,
-  personal_id uuid not null references public.personal_campo(id) on delete restrict,
-  quincena text not null,
-  total_unidades integer not null default 0,
-  total_monto numeric(12,2) not null default 0,
-  estado text not null default 'borrador' check (estado in ('borrador', 'confirmada', 'pagada')),
-  observaciones text null
-);
-
 create table if not exists public.movimientos_cubetas (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -572,7 +520,6 @@ create index if not exists idx_colaboradores_codigo on public.colaboradores(codi
 create index if not exists idx_productos_codigo on public.productos(codigo);
 create index if not exists idx_agricultor_producto_hectareas_agricultor_id on public.agricultor_producto_hectareas(agricultor_id);
 create index if not exists idx_agricultor_producto_hectareas_producto_id on public.agricultor_producto_hectareas(producto_id);
-create index if not exists idx_personal_campo_codigo on public.personal_campo(codigo);
 create index if not exists idx_centros_acopio_codigo on public.centros_acopio(codigo);
 create index if not exists idx_lotes_codigo on public.lotes(codigo);
 create index if not exists idx_lotes_agricultor_id on public.lotes(agricultor_id);
@@ -584,9 +531,6 @@ create index if not exists idx_clasificaciones_lote_id on public.clasificaciones
 create index if not exists idx_despachos_lote_id on public.despachos(lote_id);
 create index if not exists idx_liquidaciones_agri_agricultor_id on public.liquidaciones_agri(agricultor_id);
 create index if not exists idx_liquidacion_agri_detalle_liquidacion_id on public.liquidacion_agri_detalle(liquidacion_id);
-create index if not exists idx_actividades_personal_personal_id on public.actividades_personal(personal_id);
-create index if not exists idx_actividades_personal_lote_id on public.actividades_personal(lote_id);
-create index if not exists idx_liquidaciones_personal_personal_id on public.liquidaciones_personal(personal_id);
 create index if not exists idx_movimientos_cubetas_agricultor_id on public.movimientos_cubetas(agricultor_id);
 
 drop trigger if exists trg_agricultores_updated_at on public.agricultores;
@@ -725,9 +669,6 @@ create trigger trg_productos_updated_at before update on public.productos for ea
 drop trigger if exists trg_agricultor_producto_hectareas_updated_at on public.agricultor_producto_hectareas;
 create trigger trg_agricultor_producto_hectareas_updated_at before update on public.agricultor_producto_hectareas for each row execute function public.set_updated_at();
 
-drop trigger if exists trg_personal_campo_updated_at on public.personal_campo;
-create trigger trg_personal_campo_updated_at before update on public.personal_campo for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_centros_acopio_protect_codigo on public.centros_acopio;
 create trigger trg_centros_acopio_protect_codigo before update on public.centros_acopio for each row execute function public.protect_centro_acopio_codigo();
 
@@ -752,12 +693,6 @@ create trigger trg_liquidaciones_agri_updated_at before update on public.liquida
 drop trigger if exists trg_liquidacion_agri_detalle_updated_at on public.liquidacion_agri_detalle;
 create trigger trg_liquidacion_agri_detalle_updated_at before update on public.liquidacion_agri_detalle for each row execute function public.set_updated_at();
 
-drop trigger if exists trg_actividades_personal_updated_at on public.actividades_personal;
-create trigger trg_actividades_personal_updated_at before update on public.actividades_personal for each row execute function public.set_updated_at();
-
-drop trigger if exists trg_liquidaciones_personal_updated_at on public.liquidaciones_personal;
-create trigger trg_liquidaciones_personal_updated_at before update on public.liquidaciones_personal for each row execute function public.set_updated_at();
-
 drop trigger if exists trg_movimientos_cubetas_updated_at on public.movimientos_cubetas;
 create trigger trg_movimientos_cubetas_updated_at before update on public.movimientos_cubetas for each row execute function public.set_updated_at();
 
@@ -766,15 +701,12 @@ alter table public.acopiadores enable row level security;
 alter table public.colaboradores enable row level security;
 alter table public.productos enable row level security;
 alter table public.agricultor_producto_hectareas enable row level security;
-alter table public.personal_campo enable row level security;
 alter table public.centros_acopio enable row level security;
 alter table public.lotes enable row level security;
 alter table public.clasificaciones enable row level security;
 alter table public.despachos enable row level security;
 alter table public.liquidaciones_agri enable row level security;
 alter table public.liquidacion_agri_detalle enable row level security;
-alter table public.actividades_personal enable row level security;
-alter table public.liquidaciones_personal enable row level security;
 alter table public.movimientos_cubetas enable row level security;
 
 drop policy if exists agricultores_authenticated_all on public.agricultores;
@@ -791,9 +723,6 @@ create policy productos_authenticated_all on public.productos for all to authent
 
 drop policy if exists agricultor_producto_hectareas_authenticated_all on public.agricultor_producto_hectareas;
 create policy agricultor_producto_hectareas_authenticated_all on public.agricultor_producto_hectareas for all to authenticated using (true) with check (auth.uid() is not null);
-
-drop policy if exists personal_campo_authenticated_all on public.personal_campo;
-create policy personal_campo_authenticated_all on public.personal_campo for all to authenticated using (true) with check (auth.uid() is not null);
 
 drop policy if exists centros_acopio_authenticated_all on public.centros_acopio;
 create policy centros_acopio_authenticated_all on public.centros_acopio for all to authenticated using (true) with check (auth.uid() is not null);
@@ -813,12 +742,6 @@ create policy liquidaciones_agri_authenticated_all on public.liquidaciones_agri 
 drop policy if exists liquidacion_agri_detalle_authenticated_all on public.liquidacion_agri_detalle;
 create policy liquidacion_agri_detalle_authenticated_all on public.liquidacion_agri_detalle for all to authenticated using (true) with check (auth.uid() is not null);
 
-drop policy if exists actividades_personal_authenticated_all on public.actividades_personal;
-create policy actividades_personal_authenticated_all on public.actividades_personal for all to authenticated using (true) with check (auth.uid() is not null);
-
-drop policy if exists liquidaciones_personal_authenticated_all on public.liquidaciones_personal;
-create policy liquidaciones_personal_authenticated_all on public.liquidaciones_personal for all to authenticated using (true) with check (auth.uid() is not null);
-
 drop policy if exists movimientos_cubetas_authenticated_all on public.movimientos_cubetas;
 create policy movimientos_cubetas_authenticated_all on public.movimientos_cubetas for all to authenticated using (true) with check (auth.uid() is not null);
 
@@ -830,6 +753,13 @@ create policy movimientos_cubetas_authenticated_all on public.movimientos_cubeta
 alter table public.clasificaciones drop column if exists personal_id;
 alter table public.clasificaciones drop column if exists categoria;
 alter table public.clasificaciones drop column if exists num_cajas;
+alter table public.clasificaciones drop column if exists peso_kg;
+
+-- Eliminar tablas legacy que ya no usa la aplicación
+drop table if exists public.actividades_personal cascade;
+drop table if exists public.liquidaciones_personal cascade;
+drop table if exists public.personal_campo cascade;
+drop table if exists public.clasificacion_mesas cascade;
 
 -- Garantizar una sola sesión por lote
 do $$
@@ -869,22 +799,3 @@ alter table public.clasificacion_aportes enable row level security;
 drop policy if exists clasificacion_aportes_authenticated_all on public.clasificacion_aportes;
 create policy clasificacion_aportes_authenticated_all on public.clasificacion_aportes for all to authenticated using (true) with check (auth.uid() is not null);
 
--- Tabla de mesas participantes en la sesión de clasificación
-create table if not exists public.clasificacion_mesas (
-  id uuid primary key default gen_random_uuid(),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  created_by uuid not null references auth.users(id) on delete restrict,
-  clasificacion_id uuid not null references public.clasificaciones(id) on delete cascade,
-  nombre text not null,
-  num_jabas integer not null default 0 check (num_jabas >= 0)
-);
-
-create index if not exists idx_clasificacion_mesas_clasificacion_id on public.clasificacion_mesas(clasificacion_id);
-
-drop trigger if exists trg_clasificacion_mesas_updated_at on public.clasificacion_mesas;
-create trigger trg_clasificacion_mesas_updated_at before update on public.clasificacion_mesas for each row execute function public.set_updated_at();
-
-alter table public.clasificacion_mesas enable row level security;
-drop policy if exists clasificacion_mesas_authenticated_all on public.clasificacion_mesas;
-create policy clasificacion_mesas_authenticated_all on public.clasificacion_mesas for all to authenticated using (true) with check (auth.uid() is not null);
