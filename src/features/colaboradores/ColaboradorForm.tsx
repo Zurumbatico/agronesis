@@ -2,25 +2,27 @@ import { useEffect, useMemo } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { agricultorSchema, type AgricultorFormData } from '@/utils/validators'
+import { colaboradorSchema, type ColaboradorFormData } from '@/utils/validators'
+import { ROL_COLABORADOR_CONFIG } from '@/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FormField } from '@/components/shared/FormField'
 
-type AgricultorFormInput = z.input<typeof agricultorSchema>
+type ColaboradorFormInput = z.input<typeof colaboradorSchema>
 
-interface AgricultorFormProps {
-  defaultValues?: Partial<AgricultorFormData>
-  onSubmit: (data: AgricultorFormData) => Promise<void>
+interface ColaboradorFormProps {
+  defaultValues?: Partial<ColaboradorFormData>
+  onSubmit: (data: ColaboradorFormData) => Promise<void>
   onCancel: () => void
   isEditing?: boolean
 }
 
-export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }: AgricultorFormProps) {
-  const normalizedDefaults = useMemo<Partial<AgricultorFormInput>>(() => ({
+export function ColaboradorForm({ defaultValues, onSubmit, onCancel, isEditing }: ColaboradorFormProps) {
+  const normalizedDefaults = useMemo<Partial<ColaboradorFormInput>>(() => ({
     estado: 'activo',
+    rol: 'recepcionista',
     codigo: defaultValues?.codigo ?? 'AUTO',
     ...defaultValues,
     dni: defaultValues?.dni ?? '',
@@ -36,8 +38,8 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
     control,
     reset,
     formState: { errors, isSubmitting },
-  } = useForm<AgricultorFormInput>({
-    resolver: zodResolver(agricultorSchema) as any,
+  } = useForm<ColaboradorFormInput>({
+    resolver: zodResolver(colaboradorSchema) as any,
     defaultValues: normalizedDefaults,
   })
 
@@ -45,20 +47,20 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
     reset(normalizedDefaults)
   }, [normalizedDefaults, reset])
 
-  const handleValidSubmit = async (data: AgricultorFormInput) => {
-    await onSubmit(agricultorSchema.parse(data) as AgricultorFormData)
+  const handleValidSubmit = async (data: ColaboradorFormInput) => {
+    await onSubmit(colaboradorSchema.parse(data) as ColaboradorFormData)
   }
 
   return (
     <form onSubmit={handleSubmit(handleValidSubmit as any)} className="flex flex-col gap-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Código" error={errors.codigo?.message} required>
+        <FormField label="Codigo" error={errors.codigo?.message} required>
           {isEditing ? (
             <>
               <Input
                 value={defaultValues?.codigo ?? ''}
                 disabled
-                placeholder="AGRI-000001"
+                placeholder="COL-000001"
                 className="cursor-not-allowed border-dashed bg-muted text-muted-foreground disabled:opacity-100"
               />
               <Input type="hidden" {...register('codigo')} />
@@ -69,7 +71,7 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
                 readOnly
                 aria-disabled="true"
                 value=""
-                placeholder="Se asigna automáticamente al guardar"
+                placeholder="Se asigna automaticamente al guardar"
                 className="cursor-not-allowed border-dashed bg-muted text-muted-foreground placeholder:text-muted-foreground/90"
               />
               <Input type="hidden" {...register('codigo')} />
@@ -101,11 +103,28 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
           <Input placeholder="Quispe" {...register('apellido')} />
         </FormField>
 
+        <FormField label="Rol" error={errors.rol?.message} required>
+          <Controller
+            name="rol"
+            control={control}
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value}>
+                <SelectTrigger><SelectValue placeholder="Seleccionar rol..." /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(ROL_COLABORADOR_CONFIG).map(([value, config]) => (
+                    <SelectItem key={value} value={value}>{config.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </FormField>
+
         <FormField label="DNI" error={errors.dni?.message}>
           <Input placeholder="12345678" maxLength={8} {...register('dni')} />
         </FormField>
 
-        <FormField label="Teléfono" error={errors.telefono?.message}>
+        <FormField label="Telefono" error={errors.telefono?.message}>
           <Input placeholder="987 654 321" {...register('telefono')} />
         </FormField>
 
@@ -116,11 +135,10 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
         <FormField label="Fecha de alta" error={errors.fecha_alta?.message} required>
           <Input type="date" {...register('fecha_alta')} />
         </FormField>
-
       </div>
 
-      <FormField label="Ubicación" error={errors.ubicacion?.message}>
-        <Textarea placeholder="Sector, dirección o referencia..." rows={2} {...register('ubicacion')} />
+      <FormField label="Ubicacion" error={errors.ubicacion?.message}>
+        <Textarea placeholder="Sector, direccion o referencia..." rows={2} {...register('ubicacion')} />
       </FormField>
 
       <div className="flex gap-3 justify-end pt-2">
@@ -128,7 +146,7 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
           Cancelar
         </Button>
         <Button type="submit" loading={isSubmitting}>
-          {isEditing ? 'Guardar cambios' : 'Registrar agricultor'}
+          {isEditing ? 'Guardar cambios' : 'Registrar colaborador'}
         </Button>
       </div>
     </form>

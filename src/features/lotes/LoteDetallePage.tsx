@@ -6,7 +6,7 @@ import { getDespachosPorLote } from '@/services/despachos.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
-import { EstadoLoteBadge, CategoriaClasificacionBadge } from '@/components/shared/StatusBadge'
+import { EstadoLoteBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoteTimeline } from './LoteTimeline'
@@ -18,10 +18,13 @@ import {
   TIPO_PRODUCCION_CONFIG,
 } from '@/constants'
 import { formatFecha, formatPeso, formatMoneda } from '@/utils/formatters'
-import { calcularTotalesClasificacion } from '@/utils/business-rules'
-import { siguienteEstadoLote } from '@/utils/business-rules'
-import { actualizarEstadoLote } from '@/services/lotes.service'
 import type { Lote, Clasificacion, Despacho } from '@/types/models'
+
+type CuadroLocal = {
+  filas: Array<{ colaborador_id: string; peso_bueno_kg: string }>
+}
+
+const getMesasStorageKey = (loteId: string) => `clasificacion-cuadros-${loteId}`
 
 export default function LoteDetallePage() {
   const { id } = useParams<{ id: string }>()
@@ -29,9 +32,9 @@ export default function LoteDetallePage() {
   const [lote, setLote] = useState<Lote | null>(null)
   const [clasificaciones, setClasificaciones] = useState<Clasificacion[]>([])
   const [despachos, setDespachos] = useState<Despacho[]>([])
+  const [cuadrosLocales, setCuadrosLocales] = useState<CuadroLocal[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cambiandoEstado, setCambiandoEstado] = useState(false)
 
   const cargar = async () => {
     if (!id) return
@@ -52,24 +55,32 @@ export default function LoteDetallePage() {
 
   useEffect(() => { cargar() }, [id])
 
-  const handleAvanzarEstado = async () => {
-    if (!lote) return
-    const siguiente = siguienteEstadoLote(lote.estado)
-    if (!siguiente) return
-    if (!confirm(`¿Pasar el lote a "${siguiente.replace('_', ' ')}"?`)) return
-    setCambiandoEstado(true)
+  useEffect(() => {
+    if (!id) return
     try {
-      const actualizado = await actualizarEstadoLote(lote.id, siguiente)
-      setLote(actualizado)
-    } finally { setCambiandoEstado(false) }
-  }
+      const raw = localStorage.getItem(getMesasStorageKey(id))
+      if (!raw) {
+        setCuadrosLocales(null)
+        return
+      }
+      const parsed = JSON.parse(raw) as unknown
+      if (!Array.isArray(parsed)) {
+        setCuadrosLocales(null)
+        return
+      }
+      const cuadros = parsed.filter((item) => item && typeof item === 'object') as CuadroLocal[]
+      setCuadrosLocales(cuadros)
+    } catch {
+      setCuadrosLocales(null)
+    }
+  }, [id])
 
   if (loading) return <LoadingPage />
   if (error) return <ErrorMessage message={error} onRetry={cargar} />
   if (!lote) return null
 
-  const totalesClasif = calcularTotalesClasificacion(clasificaciones)
-  const siguienteEstado = siguienteEstadoLote(lote.estado)
+  const totalesBuenos = clasificaciones.reduce((acc, c) => acc + c.peso_bueno_kg, 0)
+  const totalesMalos = Math.max(0, lote.peso_neto_kg - totalesBuenos)
   const acopiadorNombre = lote.acopiador
     ? `${lote.acopiador.apellido}, ${lote.acopiador.nombre}`
     : lote.acopiador_agricultor
@@ -80,23 +91,21 @@ export default function LoteDetallePage() {
     <div className="max-w-5xl mx-auto">
       <PageHeader
         title={`Lote ${lote.codigo}`}
-        description={`${lote.centro_acopio?.nombre ?? '-'} · ${formatFecha(lote.fecha_ingreso)} · N° JABAS: ${lote.num_cubetas} · Bruto: ${formatPeso(lote.peso_bruto_kg)} · Tara: ${formatPeso(lote.peso_tara_kg)} · Neto: ${formatPeso(lote.peso_neto_kg)}`}
+        description={`${lote.centro_acopio?.nombre ?? '-'} · ${formatFecha(lote.fecha_ingreso)}${lote.codigo_lote_agricultor ? ` · Cod. agricultor: ${lote.codigo_lote_agricultor}` : ''} · N° JABAS INGRESADAS: ${lote.num_cubetas} · Bruto: ${formatPeso(lote.peso_bruto_kg)} · Tara: ${formatPeso(lote.peso_tara_kg)} · Neto: ${formatPeso(lote.peso_neto_kg)}`}
         backHref={ROUTES.LOTES}
         actions={
           <div className="flex gap-2">
             {(lote.estado === 'ingresado' || lote.estado === 'en_clasificacion') && (
-              <Button variant="outline" onClick={() => navigate(`/lotes/${id}/clasificar`)}>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
+                onClick={() => navigate(`/lotes/${id}/clasificar`)}
+              >
                 Clasificar
               </Button>
             )}
             {(lote.estado === 'clasificado' || lote.estado === 'en_despacho') && (
               <Button variant="outline" onClick={() => navigate(`/lotes/${id}/despachar`)}>
                 Despachar
-              </Button>
-            )}
-            {siguienteEstado && (
-              <Button onClick={handleAvanzarEstado} loading={cambiandoEstado}>
-                Avanzar estado
               </Button>
             )}
           </div>
@@ -130,10 +139,6 @@ export default function LoteDetallePage() {
                     <p className="font-medium">{lote.agricultor?.apellido}, {lote.agricultor?.nombre}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Nro. lote agricultor</p>
-                    <p className="font-medium">{lote.agricultor?.nro_lote || '-'}</p>
-                  </div>
-                  <div>
                     <p className="text-xs text-muted-foreground">Acopiador</p>
                     <p className="font-medium">{acopiadorNombre}</p>
                   </div>
@@ -162,6 +167,12 @@ export default function LoteDetallePage() {
 
                 <section className="rounded-lg border bg-muted/20 p-3 space-y-2">
                   <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Logística</p>
+                  {lote.codigo_lote_agricultor && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Código de lote por agricultor</p>
+                      <p className="font-medium">{lote.codigo_lote_agricultor}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="text-xs text-muted-foreground">Centro de acopio</p>
                     <p className="font-medium">{lote.centro_acopio?.nombre}</p>
@@ -171,7 +182,7 @@ export default function LoteDetallePage() {
                     <p className="font-medium">{formatFecha(lote.fecha_ingreso)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">N° Jabas</p>
+                    <p className="text-xs text-muted-foreground">N° Jabas ingresadas</p>
                     <p className="font-medium">{lote.num_cubetas}</p>
                   </div>
                 </section>
@@ -204,33 +215,75 @@ export default function LoteDetallePage() {
             </CardContent>
           </Card>
 
-          {/* Clasificaciones */}
-          {clasificaciones.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2"><CardTitle className="text-base">Clasificación ({clasificaciones.length} registros)</CardTitle></CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-3 gap-3 mb-3">
-                  {(['primera', 'segunda', 'descarte'] as const).map((cat) => (
-                    <div key={cat} className="bg-muted rounded-lg p-3 text-center">
-                      <CategoriaClasificacionBadge categoria={cat} />
-                      <p className="font-bold mt-1">{formatPeso(totalesClasif[cat].peso_kg)}</p>
-                      <p className="text-xs text-muted-foreground">{totalesClasif[cat].num_cajas} cajas</p>
+          {/* Clasificación */}
+          {clasificaciones.length > 0 && (() => {
+            const sesion = clasificaciones[0]
+            const aportes = sesion.aportes ?? []
+            const aportesPorColaborador = new Map(aportes.map((a) => [a.colaborador_id, a]))
+            const aportesAgrupadosPorMesa = (cuadrosLocales ?? [])
+              .map((cuadro, index) => ({
+                index,
+                aportes: (cuadro.filas ?? [])
+                  .map((f) => aportesPorColaborador.get(f.colaborador_id))
+                  .filter((a): a is NonNullable<typeof a> => Boolean(a)),
+              }))
+              .filter((mesa) => mesa.aportes.length > 0)
+
+            return (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Clasificación</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+                    <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
+                      <p className="text-xs text-green-700 mb-0.5">Buenos</p>
+                      <p className="font-bold text-lg text-green-700">{formatPeso(totalesBuenos)}</p>
                     </div>
-                  ))}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  {clasificaciones.map((c) => (
-                    <div key={c.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                      <div className="flex items-center gap-2 ml-auto">
-                        <CategoriaClasificacionBadge categoria={c.categoria} />
-                        <span className="font-medium">{formatPeso(c.peso_kg)} · {c.num_cajas} cjs</span>
-                      </div>
+                    <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
+                      <p className="text-xs text-red-700 mb-0.5">Malos / descarte</p>
+                      <p className="font-bold text-lg text-red-700">{formatPeso(totalesMalos)}</p>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  </div>
+                  {aportes.length > 0 && aportesAgrupadosPorMesa.length === 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Por seleccionador</p>
+                      {aportes.map((a) => (
+                        <div key={a.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
+                          <span className="text-muted-foreground">
+                            {a.colaborador
+                              ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
+                              : a.colaborador_id}
+                          </span>
+                          <span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {aportesAgrupadosPorMesa.length > 0 && (
+                    <div className="flex flex-col gap-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Por mesa</p>
+                      {aportesAgrupadosPorMesa.map((mesa) => (
+                        <div key={mesa.index} className="flex flex-col gap-1.5">
+                          <p className="text-xs text-muted-foreground">Mesa {mesa.index + 1}</p>
+                          {mesa.aportes.map((a) => (
+                            <div key={a.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
+                              <span className="text-muted-foreground">
+                                {a.colaborador
+                                  ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
+                                  : a.colaborador_id}
+                              </span>
+                              <span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })()}
 
           {/* Despachos */}
           {despachos.length > 0 && (

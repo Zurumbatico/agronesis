@@ -5,7 +5,6 @@ import type { BaseEntity, EstadoActivo, UUID } from './common'
 // ─────────────────────────────────────────────
 export interface Agricultor extends BaseEntity {
   codigo: string
-  nro_lote: string | null
   nombre: string
   apellido: string
   dni: string | null
@@ -34,6 +33,24 @@ export interface Acopiador extends BaseEntity {
 
 export type AcopiadorInsert = Omit<Acopiador, keyof BaseEntity>
 export type AcopiadorUpdate = Partial<AcopiadorInsert>
+
+export type RolColaborador = 'recepcionista' | 'seleccionador' | 'empaquetador'
+
+export interface Colaborador extends BaseEntity {
+  codigo: string
+  nombre: string
+  apellido: string
+  dni: string | null
+  telefono: string | null
+  numero_cuenta: string | null
+  fecha_alta: string
+  ubicacion: string | null
+  rol: RolColaborador
+  estado: EstadoActivo
+}
+
+export type ColaboradorInsert = Omit<Colaborador, keyof BaseEntity>
+export type ColaboradorUpdate = Partial<ColaboradorInsert>
 
 export interface AgricultorHectarea extends BaseEntity {
   agricultor_id: UUID
@@ -100,6 +117,7 @@ export interface Lote extends BaseEntity {
   peso_tara_kg: number
   peso_neto_kg: number
   num_cubetas: number
+  codigo_lote_agricultor: string | null
   observaciones: string | null
   estado: EstadoLote
   // relaciones (join)
@@ -116,24 +134,45 @@ export type LoteUpdate = Partial<LoteInsert>
 // ─────────────────────────────────────────────
 // CLASIFICACIÓN
 // ─────────────────────────────────────────────
+// Mantenemos el tipo para compatibilidad con liquidaciones_agri_detalle
 export type CategoriaClasificacion = 'primera' | 'segunda' | 'descarte'
 
+/** Sesión de clasificación: una por lote */
 export interface Clasificacion extends BaseEntity {
   lote_id: UUID
-  personal_id: UUID | null
-  categoria: CategoriaClasificacion
-  peso_kg: number
-  num_cajas: number
   fecha_clasificacion: string
+  peso_bueno_kg: number
   observaciones: string | null
   // relaciones
   lote?: Lote
+  aportes?: ClasificacionAporte[]
+  mesas?: ClasificacionMesa[]
 }
 
-export type ClasificacionInsert = Omit<Clasificacion, keyof BaseEntity | 'lote' | 'personal_id'> & {
-  personal_id?: UUID | null
-}
+export type ClasificacionInsert = Omit<Clasificacion, keyof BaseEntity | 'lote' | 'aportes'>
 export type ClasificacionUpdate = Partial<ClasificacionInsert>
+
+/** Aporte de un seleccionador dentro de una sesión de clasificación */
+export interface ClasificacionAporte extends BaseEntity {
+  clasificacion_id: UUID
+  colaborador_id: UUID
+  peso_bueno_kg: number
+  // relaciones
+  colaborador?: Colaborador
+}
+
+export type ClasificacionAporteInsert = Omit<ClasificacionAporte, keyof BaseEntity | 'colaborador'>
+export type ClasificacionAporteUpdate = Partial<ClasificacionAporteInsert>
+
+/** Mesa participante en una sesión de clasificación */
+export interface ClasificacionMesa extends BaseEntity {
+  clasificacion_id: UUID
+  nombre: string
+  num_jabas: number
+}
+
+export type ClasificacionMesaInsert = Omit<ClasificacionMesa, keyof BaseEntity>
+export type ClasificacionMesaUpdate = Partial<ClasificacionMesaInsert>
 
 // ─────────────────────────────────────────────
 // DESPACHO

@@ -53,6 +53,12 @@ export const TIPO_MOVIMIENTO_CUBETA_CONFIG = {
   devolucion:  { label: 'Devolución',  color: 'bg-green-100 text-green-800' },
 } as const
 
+export const ROL_COLABORADOR_CONFIG = {
+  recepcionista: { label: 'Recepcionista' },
+  seleccionador: { label: 'Seleccionador' },
+  empaquetador: { label: 'Empaquetador' },
+} as const
+
 // Transiciones válidas de estado de lote
 export const TRANSICIONES_LOTE: Record<string, string[]> = {
   ingresado:        ['en_clasificacion'],
@@ -71,6 +77,7 @@ export const ROUTES = {
   AGRICULTORES_NUEVO:       '/agricultores/nuevo',
   AGRICULTORES_EDITAR:      '/agricultores/:id/editar',
   ACOPIADORES:              '/acopiadores',
+  COLABORADORES:            '/colaboradores',
   PRODUCTOS:                '/productos',
   PRODUCTOS_NUEVO:          '/productos/nuevo',
   PRODUCTOS_EDITAR:         '/productos/:id/editar',

@@ -16,7 +16,6 @@ export interface Database {
           updated_at: string
           created_by: string
           codigo: string
-          nro_lote: string | null
           nombre: string
           apellido: string
           dni: string | null
@@ -48,6 +47,27 @@ export interface Database {
         }
         Insert: Omit<Database['public']['Tables']['acopiadores']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['acopiadores']['Insert']>
+        Relationships: []
+      }
+      colaboradores: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          codigo: string
+          nombre: string
+          apellido: string
+          dni: string | null
+          telefono: string | null
+          numero_cuenta: string | null
+          fecha_alta: string
+          ubicacion: string | null
+          rol: 'recepcionista' | 'seleccionador' | 'empaquetador'
+          estado: 'activo' | 'inactivo'
+        }
+        Insert: Omit<Database['public']['Tables']['colaboradores']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['colaboradores']['Insert']>
         Relationships: []
       }
       productos: {
@@ -136,6 +156,7 @@ export interface Database {
           peso_tara_kg: number
           peso_neto_kg: number
           num_cubetas: number
+          codigo_lote_agricultor: string | null
           observaciones: string | null
           estado: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'en_despacho' | 'despachado' | 'liquidado'
         }
@@ -150,24 +171,56 @@ export interface Database {
           updated_at: string
           created_by: string
           lote_id: string
-          personal_id: string | null
-          categoria: 'primera' | 'segunda' | 'descarte'
-          peso_kg: number
-          num_cajas: number
           fecha_clasificacion: string
+          peso_bueno_kg: number
           observaciones: string | null
         }
         Insert: {
           created_by: string
           lote_id: string
-          personal_id?: string | null
-          categoria: 'primera' | 'segunda' | 'descarte'
-          peso_kg: number
-          num_cajas: number
           fecha_clasificacion: string
-          observaciones: string | null
+          peso_bueno_kg?: number
+          observaciones?: string | null
         }
         Update: Partial<Database['public']['Tables']['clasificaciones']['Insert']>
+        Relationships: []
+      }
+      clasificacion_aportes: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          clasificacion_id: string
+          colaborador_id: string
+          peso_bueno_kg: number
+        }
+        Insert: {
+          created_by: string
+          clasificacion_id: string
+          colaborador_id: string
+          peso_bueno_kg: number
+        }
+        Update: Partial<Database['public']['Tables']['clasificacion_aportes']['Insert']>
+        Relationships: []
+      }
+      clasificacion_mesas: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          clasificacion_id: string
+          nombre: string
+          num_jabas: number
+        }
+        Insert: {
+          created_by: string
+          clasificacion_id: string
+          nombre: string
+          num_jabas?: number
+        }
+        Update: Partial<Database['public']['Tables']['clasificacion_mesas']['Insert']>
         Relationships: []
       }
       despachos: {

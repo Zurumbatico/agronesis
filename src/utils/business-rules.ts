@@ -31,45 +31,26 @@ export function siguienteEstadoLote(estadoActual: EstadoLote): EstadoLote | null
 // ─────────────────────────────────────────────
 
 /**
- * Suma el peso total clasificado por categoría
+ * Retorna totales por "categoría" compatibles con el módulo de liquidaciones.
+ * Con el nuevo modelo, "primera" = kg buenos totales de la sesión;
+ * segunda y descarte quedan en cero (ya no se registran por separado).
  */
 export function calcularTotalesClasificacion(
   clasificaciones: Clasificacion[]
 ): Record<CategoriaClasificacion, { peso_kg: number; num_cajas: number }> {
-  const totales: Record<CategoriaClasificacion, { peso_kg: number; num_cajas: number }> = {
-    primera:  { peso_kg: 0, num_cajas: 0 },
-    segunda:  { peso_kg: 0, num_cajas: 0 },
-    descarte: { peso_kg: 0, num_cajas: 0 },
+  const totalBuenos = clasificaciones.reduce((acc, c) => acc + c.peso_bueno_kg, 0)
+  return {
+    primera:  { peso_kg: totalBuenos, num_cajas: 0 },
+    segunda:  { peso_kg: 0,           num_cajas: 0 },
+    descarte: { peso_kg: 0,           num_cajas: 0 },
   }
-  for (const c of clasificaciones) {
-    totales[c.categoria].peso_kg += c.peso_kg
-    totales[c.categoria].num_cajas += c.num_cajas
-  }
-  return totales
 }
 
 /**
- * Calcula el peso total clasificado
+ * Calcula el total de kg buenos de un lote (suma de sessions).
  */
 export function calcularPesoTotalClasificado(clasificaciones: Clasificacion[]): number {
-  return clasificaciones.reduce((acc, c) => acc + c.peso_kg, 0)
-}
-
-/**
- * Valida que el peso clasificado no supere el peso neto del lote
- * Retorna null si es válido, o un mensaje de error
- */
-export function validarPesoClasificacion(
-  pesoNetoKg: number,
-  pesoYaClasificadoKg: number,
-  nuevoPesoKg: number
-): string | null {
-  const totalResultante = pesoYaClasificadoKg + nuevoPesoKg
-  if (totalResultante > pesoNetoKg * 1.05) {
-    // Permitimos hasta 5% de diferencia por mermas
-    return `El peso clasificado (${totalResultante.toFixed(2)} kg) supera el peso neto del lote (${pesoNetoKg.toFixed(2)} kg)`
-  }
-  return null
+  return clasificaciones.reduce((acc, c) => acc + c.peso_bueno_kg, 0)
 }
 
 // ─────────────────────────────────────────────

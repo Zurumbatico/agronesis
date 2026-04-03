@@ -70,7 +70,6 @@ export const agricultorHectareaSchema = z.object({
 
 export const agricultorSchema = z.object({
   codigo:    codigoSchema,
-  nro_lote:  z.preprocess(nullableUpperTrim, z.string().max(20, 'Maximo 20 caracteres').nullable()),
   nombre:    nombreSchema,
   apellido:  nombreSchema,
   dni:       dniSchema,
@@ -93,6 +92,19 @@ export const acopiadorSchema = z.object({
   estado:    z.enum(['activo', 'inactivo']),
 })
 
+export const colaboradorSchema = z.object({
+  codigo:    codigoSchema,
+  nombre:    nombreSchema,
+  apellido:  nombreSchema,
+  dni:       dniSchema,
+  telefono:  telefonoSchema,
+  numero_cuenta: z.preprocess(nullableUpperTrim, z.string().max(50, 'Maximo 50 caracteres').nullable()),
+  fecha_alta: z.string().min(1, 'Ingrese la fecha de alta'),
+  ubicacion: z.preprocess(nullableUpperTrim, z.string().max(200).nullable()),
+  rol:       z.enum(['recepcionista', 'seleccionador', 'empaquetador']),
+  estado:    z.enum(['activo', 'inactivo']),
+})
+
 export const productoSchema = z.object({
   codigo:          codigoSchema,
   nombre:          nombreSchema,
@@ -112,7 +124,7 @@ export const centroAcopioSchema = z.object({
 export const loteSchema = z.object({
   codigo:             codigoSchema,
   agricultor_id:      z.string().uuid('Seleccione un agricultor'),
-  acopiador_combined: z.string().min(1, 'Seleccione un acopiador'),
+  acopiador_combined: z.string().optional().default(''),
   producto_id:        z.string().uuid('Seleccione un producto'),
   centro_acopio_id:   z.string().uuid('Seleccione un centro de acopio'),
   fecha_ingreso:    z.string().min(1, 'Ingrese la fecha de ingreso'),
@@ -123,6 +135,7 @@ export const loteSchema = z.object({
     .max(50000, 'Peso fuera de rango (máx 50,000 kg)'),
   peso_neto_kg:     pesoKgSchema,
   num_cubetas:      cantidadEnteraSchema,
+  codigo_lote_agricultor: z.preprocess(nullableUpperTrim, z.string().max(30, 'Maximo 30 caracteres').nullable()),
   observaciones:    observacionesSchema,
 }).superRefine((data, ctx) => {
   const totalTara = Number((data.peso_tara_kg * data.num_cubetas).toFixed(2))
@@ -144,21 +157,25 @@ export const loteSchema = z.object({
     })
   }
 }).transform((data) => {
+  if (!data.acopiador_combined) {
+    return {
+      ...data,
+      acopiador_id: null,
+      acopiador_agricultor_id: null,
+    }
+  }
   const colonIdx = data.acopiador_combined.indexOf(':')
   const type  = data.acopiador_combined.slice(0, colonIdx)
   const refId = data.acopiador_combined.slice(colonIdx + 1)
   return {
     ...data,
-    acopiador_id:            type === 'aco'  ? refId : null,
+    acopiador_id: type === 'aco' ? refId : null,
     acopiador_agricultor_id: type === 'agri' ? refId : null,
   }
 })
 
 export const clasificacionSchema = z.object({
   lote_id:             z.string().uuid(),
-  categoria:           z.enum(['primera', 'segunda', 'descarte']),
-  peso_kg:             pesoKgSchema,
-  num_cajas:           cantidadEnteraSchema,
   fecha_clasificacion: z.string().min(1, 'Ingrese la fecha'),
   observaciones:       observacionesSchema,
 })
@@ -189,6 +206,7 @@ export const movimientoCubetaSchema = z.object({
 // ─────────────────────────────────────────────
 export type AgricultorFormData       = z.infer<typeof agricultorSchema>
 export type AcopiadorFormData        = z.infer<typeof acopiadorSchema>
+export type ColaboradorFormData      = z.infer<typeof colaboradorSchema>
 export type ProductoFormData         = z.infer<typeof productoSchema>
 export type CentroAcopioFormData     = z.infer<typeof centroAcopioSchema>
 export type LoteFormData             = z.infer<typeof loteSchema>

@@ -2,6 +2,7 @@ create extension if not exists pgcrypto;
 
 create sequence if not exists public.agricultores_codigo_seq;
 create sequence if not exists public.acopiadores_codigo_seq;
+create sequence if not exists public.colaboradores_codigo_seq;
 create sequence if not exists public.productos_codigo_seq;
 create sequence if not exists public.lotes_codigo_seq;
 create sequence if not exists public.centros_acopio_codigo_seq;
@@ -45,7 +46,36 @@ begin
 end;
 $$;
 
+create or replace function public.generate_colaborador_codigo()
+returns text
+language plpgsql
+as $$
+begin
+  return 'COL-' || lpad(nextval('public.colaboradores_codigo_seq')::text, 6, '0');
+end;
+$$;
+
+create or replace function public.set_colaborador_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := public.generate_colaborador_codigo();
+  return new;
+end;
+$$;
+
 create or replace function public.protect_acopiador_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := old.codigo;
+  return new;
+end;
+$$;
+
+create or replace function public.protect_colaborador_codigo()
 returns trigger
 language plpgsql
 as $$
@@ -169,7 +199,6 @@ create table if not exists public.agricultores (
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
   codigo text not null unique default public.generate_agricultor_codigo(),
-  nro_lote text null,
   nombre text not null,
   apellido text not null,
   dni text null,
@@ -196,12 +225,32 @@ create table if not exists public.acopiadores (
   estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
 );
 
+create table if not exists public.colaboradores (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  codigo text not null unique default public.generate_colaborador_codigo(),
+  nombre text not null,
+  apellido text not null,
+  dni text null,
+  telefono text null,
+  numero_cuenta text null,
+  fecha_alta date not null default current_date,
+  ubicacion text null,
+  rol text not null default 'recepcionista' check (rol in ('recepcionista', 'seleccionador', 'empaquetador')),
+  estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
+);
+
 alter table public.acopiadores add column if not exists numero_cuenta text null;
 alter table public.acopiadores add column if not exists fecha_alta date not null default current_date;
+alter table public.colaboradores add column if not exists numero_cuenta text null;
+alter table public.colaboradores add column if not exists fecha_alta date not null default current_date;
+alter table public.colaboradores add column if not exists ubicacion text null;
+alter table public.colaboradores add column if not exists rol text not null default 'recepcionista';
 
 do $$
 begin
-  alter table public.agricultores add column if not exists nro_lote text null;
   alter table public.agricultores add column if not exists numero_cuenta text null;
   alter table public.agricultores add column if not exists fecha_alta date not null default current_date;
 
@@ -215,6 +264,9 @@ begin
     alter table public.agricultores drop column if exists direccion;
     alter table public.agricultores drop column if exists sector;
   end if;
+
+  -- Eliminar columna nro_lote si existe
+  alter table public.agricultores drop column if exists nro_lote;
 end;
 $$;
 
@@ -362,6 +414,7 @@ create table if not exists public.lotes (
   peso_tara_kg numeric(12,2) not null default 0 check (peso_tara_kg >= 0),
   peso_neto_kg numeric(12,2) not null default 0 check (peso_neto_kg >= 0),
   num_cubetas integer not null default 0,
+  codigo_lote_agricultor text null,
   observaciones text null,
   estado text not null default 'ingresado' check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'en_despacho', 'despachado', 'liquidado'))
 );
@@ -404,6 +457,7 @@ begin
   end if;
 end;
 $$;
+alter table public.lotes add column if not exists codigo_lote_agricultor text null;
 alter table public.lotes add column if not exists peso_tara_kg numeric(12,2) not null default 0;
 alter table public.lotes add column if not exists peso_neto_kg numeric(12,2);
 update public.lotes
@@ -425,8 +479,6 @@ create table if not exists public.clasificaciones (
   fecha_clasificacion date not null,
   observaciones text null
 );
-
-alter table public.clasificaciones alter column personal_id drop not null;
 
 create table if not exists public.despachos (
   id uuid primary key default gen_random_uuid(),
@@ -516,6 +568,7 @@ create table if not exists public.movimientos_cubetas (
 
 create index if not exists idx_agricultores_codigo on public.agricultores(codigo);
 create index if not exists idx_acopiadores_codigo on public.acopiadores(codigo);
+create index if not exists idx_colaboradores_codigo on public.colaboradores(codigo);
 create index if not exists idx_productos_codigo on public.productos(codigo);
 create index if not exists idx_agricultor_producto_hectareas_agricultor_id on public.agricultor_producto_hectareas(agricultor_id);
 create index if not exists idx_agricultor_producto_hectareas_producto_id on public.agricultor_producto_hectareas(producto_id);
@@ -528,7 +581,6 @@ create index if not exists idx_lotes_acopiador_agricultor_id on public.lotes(aco
 create index if not exists idx_lotes_producto_id on public.lotes(producto_id);
 create index if not exists idx_lotes_centro_acopio_id on public.lotes(centro_acopio_id);
 create index if not exists idx_clasificaciones_lote_id on public.clasificaciones(lote_id);
-create index if not exists idx_clasificaciones_personal_id on public.clasificaciones(personal_id);
 create index if not exists idx_despachos_lote_id on public.despachos(lote_id);
 create index if not exists idx_liquidaciones_agri_agricultor_id on public.liquidaciones_agri(agricultor_id);
 create index if not exists idx_liquidacion_agri_detalle_liquidacion_id on public.liquidacion_agri_detalle(liquidacion_id);
@@ -558,6 +610,17 @@ drop trigger if exists trg_acopiadores_codigo on public.acopiadores;
 create trigger trg_acopiadores_codigo before insert on public.acopiadores for each row execute function public.set_acopiador_codigo();
 
 alter table public.acopiadores alter column codigo set default public.generate_acopiador_codigo();
+
+drop trigger if exists trg_colaboradores_updated_at on public.colaboradores;
+create trigger trg_colaboradores_updated_at before update on public.colaboradores for each row execute function public.set_updated_at();
+
+drop trigger if exists trg_colaboradores_protect_codigo on public.colaboradores;
+create trigger trg_colaboradores_protect_codigo before update on public.colaboradores for each row execute function public.protect_colaborador_codigo();
+
+drop trigger if exists trg_colaboradores_codigo on public.colaboradores;
+create trigger trg_colaboradores_codigo before insert on public.colaboradores for each row execute function public.set_colaborador_codigo();
+
+alter table public.colaboradores alter column codigo set default public.generate_colaborador_codigo();
 
 drop trigger if exists trg_productos_updated_at on public.productos;
 create trigger trg_productos_updated_at before update on public.productos for each row execute function public.set_updated_at();
@@ -602,6 +665,22 @@ begin
     perform setval('public.acopiadores_codigo_seq', 1, false);
   else
     perform setval('public.acopiadores_codigo_seq', v_max, true);
+  end if;
+end;
+$$;
+
+do $$
+declare
+  v_max bigint;
+begin
+  select coalesce(max(substring(codigo from '^COL-(\d+)$')::bigint), 0)
+  into v_max
+  from public.colaboradores;
+
+  if v_max = 0 then
+    perform setval('public.colaboradores_codigo_seq', 1, false);
+  else
+    perform setval('public.colaboradores_codigo_seq', v_max, true);
   end if;
 end;
 $$;
@@ -684,6 +763,7 @@ create trigger trg_movimientos_cubetas_updated_at before update on public.movimi
 
 alter table public.agricultores enable row level security;
 alter table public.acopiadores enable row level security;
+alter table public.colaboradores enable row level security;
 alter table public.productos enable row level security;
 alter table public.agricultor_producto_hectareas enable row level security;
 alter table public.personal_campo enable row level security;
@@ -702,6 +782,9 @@ create policy agricultores_authenticated_all on public.agricultores for all to a
 
 drop policy if exists acopiadores_authenticated_all on public.acopiadores;
 create policy acopiadores_authenticated_all on public.acopiadores for all to authenticated using (true) with check (auth.uid() is not null);
+
+drop policy if exists colaboradores_authenticated_all on public.colaboradores;
+create policy colaboradores_authenticated_all on public.colaboradores for all to authenticated using (true) with check (auth.uid() is not null);
 
 drop policy if exists productos_authenticated_all on public.productos;
 create policy productos_authenticated_all on public.productos for all to authenticated using (true) with check (auth.uid() is not null);
@@ -738,3 +821,70 @@ create policy liquidaciones_personal_authenticated_all on public.liquidaciones_p
 
 drop policy if exists movimientos_cubetas_authenticated_all on public.movimientos_cubetas;
 create policy movimientos_cubetas_authenticated_all on public.movimientos_cubetas for all to authenticated using (true) with check (auth.uid() is not null);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- CLASIFICACIONES: migración a modelo sesión + aportes por seleccionador
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- Eliminar columnas del modelo anterior (solo si existen)
+alter table public.clasificaciones drop column if exists personal_id;
+alter table public.clasificaciones drop column if exists categoria;
+alter table public.clasificaciones drop column if exists num_cajas;
+
+-- Garantizar una sola sesión por lote
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.table_constraints
+    where table_schema = 'public' and table_name = 'clasificaciones'
+      and constraint_name = 'uq_clasificacion_lote_id'
+  ) then
+    alter table public.clasificaciones add constraint uq_clasificacion_lote_id unique (lote_id);
+  end if;
+end;
+$$;
+
+-- Agregar total de kg buenos al registro de sesión (denormalizado desde aportes)
+alter table public.clasificaciones add column if not exists peso_bueno_kg numeric(12,2) not null default 0;
+
+-- Tabla de aportes por seleccionador
+create table if not exists public.clasificacion_aportes (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  clasificacion_id uuid not null references public.clasificaciones(id) on delete cascade,
+  colaborador_id uuid not null references public.colaboradores(id) on delete restrict,
+  peso_bueno_kg numeric(12,2) not null check (peso_bueno_kg >= 0),
+  constraint uq_aporte_clasificacion_colaborador unique (clasificacion_id, colaborador_id)
+);
+
+create index if not exists idx_clasificacion_aportes_clasificacion_id on public.clasificacion_aportes(clasificacion_id);
+create index if not exists idx_clasificacion_aportes_colaborador_id on public.clasificacion_aportes(colaborador_id);
+
+drop trigger if exists trg_clasificacion_aportes_updated_at on public.clasificacion_aportes;
+create trigger trg_clasificacion_aportes_updated_at before update on public.clasificacion_aportes for each row execute function public.set_updated_at();
+
+alter table public.clasificacion_aportes enable row level security;
+drop policy if exists clasificacion_aportes_authenticated_all on public.clasificacion_aportes;
+create policy clasificacion_aportes_authenticated_all on public.clasificacion_aportes for all to authenticated using (true) with check (auth.uid() is not null);
+
+-- Tabla de mesas participantes en la sesión de clasificación
+create table if not exists public.clasificacion_mesas (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  clasificacion_id uuid not null references public.clasificaciones(id) on delete cascade,
+  nombre text not null,
+  num_jabas integer not null default 0 check (num_jabas >= 0)
+);
+
+create index if not exists idx_clasificacion_mesas_clasificacion_id on public.clasificacion_mesas(clasificacion_id);
+
+drop trigger if exists trg_clasificacion_mesas_updated_at on public.clasificacion_mesas;
+create trigger trg_clasificacion_mesas_updated_at before update on public.clasificacion_mesas for each row execute function public.set_updated_at();
+
+alter table public.clasificacion_mesas enable row level security;
+drop policy if exists clasificacion_mesas_authenticated_all on public.clasificacion_mesas;
+create policy clasificacion_mesas_authenticated_all on public.clasificacion_mesas for all to authenticated using (true) with check (auth.uid() is not null);

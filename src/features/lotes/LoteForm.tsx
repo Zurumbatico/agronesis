@@ -81,43 +81,21 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
 
   return (
     <form onSubmit={handleSubmit(handleValidSubmit as any)} className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FormField label="Código de lote" error={errors.codigo?.message} required>
-          {isEditing ? (
-            <>
-              <Input
-                value={defaultValues?.codigo ?? ''}
-                disabled
-                placeholder="LOT-20260331-001"
-                className="cursor-not-allowed border-dashed bg-muted text-muted-foreground disabled:opacity-100"
-              />
-              <Input type="hidden" {...register('codigo')} />
-            </>
-          ) : (
-            <>
-              <Input
-                readOnly
-                aria-disabled="true"
-                value=""
-                placeholder="Se asigna automáticamente al guardar"
-                className="cursor-not-allowed border-dashed bg-muted text-muted-foreground placeholder:text-muted-foreground/90"
-              />
-              <Input type="hidden" {...register('codigo')} />
-            </>
-          )}
-        </FormField>
+      <Input type="hidden" {...register('codigo')} />
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Fecha de ingreso" error={errors.fecha_ingreso?.message} required>
           <Input type="date" {...register('fecha_ingreso')} />
+        </FormField>
+
+        <FormField label="Código de lote por agricultor" error={errors.codigo_lote_agricultor?.message}>
+          <Input placeholder="Ej: LOTE-A-001" maxLength={30} {...register('codigo_lote_agricultor')} />
         </FormField>
 
         <FormField label="Agricultor" error={errors.agricultor_id?.message} required className="sm:col-span-2">
           <Controller name="agricultor_id" control={control} render={({ field }) => (
             <Select
-              onValueChange={(value) => {
-                field.onChange(value)
-                setValue('acopiador_combined', `agri:${value}`)
-              }}
+              onValueChange={field.onChange}
               value={field.value ?? ''}
             >
               <SelectTrigger><SelectValue placeholder="Seleccionar agricultor..." /></SelectTrigger>
@@ -133,15 +111,14 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
         <FormField
           label="Acopiador"
           error={errors.acopiador_combined?.message}
-          required
           className="sm:col-span-2"
         >
           <Controller name="acopiador_combined" control={control} render={({ field }) => (
             <AcopiadorPicker
               value={field.value ?? ''}
               onChange={field.onChange}
-              agricultores={agricultoresActivos}
               acopiadores={acopiadoresActivos}
+              agricultores={agricultoresActivos}
               error={!!errors.acopiador_combined}
             />
           )} />
@@ -152,9 +129,15 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
             <Select onValueChange={field.onChange} value={field.value ?? ''}>
               <SelectTrigger><SelectValue placeholder="Seleccionar producto..." /></SelectTrigger>
               <SelectContent>
-                {productosActivos.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.nombre} · {p.variedad === 'snow_peas' ? 'Snow Peas' : 'Sugar'}</SelectItem>
-                ))}
+                {productosActivos.map((p) => {
+                  const variedadLabel = p.variedad === 'snow_peas' ? 'Snow Peas' : 'Sugar'
+                  const produccionLabel = p.tipo_produccion === 'organico' ? 'Orgánico' : 'Convencional'
+                  return (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.codigo} · {p.nombre} · {variedadLabel} · {produccionLabel}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           )} />
@@ -200,7 +183,7 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
           />
         </FormField>
 
-        <FormField label="N° jabas" error={errors.num_cubetas?.message} required>
+        <FormField label="Jabas ingresadas" error={errors.num_cubetas?.message} required>
           <Input
             type="number"
             min="0"

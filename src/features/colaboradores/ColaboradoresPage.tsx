@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Plus, Search, Pencil, Trash2, Phone, MapPin, LayoutGrid, List } from 'lucide-react'
-import { useAcopiadores } from './hooks/useAcopiadores'
-import { AcopiadorForm } from './AcopiadorForm'
+import { useColaboradores } from './hooks/useColaboradores'
+import { ColaboradorForm } from './ColaboradorForm'
+import { ROL_COLABORADOR_CONFIG } from '@/constants'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -12,21 +13,23 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { Acopiador } from '@/types/models'
-import type { AcopiadorFormData } from '@/utils/validators'
+import type { Colaborador } from '@/types/models'
+import type { ColaboradorFormData } from '@/utils/validators'
 
-export default function AcopiadoresPage() {
-  const { acopiadores, loading, error, reload, crear, actualizar, eliminar } = useAcopiadores()
+export default function ColaboradoresPage() {
+  const { colaboradores, loading, error, reload, crear, actualizar, eliminar } = useColaboradores()
   const [busqueda, setBusqueda] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editando, setEditando] = useState<Acopiador | null>(null)
+  const [editando, setEditando] = useState<Colaborador | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [vista, setVista] = useState<'cards' | 'lista'>('lista')
   const [paginaActual, setPaginaActual] = useState(1)
   const [tamanoPagina, setTamanoPagina] = useState(12)
 
-  const filtrados = acopiadores.filter((a) =>
-    `${a.nombre} ${a.apellido} ${a.codigo} ${a.dni ?? ''} ${a.telefono ?? ''} ${a.numero_cuenta ?? ''} ${a.ubicacion ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
+  const filtrados = colaboradores.filter((c) =>
+    `${c.nombre} ${c.apellido} ${c.codigo} ${c.dni ?? ''} ${c.telefono ?? ''} ${c.numero_cuenta ?? ''} ${c.ubicacion ?? ''} ${ROL_COLABORADOR_CONFIG[c.rol].label}`
+      .toLowerCase()
+      .includes(busqueda.toLowerCase())
   )
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / tamanoPagina))
@@ -40,10 +43,10 @@ export default function AcopiadoresPage() {
   }, [paginaActual, totalPaginas])
 
   const abrirNuevo = () => { setEditando(null); setDialogError(null); setDialogOpen(true) }
-  const abrirEditar = (a: Acopiador) => { setEditando(a); setDialogError(null); setDialogOpen(true) }
+  const abrirEditar = (colaborador: Colaborador) => { setEditando(colaborador); setDialogError(null); setDialogOpen(true) }
   const cerrar = () => { setDialogOpen(false); setEditando(null); setDialogError(null) }
 
-  const handleSubmit = async (data: AcopiadorFormData) => {
+  const handleSubmit = async (data: ColaboradorFormData) => {
     try {
       if (editando) await actualizar(editando.id, data)
       else await crear(data)
@@ -59,8 +62,8 @@ export default function AcopiadoresPage() {
   return (
     <div>
       <PageHeader
-        title="Acopiadores"
-        description={`${acopiadores.length} registrados`}
+        title="Colaboradores"
+        description={`${colaboradores.length} registrados`}
         actions={<Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Nuevo</Button>}
       />
 
@@ -95,49 +98,40 @@ export default function AcopiadoresPage() {
               <SelectItem value="48">48 / pag</SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            type="button"
-            size="sm"
-            variant={vista === 'lista' ? 'secondary' : 'outline'}
-            onClick={() => setVista('lista')}
-          >
+          <Button type="button" size="sm" variant={vista === 'lista' ? 'secondary' : 'outline'} onClick={() => setVista('lista')}>
             <List className="h-4 w-4" /> Lista
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={vista === 'cards' ? 'secondary' : 'outline'}
-            onClick={() => setVista('cards')}
-          >
+          <Button type="button" size="sm" variant={vista === 'cards' ? 'secondary' : 'outline'} onClick={() => setVista('cards')}>
             <LayoutGrid className="h-4 w-4" /> Tarjetas
           </Button>
         </div>
       </div>
 
       {filtrados.length === 0 ? (
-        <EmptyState title="Sin acopiadores" action={!busqueda ? <Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Agregar</Button> : undefined} />
+        <EmptyState title="Sin colaboradores" action={!busqueda ? <Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Agregar</Button> : undefined} />
       ) : vista === 'cards' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-          {paginados.map((a) => (
-            <div key={a.id} className="bg-card border rounded-xl p-4 flex flex-col gap-2 hover:shadow-md transition-shadow">
+          {paginados.map((c) => (
+            <div key={c.id} className="bg-card border rounded-xl p-4 flex flex-col gap-2 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="font-semibold">{a.apellido}, {a.nombre}</p>
-                  <p className="text-xs text-muted-foreground">{a.codigo}</p>
+                  <p className="font-semibold">{c.apellido}, {c.nombre}</p>
+                  <p className="text-xs text-muted-foreground">{c.codigo}</p>
                 </div>
-                <EstadoActivoBadge estado={a.estado} />
+                <EstadoActivoBadge estado={c.estado} />
               </div>
               <div className="text-sm text-muted-foreground flex flex-col gap-0.5">
-                {a.dni && <span>DNI: {a.dni}</span>}
-                {a.telefono && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{a.telefono}</span>}
-                {a.numero_cuenta && <span>N° cuenta: {a.numero_cuenta}</span>}
-                {a.ubicacion && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{a.ubicacion}</span>}
+                <span>Rol: {ROL_COLABORADOR_CONFIG[c.rol].label}</span>
+                {c.dni && <span>DNI: {c.dni}</span>}
+                {c.telefono && <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{c.telefono}</span>}
+                {c.numero_cuenta && <span>N° cuenta: {c.numero_cuenta}</span>}
+                {c.ubicacion && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{c.ubicacion}</span>}
               </div>
               <div className="flex gap-2 pt-2 border-t">
-                <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(a)}>
+                <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(c)}>
                   <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                 </Button>
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este acopiador?')) eliminar(a.id) }}>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este colaborador?')) eliminar(c.id) }}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -149,7 +143,8 @@ export default function AcopiadoresPage() {
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead>Acopiador</TableHead>
+                <TableHead>Colaborador</TableHead>
+                <TableHead>Rol</TableHead>
                 <TableHead>DNI</TableHead>
                 <TableHead>Teléfono</TableHead>
                 <TableHead>N° cuenta</TableHead>
@@ -158,22 +153,23 @@ export default function AcopiadoresPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginados.map((a) => (
-                <TableRow key={a.id}>
+              {paginados.map((c) => (
+                <TableRow key={c.id}>
                   <TableCell>
-                    <p className="font-medium">{a.apellido}, {a.nombre}</p>
-                    <p className="text-xs text-muted-foreground">{a.codigo}</p>
+                    <p className="font-medium">{c.apellido}, {c.nombre}</p>
+                    <p className="text-xs text-muted-foreground">{c.codigo}</p>
                   </TableCell>
-                  <TableCell>{a.dni || '—'}</TableCell>
-                  <TableCell>{a.telefono || '—'}</TableCell>
-                  <TableCell>{a.numero_cuenta || '—'}</TableCell>
-                  <TableCell><EstadoActivoBadge estado={a.estado} /></TableCell>
+                  <TableCell>{ROL_COLABORADOR_CONFIG[c.rol].label}</TableCell>
+                  <TableCell>{c.dni || '—'}</TableCell>
+                  <TableCell>{c.telefono || '—'}</TableCell>
+                  <TableCell>{c.numero_cuenta || '—'}</TableCell>
+                  <TableCell><EstadoActivoBadge estado={c.estado} /></TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => abrirEditar(a)}>
+                      <Button variant="ghost" size="sm" onClick={() => abrirEditar(c)}>
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este acopiador?')) eliminar(a.id) }}>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este colaborador?')) eliminar(c.id) }}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -218,9 +214,9 @@ export default function AcopiadoresPage() {
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>{editando ? 'Editar acopiador' : 'Nuevo acopiador'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editando ? 'Editar colaborador' : 'Nuevo colaborador'}</DialogTitle></DialogHeader>
           {dialogError && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{dialogError}</p>}
-          <AcopiadorForm defaultValues={editando ?? undefined} onSubmit={handleSubmit} onCancel={cerrar} isEditing={!!editando} />
+          <ColaboradorForm defaultValues={editando ?? undefined} onSubmit={handleSubmit} onCancel={cerrar} isEditing={!!editando} />
         </DialogContent>
       </Dialog>
     </div>
