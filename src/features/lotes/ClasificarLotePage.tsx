@@ -7,10 +7,10 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { ToastContainer, useToast } from '@/components/shared/Toast'
+import { ColaboradorPicker } from '@/components/shared/ColaboradorPicker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/store/auth.store'
 import { formatPeso } from '@/utils/formatters'
@@ -29,6 +29,17 @@ export default function ClasificarLotePage() {
   const { user } = useAuthStore()
   const uid = useId()
 
+  const crearFila = (suffix: string): Fila => ({
+    key: `${uid}-f-${suffix}`,
+    colaborador_id: '',
+    peso_bueno_kg: '',
+  })
+
+  const crearMesa = (suffix: string, conFilaInicial = true): MesaBloque => ({
+    key: `${uid}-m-${suffix}`,
+    filas: conFilaInicial ? [crearFila(`${suffix}-0`)] : [],
+  })
+
   const [lote, setLote] = useState<Lote | null>(null)
   const [seleccionadores, setSeleccionadores] = useState<Colaborador[]>([])
   const [loading, setLoading] = useState(true)
@@ -40,9 +51,7 @@ export default function ClasificarLotePage() {
   // Datos de la sesión
   const [fecha, setFecha] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [observaciones, setObservaciones] = useState('')
-  const [mesas, setMesas] = useState<MesaBloque[]>([
-    { key: `${uid}-mesa-inicial`, filas: [] },
-  ])
+  const [mesas, setMesas] = useState<MesaBloque[]>([crearMesa('inicial')])
 
   const todasFilas = mesas.flatMap((m) => m.filas)
   const totalBuenos = todasFilas.reduce((acc, f) => acc + (parseFloat(f.peso_bueno_kg) || 0), 0)
@@ -64,7 +73,7 @@ export default function ClasificarLotePage() {
       if (sesion) {
         setFecha(sesion.fecha_clasificacion)
         setObservaciones(sesion.observaciones ?? '')
-        const mesasCargadas: MesaBloque[] = [{ key: `${uid}-mesa-default`, filas: [] }]
+        const mesasCargadas: MesaBloque[] = [crearMesa('default')]
 
         const aportesCargados = (sesion.aportes ?? []).map((a, i) => ({
           key: `${uid}-loaded-${i}`,
@@ -82,16 +91,18 @@ export default function ClasificarLotePage() {
           if (raw) {
             const parsed = JSON.parse(raw) as Array<{ filas: Array<{ colaborador_id: string; peso_bueno_kg: string }> }>
             if (Array.isArray(parsed) && parsed.length > 0) {
-              const mesasDesdeLocal: MesaBloque[] = parsed.map((m, i) => ({
-                key: `${uid}-mesa-local-${i}`,
-                filas: Array.isArray(m.filas)
-                  ? m.filas.map((f, j) => ({
-                      key: `${uid}-fila-local-${i}-${j}`,
-                      colaborador_id: f.colaborador_id ?? '',
-                      peso_bueno_kg: String(f.peso_bueno_kg ?? ''),
-                    }))
-                  : [],
-              }))
+              const mesasDesdeLocal: MesaBloque[] = parsed
+                .map((m, i) => ({
+                  key: `${uid}-mesa-local-${i}`,
+                  filas: Array.isArray(m.filas)
+                    ? m.filas.map((f, j) => ({
+                        key: `${uid}-fila-local-${i}-${j}`,
+                        colaborador_id: f.colaborador_id ?? '',
+                        peso_bueno_kg: String(f.peso_bueno_kg ?? ''),
+                      }))
+                    : [],
+                }))
+                .filter((m) => m.filas.length > 0)
               if (mesasDesdeLocal.length > 0) {
                 setMesas(mesasDesdeLocal)
                 setLoading(false)
@@ -125,15 +136,15 @@ export default function ClasificarLotePage() {
   const agregarMesa = () => {
     setMesas((prev) => [
       ...prev,
-      {
-        key: `${uid}-m-${Date.now()}`,
-        filas: [{ key: `${uid}-f-${Date.now()}`, colaborador_id: '', peso_bueno_kg: '' }],
-      },
+      crearMesa(String(Date.now())),
     ])
   }
 
   const eliminarMesa = (mesaKey: string) => {
-    setMesas((prev) => prev.filter((m) => m.key !== mesaKey))
+    setMesas((prev) => {
+      if (prev.length <= 1) return prev
+      return prev.filter((m) => m.key !== mesaKey)
+    })
   }
 
   const agregarFilaEnMesa = (mesaKey: string) => {
@@ -141,16 +152,22 @@ export default function ClasificarLotePage() {
       m.key === mesaKey
         ? {
             ...m,
-            filas: [...m.filas, { key: `${uid}-f-${Date.now()}`, colaborador_id: '', peso_bueno_kg: '' }],
+            filas: [...m.filas, crearFila(String(Date.now()))],
           }
         : m
     )))
   }
 
   const eliminarFilaEnMesa = (mesaKey: string, filaKey: string) => {
-    setMesas((prev) => prev.map((m) => (
-      m.key === mesaKey ? { ...m, filas: m.filas.filter((f) => f.key !== filaKey) } : m
-    )))
+    setMesas((prev) => prev.flatMap((m) => {
+      if (m.key !== mesaKey) return [m]
+
+      const totalFilasPrevias = prev.reduce((acc, mesa) => acc + mesa.filas.length, 0)
+      if (totalFilasPrevias <= 1) return [m]
+
+      const filasRestantes = m.filas.filter((f) => f.key !== filaKey)
+      return filasRestantes.length > 0 ? [{ ...m, filas: filasRestantes }] : []
+    }))
   }
 
   const actualizarFilaEnMesa = (mesaKey: string, filaKey: string, campo: keyof Omit<Fila, 'key'>, valor: string) => {
@@ -363,25 +380,12 @@ export default function ClasificarLotePage() {
                 <div key={fila.key} className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground w-5 text-right">{idx + 1}.</span>
                   <div className="flex-1">
-                    <Select
+                    <ColaboradorPicker
                       value={fila.colaborador_id}
-                      onValueChange={(v) => actualizarFilaEnMesa(mesa.key, fila.key, 'colaborador_id', v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionador..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {seleccionadores.map((s) => (
-                          <SelectItem
-                            key={s.id}
-                            value={s.id}
-                            disabled={colaboradoresSeleccionados.has(s.id) && fila.colaborador_id !== s.id}
-                          >
-                            {s.apellido}, {s.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onChange={(v) => actualizarFilaEnMesa(mesa.key, fila.key, 'colaborador_id', v)}
+                      colaboradores={seleccionadores}
+                      disabledIds={colaboradoresSeleccionados}
+                    />
                   </div>
                   <div className="w-32">
                     <Input
@@ -398,6 +402,7 @@ export default function ClasificarLotePage() {
                     size="icon"
                     className="text-muted-foreground hover:text-destructive"
                     onClick={() => eliminarFilaEnMesa(mesa.key, fila.key)}
+                    disabled={todasFilas.length <= 1}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -409,7 +414,7 @@ export default function ClasificarLotePage() {
                   <Plus className="w-4 h-4 mr-1" />
                   Agregar trabajador
                 </Button>
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => eliminarMesa(mesa.key)}>
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive" onClick={() => eliminarMesa(mesa.key)} disabled={mesas.length <= 1}>
                   <Trash2 className="w-4 h-4 mr-1" />
                   Eliminar cuadro
                 </Button>
