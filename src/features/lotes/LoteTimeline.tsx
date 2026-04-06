@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 const PASOS: EstadoLote[] = [
   'ingresado', 'en_clasificacion', 'clasificado',
-  'en_despacho', 'despachado', 'liquidado',
+  'pesado_pe', 'en_despacho', 'despachado', 'liquidado',
 ]
 
 interface LoteTimelineProps {
@@ -18,8 +18,9 @@ export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
   return (
     <div className="flex flex-col gap-0">
       {PASOS.map((paso, i) => {
-        const completado = i < indexActual
-        const activo = i === indexActual
+        const esFinal = i === PASOS.length - 1
+        const completado = i < indexActual || (esFinal && i === indexActual)
+        const activo = i === indexActual && !esFinal
         const esPasoDespacho = paso === 'en_despacho'
         const { label } = ESTADO_LOTE_CONFIG[paso]
 

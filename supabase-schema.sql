@@ -396,7 +396,7 @@ create table if not exists public.lotes (
   num_cubetas integer not null default 0,
   codigo_lote_agricultor text null,
   observaciones text null,
-  estado text not null default 'ingresado' check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'en_despacho', 'despachado', 'liquidado'))
+  estado text not null default 'ingresado' check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'pesado_pe', 'en_despacho', 'despachado', 'liquidado'))
 );
 
 alter table public.lotes alter column codigo set default public.generate_lote_codigo();
@@ -798,4 +798,30 @@ create trigger trg_clasificacion_aportes_updated_at before update on public.clas
 alter table public.clasificacion_aportes enable row level security;
 drop policy if exists clasificacion_aportes_authenticated_all on public.clasificacion_aportes;
 create policy clasificacion_aportes_authenticated_all on public.clasificacion_aportes for all to authenticated using (true) with check (auth.uid() is not null);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- CONFIG PRECIOS — precio/kg por semana + variedad + categoría (Módulo 8 PDF)
+-- El Jefe de Planta lo configura antes de cada semana desde el panel admin.
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.config_precios (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  semana integer not null check (semana between 1 and 53),
+  anio integer not null check (anio >= 2024),
+  variedad text not null check (variedad in ('snow_peas', 'sugar')),
+  categoria text not null check (categoria in ('cat1', 'cat2')),
+  precio_kg_sol numeric(10,4) not null check (precio_kg_sol >= 0),
+  constraint uq_config_precio unique (semana, anio, variedad, categoria)
+);
+
+create index if not exists idx_config_precios_semana_anio on public.config_precios(anio, semana);
+
+drop trigger if exists trg_config_precios_updated_at on public.config_precios;
+create trigger trg_config_precios_updated_at before update on public.config_precios for each row execute function public.set_updated_at();
+
+alter table public.config_precios enable row level security;
+drop policy if exists config_precios_authenticated_all on public.config_precios;
+create policy config_precios_authenticated_all on public.config_precios for all to authenticated using (true) with check (auth.uid() is not null);
 

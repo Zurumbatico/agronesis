@@ -17,7 +17,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/store/auth.store'
 import { formatFecha, formatPeso, formatMoneda } from '@/utils/formatters'
-import { calcularTotalesClasificacion, validarCajasDespacho, calcularValorDespacho } from '@/utils/business-rules'
+import {
+  calcularTotalesClasificacion,
+  calcularPesoTotalClasificado,
+  calcularCajasExportables,
+  calcularPallets,
+  validarCajasDespacho,
+  calcularValorDespacho,
+} from '@/utils/business-rules'
 import { format } from 'date-fns'
 import type { Lote, Clasificacion, Despacho } from '@/types/models'
 
@@ -38,12 +45,15 @@ export default function DespacharLotePage() {
       lote_id: id ?? '',
       fecha_despacho: format(new Date(), 'yyyy-MM-dd'),
       destino: 'exportacion',
+      precio_venta_kg: 0,
     },
   })
 
   const precioVenta = watch('precio_venta_kg')
   const pesoNeto = watch('peso_neto_kg')
+  const numCajasInput = watch('num_cajas_despachadas')
   const subtotal = precioVenta && pesoNeto ? calcularValorDespacho({ peso_neto_kg: pesoNeto, precio_venta_kg: precioVenta }) : 0
+  const palletsPreview = numCajasInput > 0 ? calcularPallets(numCajasInput) : null
 
   const cargar = async () => {
     if (!id) return
@@ -70,12 +80,12 @@ export default function DespacharLotePage() {
     setErrorCajas(null)
     const nuevo = await createDespacho(data, user.id)
 
-    if (lote.estado === 'clasificado') {
+    if (lote.estado === 'pesado_pe') {
       await actualizarEstadoLote(lote.id, 'en_despacho')
     }
 
     setDespachos((prev) => [...prev, nuevo])
-    reset({ lote_id: id ?? '', fecha_despacho: format(new Date(), 'yyyy-MM-dd'), destino: 'exportacion' })
+    reset({ lote_id: id ?? '', fecha_despacho: format(new Date(), 'yyyy-MM-dd'), destino: 'exportacion', precio_venta_kg: 0 })
   }
 
   const handleFinalizar = async () => {
@@ -85,9 +95,11 @@ export default function DespacharLotePage() {
     navigate(`/lotes/${id}`)
   }
 
-  const totalesClasificacion = calcularTotalesClasificacion(clasificaciones)
-  const totalCajasClasificadas = Object.values(totalesClasificacion).reduce((acc, t) => acc + t.num_cajas, 0)
+  const pesoKgBuenos = calcularPesoTotalClasificado(clasificaciones)
+  const totalCajasExportables = calcularCajasExportables(pesoKgBuenos)
   const totalCajasDespachadas = despachos.reduce((acc, d) => acc + d.num_cajas_despachadas, 0)
+  const cajasDisponibles = totalCajasExportables - totalCajasDespachadas
+  const pesoKgDespachado = despachos.reduce((acc, d) => acc + d.peso_neto_kg, 0)
 
   if (loading) return <LoadingPage />
   if (error) return <ErrorMessage message={error} onRetry={cargar} />
@@ -105,12 +117,26 @@ export default function DespacharLotePage() {
         }
       />
 
-      {/* Resumen cajas */}
+      {/* Resumen cajas y pesos */}
       <Card className="mb-4">
-        <CardContent className="pt-4 grid grid-cols-3 gap-2 text-sm">
-          <div><p className="text-muted-foreground text-xs">Cajas clasificadas</p><p className="font-bold">{totalCajasClasificadas}</p></div>
-          <div><p className="text-muted-foreground text-xs">Despachadas</p><p className="font-bold text-agro-green">{totalCajasDespachadas}</p></div>
-          <div><p className="text-muted-foreground text-xs">Pendiente</p><p className="font-bold">{totalCajasClasificadas - totalCajasDespachadas}</p></div>
+        <CardContent className="pt-4 space-y-3">
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <div>
+              <p className="text-muted-foreground text-xs">Cajas exportables</p>
+              <p className="font-bold text-lg">{totalCajasExportables}</p>
+              <p className="text-muted-foreground text-[11px]">{formatPeso(pesoKgBuenos)} buenos</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Despachadas</p>
+              <p className="font-bold text-lg text-agro-green">{totalCajasDespachadas}</p>
+              <p className="text-muted-foreground text-[11px]">{formatPeso(pesoKgDespachado)}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">Disponibles</p>
+              <p className={`font-bold text-lg ${cajasDisponibles <= 0 ? 'text-destructive' : ''}`}>{cajasDisponibles}</p>
+              <p className="text-muted-foreground text-[11px]">{cajasDisponibles <= 0 ? 'Sin stock' : `${formatPeso(cajasDisponibles * 4.65)} est.`}</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -149,14 +175,21 @@ export default function DespacharLotePage() {
 
               <FormField label="N° cajas a despachar" error={errors.num_cajas_despachadas?.message} required>
                 <Input type="number" min="1" step="1" {...register('num_cajas_despachadas', { valueAsNumber: true })} />
+                {palletsPreview !== null && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {palletsPreview.completos > 0
+                      ? `${palletsPreview.completos} pallet${palletsPreview.completos > 1 ? 's' : ''} completo${palletsPreview.completos > 1 ? 's' : ''}${palletsPreview.restantes > 0 ? ` + ${palletsPreview.restantes} cajas` : ''}`
+                      : `${palletsPreview.restantes} cajas (sin pallet completo)`}
+                  </p>
+                )}
               </FormField>
 
               <FormField label="Peso neto (kg)" error={errors.peso_neto_kg?.message} required>
                 <Input type="number" step="0.01" min="0.01" {...register('peso_neto_kg', { valueAsNumber: true })} />
               </FormField>
 
-              <FormField label="Precio venta (S/./kg)" error={errors.precio_venta_kg?.message} required>
-                <Input type="number" step="0.01" min="0.01" {...register('precio_venta_kg', { valueAsNumber: true })} />
+              <FormField label="Precio venta (S/./kg)" error={errors.precio_venta_kg?.message}>
+                <Input type="number" step="0.01" min="0" placeholder="0.00 — opcional" {...register('precio_venta_kg', { valueAsNumber: true })} />
               </FormField>
 
               {subtotal > 0 && (

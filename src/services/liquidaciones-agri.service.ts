@@ -68,3 +68,33 @@ export async function actualizarEstadoLiquidacionAgri(
   if (error) throw new Error(error.message)
   return data as unknown as LiquidacionAgri
 }
+
+/**
+ * Marca la liquidación como pagada y actualiza todos sus lotes asociados a 'liquidado'.
+ * Llama a esto en lugar de actualizarEstadoLiquidacionAgri cuando el pago es confirmado.
+ */
+export async function pagarLiquidacionAgri(id: string): Promise<LiquidacionAgri> {
+  // Traer la liquidación con sus detalles para obtener los lote_ids
+  const liquidacion = await getLiquidacionAgri(id)
+  const loteIds = [...new Set((liquidacion.detalles ?? []).map((d) => d.lote_id))]
+
+  // Marcar cada lote como liquidado
+  if (loteIds.length > 0) {
+    const { error } = await supabase
+      .from('lotes')
+      .update({ estado: 'liquidado', updated_at: new Date().toISOString() })
+      .in('id', loteIds)
+    if (error) throw new Error(error.message)
+  }
+
+  // Marcar la liquidación como pagada
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update({ estado: 'pagada', updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('*, agricultor:agricultores(*)')
+    .single()
+
+  if (error) throw new Error(error.message)
+  return data as unknown as LiquidacionAgri
+}

@@ -7,12 +7,13 @@ export const APP_VERSION = '1.0.0'
 
 // Estados y sus etiquetas/colores para UI
 export const ESTADO_LOTE_CONFIG = {
-  ingresado:        { label: 'Ingresado',        color: 'bg-blue-100 text-blue-800' },
-  en_clasificacion: { label: 'Clasificando',      color: 'bg-yellow-100 text-yellow-800' },
-  clasificado:      { label: 'Clasificado',       color: 'bg-purple-100 text-purple-800' },
-  en_despacho:      { label: 'En Despacho',       color: 'bg-orange-100 text-orange-800' },
-  despachado:       { label: 'Despachado',        color: 'bg-green-100 text-green-800' },
-  liquidado:        { label: 'Liquidado',         color: 'bg-gray-100 text-gray-700' },
+  ingresado:        { label: 'Ingresado',            color: 'bg-blue-100 text-blue-800' },
+  en_clasificacion: { label: 'Clasificando',          color: 'bg-yellow-100 text-yellow-800' },
+  clasificado:      { label: 'Clasificado',           color: 'bg-purple-100 text-purple-800' },
+  pesado_pe:        { label: 'Pesado PE',             color: 'bg-sky-100 text-sky-800' },
+  en_despacho:      { label: 'En Despacho',           color: 'bg-orange-100 text-orange-800' },
+  despachado:       { label: 'Despachado',            color: 'bg-green-100 text-green-800' },
+  liquidado:        { label: 'Liquidado',             color: 'bg-gray-100 text-gray-700' },
 } as const
 
 export const ESTADO_LIQUIDACION_CONFIG = {
@@ -63,7 +64,8 @@ export const ROL_COLABORADOR_CONFIG = {
 export const TRANSICIONES_LOTE: Record<string, string[]> = {
   ingresado:        ['en_clasificacion'],
   en_clasificacion: ['clasificado'],
-  clasificado:      ['en_despacho'],
+  clasificado:      ['pesado_pe'],
+  pesado_pe:        ['en_despacho'],
   en_despacho:      ['despachado'],
   despachado:       ['liquidado'],
   liquidado:        [],
@@ -88,11 +90,13 @@ export const ROUTES = {
   LOTES_NUEVO:              '/lotes/nuevo',
   LOTES_DETALLE:            '/lotes/:id',
   CLASIFICACIONES:          '/lotes/:id/clasificar',
+  PESADO_PE:                '/lotes/:id/pesado-pe',
   DESPACHOS:                '/lotes/:id/despachar',
   LIQUIDACIONES_AGRI:       '/liquidaciones/agricultores',
   LIQUIDACIONES_AGRI_NUEVA: '/liquidaciones/agricultores/nueva',
   LIQUIDACIONES_AGRI_DETALLE: '/liquidaciones/agricultores/:id',
   CUBETAS:                  '/cubetas',
+  CONFIG_PRECIOS:           '/admin/config-precios',
 } as const
 
 // Controla módulos habilitados en UI/ruteo.

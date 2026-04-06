@@ -101,6 +101,7 @@ export type EstadoLote =
   | 'ingresado'
   | 'en_clasificacion'
   | 'clasificado'
+  | 'pesado_pe'
   | 'en_despacho'
   | 'despachado'
   | 'liquidado'
@@ -230,6 +231,20 @@ export type LiquidacionAgriInsert = Omit<LiquidacionAgri, keyof BaseEntity | 'ag
 export type LiquidacionAgriUpdate = Partial<LiquidacionAgriInsert>
 
 export type LiquidacionAgriDetalleInsert = Omit<LiquidacionAgriDetalle, keyof BaseEntity | 'lote'>
+
+// ─────────────────────────────────────────────
+// CONFIGURACIÓN DE PRECIOS
+// ─────────────────────────────────────────────
+export interface ConfigPrecio extends BaseEntity {
+  semana: number
+  anio: number
+  variedad: VariedadProducto
+  categoria: CalidadProducto
+  precio_kg_sol: number
+}
+
+export type ConfigPrecioInsert = Omit<ConfigPrecio, keyof BaseEntity>
+export type ConfigPrecioUpdate = Partial<ConfigPrecioInsert>
 
 // ─────────────────────────────────────────────
 // MOVIMIENTO DE CUBETAS

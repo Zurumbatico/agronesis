@@ -188,7 +188,10 @@ export const despachoSchema = z.object({
   placa_vehiculo:       z.preprocess(nullableUpperTrim, z.string().max(20).nullable()),
   num_cajas_despachadas: cantidadEnteraSchema,
   peso_neto_kg:         pesoKgSchema,
-  precio_venta_kg:      precioSchema,
+  precio_venta_kg:      z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? 0 : Number(v)),
+    z.number().nonnegative('El precio no puede ser negativo').max(1000, 'Precio fuera de rango').default(0)
+  ),
   observaciones:        observacionesSchema,
 })
 

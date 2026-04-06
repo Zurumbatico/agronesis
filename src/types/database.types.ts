@@ -158,7 +158,7 @@ export interface Database {
           num_cubetas: number
           codigo_lote_agricultor: string | null
           observaciones: string | null
-          estado: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'en_despacho' | 'despachado' | 'liquidado'
+          estado: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'pesado_pe' | 'en_despacho' | 'despachado' | 'liquidado'
         }
         Insert: Omit<Database['public']['Tables']['lotes']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['lotes']['Insert']>
@@ -333,6 +333,22 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['movimientos_cubetas']['Insert']>
         Relationships: []
       }
+      config_precios: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          semana: number
+          anio: number
+          variedad: 'snow_peas' | 'sugar'
+          categoria: 'cat1' | 'cat2'
+          precio_kg_sol: number
+        }
+        Insert: Omit<Database['public']['Tables']['config_precios']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['config_precios']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -347,7 +363,7 @@ export interface Database {
     }
     Enums: {
       estado_activo: 'activo' | 'inactivo'
-      estado_lote: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'en_despacho' | 'despachado' | 'liquidado'
+      estado_lote: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'pesado_pe' | 'en_despacho' | 'despachado' | 'liquidado'
       estado_liquidacion: 'borrador' | 'confirmada' | 'pagada'
       tipo_producto: 'holantao' | 'snow_peas' | 'otro'
       tipo_personal: 'clasificador' | 'cosechador' | 'empacador' | 'supervisor'

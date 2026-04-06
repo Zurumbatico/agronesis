@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getLiquidacionAgri, actualizarEstadoLiquidacionAgri } from '@/services/liquidaciones-agri.service'
+import { getLiquidacionAgri, actualizarEstadoLiquidacionAgri, pagarLiquidacionAgri } from '@/services/liquidaciones-agri.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -39,13 +39,18 @@ export default function DetalleLiquidacionAgriPage() {
 
     const msg = nuevoEstado === 'confirmada'
       ? '¿Confirmar esta liquidación?'
-      : '¿Marcar como pagada?'
+      : '¿Marcar como pagada? Esto marcará todos los lotes asociados como LIQUIDADO.'
 
     if (!confirm(msg)) return
 
     setCambiando(true)
     try {
-      await actualizarEstadoLiquidacionAgri(liquidacion.id, nuevoEstado)
+      if (nuevoEstado === 'pagada') {
+        // Marca la liquidación como pagada y actualiza los lotes a 'liquidado'
+        await pagarLiquidacionAgri(liquidacion.id)
+      } else {
+        await actualizarEstadoLiquidacionAgri(liquidacion.id, nuevoEstado)
+      }
       await cargar()
     } finally {
       setCambiando(false)

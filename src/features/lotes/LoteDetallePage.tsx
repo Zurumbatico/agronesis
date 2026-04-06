@@ -24,7 +24,15 @@ type CuadroLocal = {
   filas: Array<{ colaborador_id: string; peso_bueno_kg: string }>
 }
 
+type PesadoPE = {
+  fecha_pesado_pe: string
+  peso_bruto_pe_kg: number
+  n_jabas_pe: number
+  tipo_jaba_pe: 'grande' | 'pequena'
+}
+
 const getMesasStorageKey = (loteId: string) => `clasificacion-cuadros-${loteId}`
+const getPesadoPEKey = (loteId: string) => `pesado-pe-${loteId}`
 
 export default function LoteDetallePage() {
   const { id } = useParams<{ id: string }>()
@@ -35,6 +43,7 @@ export default function LoteDetallePage() {
   const [cuadrosLocales, setCuadrosLocales] = useState<CuadroLocal[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [pesadoPE, setPesadoPE] = useState<PesadoPE | null>(null)
 
   const cargar = async () => {
     if (!id) return
@@ -59,21 +68,21 @@ export default function LoteDetallePage() {
     if (!id) return
     try {
       const raw = localStorage.getItem(getMesasStorageKey(id))
-      if (!raw) {
-        setCuadrosLocales(null)
-        return
-      }
+      if (!raw) { setCuadrosLocales(null); return }
       const parsed = JSON.parse(raw) as unknown
-      if (!Array.isArray(parsed)) {
-        setCuadrosLocales(null)
-        return
-      }
-      const cuadros = parsed.filter((item) => item && typeof item === 'object') as CuadroLocal[]
-      setCuadrosLocales(cuadros)
-    } catch {
-      setCuadrosLocales(null)
-    }
+      if (!Array.isArray(parsed)) { setCuadrosLocales(null); return }
+      setCuadrosLocales(parsed.filter((item) => item && typeof item === 'object') as CuadroLocal[])
+    } catch { setCuadrosLocales(null) }
   }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    try {
+      const raw = localStorage.getItem(getPesadoPEKey(id))
+      if (raw) setPesadoPE(JSON.parse(raw) as PesadoPE)
+    } catch { /* ignorar */ }
+  }, [id])
+
 
   if (loading) return <LoadingPage />
   if (error) return <ErrorMessage message={error} onRetry={cargar} />
@@ -103,7 +112,15 @@ export default function LoteDetallePage() {
                 Clasificar
               </Button>
             )}
-            {(lote.estado === 'clasificado' || lote.estado === 'en_despacho') && (
+            {lote.estado === 'clasificado' && (
+              <Button
+                className="bg-sky-600 hover:bg-sky-700 text-white font-semibold shadow-sm"
+                onClick={() => navigate(`/lotes/${id}/pesado-pe`)}
+              >
+                Pesar PE
+              </Button>
+            )}
+            {(lote.estado === 'pesado_pe' || lote.estado === 'en_despacho') && (
               <Button
                 className="bg-agro-green hover:bg-agro-green/90 text-white font-semibold shadow-sm"
                 onClick={() => navigate(`/lotes/${id}/despachar`)}
@@ -208,6 +225,51 @@ export default function LoteDetallePage() {
                   </div>
                 </section>
 
+                {pesadoPE && (() => {
+                  const taraGuardada = pesadoPE.n_jabas_pe * (pesadoPE.tipo_jaba_pe === 'grande' ? 1.80 : 1.25)
+                  const netoGuardado = Math.max(0, pesadoPE.peso_bruto_pe_kg - taraGuardada)
+                  const cajasTeoricas = Math.floor(netoGuardado * 0.95 / 4.65)
+                  const pctDif = totalesBuenos > 0 ? Math.abs(netoGuardado - totalesBuenos) / totalesBuenos : 0
+                  const hayAlerta = pctDif > 0.05
+                  return (
+                    <section className="md:col-span-2 rounded-lg border bg-muted/20 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Pesado PE</p>
+                        {lote.estado === 'pesado_pe' && (
+                          <button className="text-xs text-sky-600 hover:underline" onClick={() => navigate(`/lotes/${id}/pesado-pe`)}>
+                            Editar
+                          </button>
+                        )}
+                      </div>
+                      {hayAlerta && (
+                        <div className="rounded-md bg-amber-50 border border-amber-300 px-2 py-1.5 text-xs text-amber-800">
+                          ⚠️ Dif. {(pctDif * 100).toFixed(1)}% vs clasificación — revisar con Jefe de Planta
+                        </div>
+                      )}
+                      <div className="grid grid-cols-4 gap-2 text-sm">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Fecha</p>
+                          <p className="font-medium">{formatFecha(pesadoPE.fecha_pesado_pe)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Bruto</p>
+                          <p className="font-medium">{formatPeso(pesadoPE.peso_bruto_pe_kg)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Neto PE</p>
+                          <p className={`font-semibold ${hayAlerta ? 'text-amber-700' : 'text-primary'}`}>{formatPeso(netoGuardado)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Cajas teo.</p>
+                          <p className="font-medium">{cajasTeoricas}</p>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {pesadoPE.n_jabas_pe} jabas {pesadoPE.tipo_jaba_pe === 'grande' ? 'grandes' : 'pequeñas'} · tara {formatPeso(taraGuardada)}
+                      </p>
+                    </section>
+                  )
+                })()}
                 {lote.observaciones && (
                   <section className="md:col-span-2 rounded-lg border bg-muted/20 p-3">
                     <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Observaciones</p>
