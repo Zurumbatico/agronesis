@@ -80,7 +80,7 @@ export default function DespacharLotePage() {
     setErrorCajas(null)
     const nuevo = await createDespacho(data, user.id)
 
-    if (lote.estado === 'pesado_pe') {
+    if (lote.estado === 'hidroculizado') {
       await actualizarEstadoLote(lote.id, 'en_despacho')
     }
 

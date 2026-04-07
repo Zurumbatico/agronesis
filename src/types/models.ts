@@ -102,6 +102,7 @@ export type EstadoLote =
   | 'en_clasificacion'
   | 'clasificado'
   | 'pesado_pe'
+  | 'hidroculizado'
   | 'en_despacho'
   | 'despachado'
   | 'liquidado'
@@ -231,6 +232,57 @@ export type LiquidacionAgriInsert = Omit<LiquidacionAgri, keyof BaseEntity | 'ag
 export type LiquidacionAgriUpdate = Partial<LiquidacionAgriInsert>
 
 export type LiquidacionAgriDetalleInsert = Omit<LiquidacionAgriDetalle, keyof BaseEntity | 'lote'>
+
+// ─────────────────────────────────────────────
+// TAREO HIDROCULIZADO (Módulo 4 PDF — Tareo B)
+// ─────────────────────────────────────────────
+export interface TareoHidroculizado extends BaseEntity {
+  lote_id: UUID
+  colaborador_id: UUID
+  fecha: string
+  n_jabas: number
+  observaciones: string | null
+  // relaciones
+  colaborador?: Colaborador
+  lote?: Lote
+}
+
+export type TareoHidroculizadoInsert = Omit<TareoHidroculizado, keyof BaseEntity | 'colaborador' | 'lote'>
+export type TareoHidroculizadoUpdate = Partial<TareoHidroculizadoInsert>
+
+// ─────────────────────────────────────────────
+// PLANILLA QUINCENAL (Módulo 9 PDF)
+// ─────────────────────────────────────────────
+export type EstadoPlanilla = 'borrador' | 'pagada'
+
+export interface PlanillaQuincenal extends BaseEntity {
+  periodo_inicio: string   // ISO date (ej. 2026-04-01)
+  periodo_fin: string      // ISO date (ej. 2026-04-15)
+  total_monto: number
+  estado: EstadoPlanilla
+  observaciones: string | null
+  // relaciones
+  detalles?: PlanillaDetalle[]
+}
+
+export type PlanillaQuincenalInsert = Omit<PlanillaQuincenal, keyof BaseEntity | 'detalles'>
+export type PlanillaQuincenalUpdate = Partial<PlanillaQuincenalInsert>
+
+export interface PlanillaDetalle extends BaseEntity {
+  planilla_id: UUID
+  colaborador_id: UUID
+  n_jabas_hidroculizado: number   // Módulo 4 / Tareo B — jornal base (sin destajo)
+  n_cajas_empaquetado: number     // Módulo 6 / Tareo D — S/ 0.32 / caja
+  monto_empaquetado: number       // n_cajas * 0.32
+  otros_montos: number            // jornal, adelantos, descuentos, etc.
+  total: number
+  observaciones: string | null
+  // relaciones
+  colaborador?: Colaborador
+}
+
+export type PlanillaDetalleInsert = Omit<PlanillaDetalle, keyof BaseEntity | 'colaborador'>
+export type PlanillaDetalleUpdate = Partial<PlanillaDetalleInsert>
 
 // ─────────────────────────────────────────────
 // CONFIGURACIÓN DE PRECIOS

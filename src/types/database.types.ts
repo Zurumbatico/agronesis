@@ -158,7 +158,7 @@ export interface Database {
           num_cubetas: number
           codigo_lote_agricultor: string | null
           observaciones: string | null
-          estado: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'pesado_pe' | 'en_despacho' | 'despachado' | 'liquidado'
+          estado: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'pesado_pe' | 'hidroculizado' | 'en_despacho' | 'despachado' | 'liquidado'
         }
         Insert: Omit<Database['public']['Tables']['lotes']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['lotes']['Insert']>
@@ -349,6 +349,57 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['config_precios']['Insert']>
         Relationships: []
       }
+      tareo_hidroculizado: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          lote_id: string
+          colaborador_id: string
+          fecha: string
+          n_jabas: number
+          observaciones: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['tareo_hidroculizado']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['tareo_hidroculizado']['Insert']>
+        Relationships: []
+      }
+      planillas_quincenales: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          periodo_inicio: string
+          periodo_fin: string
+          total_monto: number
+          estado: 'borrador' | 'pagada'
+          observaciones: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['planillas_quincenales']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['planillas_quincenales']['Insert']>
+        Relationships: []
+      }
+      planilla_detalles: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          planilla_id: string
+          colaborador_id: string
+          n_jabas_hidroculizado: number
+          n_cajas_empaquetado: number
+          monto_empaquetado: number
+          otros_montos: number
+          total: number
+          observaciones: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['planilla_detalles']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['planilla_detalles']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -363,7 +414,7 @@ export interface Database {
     }
     Enums: {
       estado_activo: 'activo' | 'inactivo'
-      estado_lote: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'pesado_pe' | 'en_despacho' | 'despachado' | 'liquidado'
+      estado_lote: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'pesado_pe' | 'hidroculizado' | 'en_despacho' | 'despachado' | 'liquidado'
       estado_liquidacion: 'borrador' | 'confirmada' | 'pagada'
       tipo_producto: 'holantao' | 'snow_peas' | 'otro'
       tipo_personal: 'clasificador' | 'cosechador' | 'empacador' | 'supervisor'

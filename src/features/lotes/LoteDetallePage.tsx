@@ -120,12 +120,28 @@ export default function LoteDetallePage() {
                 Pesar PE
               </Button>
             )}
-            {(lote.estado === 'pesado_pe' || lote.estado === 'en_despacho') && (
+            {lote.estado === 'pesado_pe' && (
+              <Button
+                className="bg-teal-600 hover:bg-teal-700 text-white font-semibold shadow-sm"
+                onClick={() => navigate(`/lotes/${id}/hidroculizar`)}
+              >
+                Hidroculizar
+              </Button>
+            )}
+            {(lote.estado === 'hidroculizado' || lote.estado === 'en_despacho') && (
               <Button
                 className="bg-agro-green hover:bg-agro-green/90 text-white font-semibold shadow-sm"
                 onClick={() => navigate(`/lotes/${id}/despachar`)}
               >
                 Despachar
+              </Button>
+            )}
+            {lote.estado === 'despachado' && (
+              <Button
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold shadow-sm"
+                onClick={() => navigate(`/liquidaciones/agricultores/nueva`)}
+              >
+                Crear liquidación
               </Button>
             )}
           </div>

@@ -16,12 +16,14 @@ import LotesPage from '@/features/lotes/LotesPage'
 import LoteDetallePage from '@/features/lotes/LoteDetallePage'
 import ClasificarLotePage from '@/features/lotes/ClasificarLotePage'
 import PesadoPEPage from '@/features/lotes/PesadoPEPage'
+import HidroculizarPage from '@/features/lotes/HidroculizarPage'
 import DespacharLotePage from '@/features/lotes/DespacharLotePage'
 import LiquidacionesAgriPage from '@/features/liquidaciones-agri/LiquidacionesAgriPage'
 import NuevaLiquidacionAgriPage from '@/features/liquidaciones-agri/NuevaLiquidacionAgriPage'
 import DetalleLiquidacionAgriPage from '@/features/liquidaciones-agri/DetalleLiquidacionAgriPage.tsx'
 import CubetasPage from '@/features/cubetas/CubetasPage.tsx'
 import ConfigPreciosPage from '@/features/admin/ConfigPreciosPage'
+import PlanillasPage from '@/features/planillas/PlanillasPage'
 
 function LoginRoute() {
   const { user, loading } = useAuthStore()
@@ -51,6 +53,7 @@ export default function App() {
             <Route path={ROUTES.LOTES_DETALLE} element={<LoteDetallePage />} />
             <Route path={ROUTES.CLASIFICACIONES} element={<ClasificarLotePage />} />
             <Route path={ROUTES.PESADO_PE} element={<PesadoPEPage />} />
+            <Route path={ROUTES.HIDROCULIZAR} element={<HidroculizarPage />} />
             <Route path={ROUTES.DESPACHOS} element={<DespacharLotePage />} />
             <Route
               path={ROUTES.CUBETAS}
@@ -59,6 +62,7 @@ export default function App() {
             <Route path={ROUTES.LIQUIDACIONES_AGRI} element={<LiquidacionesAgriPage />} />
             <Route path={ROUTES.LIQUIDACIONES_AGRI_NUEVA} element={<NuevaLiquidacionAgriPage />} />
             <Route path={ROUTES.LIQUIDACIONES_AGRI_DETALLE} element={<DetalleLiquidacionAgriPage />} />
+            <Route path={ROUTES.PLANILLAS} element={<PlanillasPage />} />
             <Route path={ROUTES.CONFIG_PRECIOS} element={<ConfigPreciosPage />} />
           </Route>
         </Route>

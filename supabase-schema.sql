@@ -825,3 +825,90 @@ alter table public.config_precios enable row level security;
 drop policy if exists config_precios_authenticated_all on public.config_precios;
 create policy config_precios_authenticated_all on public.config_precios for all to authenticated using (true) with check (auth.uid() is not null);
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- LOTES — ampliar constraint de estado para incluir 'hidroculizado'
+-- ─────────────────────────────────────────────────────────────────────────────
+alter table public.lotes drop constraint if exists lotes_estado_check;
+alter table public.lotes add constraint lotes_estado_check
+  check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'pesado_pe', 'hidroculizado', 'en_despacho', 'despachado', 'liquidado'));
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TAREO_HIDROCULIZADO — Módulo 4 / Tareo B
+-- Registro diario de operarios que trabajaron en el proceso de hidroculizado.
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.tareo_hidroculizado (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  lote_id uuid not null references public.lotes(id) on delete cascade,
+  colaborador_id uuid not null references public.colaboradores(id) on delete restrict,
+  fecha date not null,
+  n_jabas integer not null check (n_jabas > 0),
+  observaciones text null,
+  constraint uq_tareo_hidro_lote_colaborador_fecha unique (lote_id, colaborador_id, fecha)
+);
+
+create index if not exists idx_tareo_hidro_lote_id on public.tareo_hidroculizado(lote_id);
+create index if not exists idx_tareo_hidro_colaborador_id on public.tareo_hidroculizado(colaborador_id);
+create index if not exists idx_tareo_hidro_fecha on public.tareo_hidroculizado(fecha);
+
+drop trigger if exists trg_tareo_hidroculizado_updated_at on public.tareo_hidroculizado;
+create trigger trg_tareo_hidroculizado_updated_at before update on public.tareo_hidroculizado for each row execute function public.set_updated_at();
+
+alter table public.tareo_hidroculizado enable row level security;
+drop policy if exists tareo_hidroculizado_authenticated_all on public.tareo_hidroculizado;
+create policy tareo_hidroculizado_authenticated_all on public.tareo_hidroculizado for all to authenticated using (true) with check (auth.uid() is not null);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PLANILLAS_QUINCENALES — Módulo 9
+-- Cabecera de la planilla de pago quincenal a trabajadores.
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.planillas_quincenales (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  periodo_inicio date not null,
+  periodo_fin date not null,
+  total_monto numeric(12,2) not null default 0 check (total_monto >= 0),
+  estado text not null default 'borrador' check (estado in ('borrador', 'pagada')),
+  observaciones text null,
+  constraint uq_planilla_periodo unique (periodo_inicio, periodo_fin)
+);
+
+drop trigger if exists trg_planillas_quincenales_updated_at on public.planillas_quincenales;
+create trigger trg_planillas_quincenales_updated_at before update on public.planillas_quincenales for each row execute function public.set_updated_at();
+
+alter table public.planillas_quincenales enable row level security;
+drop policy if exists planillas_quincenales_authenticated_all on public.planillas_quincenales;
+create policy planillas_quincenales_authenticated_all on public.planillas_quincenales for all to authenticated using (true) with check (auth.uid() is not null);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PLANILLA_DETALLES — línea por trabajador dentro de la planilla
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.planilla_detalles (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  planilla_id uuid not null references public.planillas_quincenales(id) on delete cascade,
+  colaborador_id uuid not null references public.colaboradores(id) on delete restrict,
+  n_jabas_hidroculizado integer not null default 0 check (n_jabas_hidroculizado >= 0),
+  n_cajas_empaquetado integer not null default 0 check (n_cajas_empaquetado >= 0),
+  monto_empaquetado numeric(10,2) not null default 0 check (monto_empaquetado >= 0),
+  otros_montos numeric(10,2) not null default 0,
+  total numeric(10,2) not null default 0,
+  constraint uq_planilla_detalle_colaborador unique (planilla_id, colaborador_id)
+);
+
+create index if not exists idx_planilla_detalles_planilla_id on public.planilla_detalles(planilla_id);
+create index if not exists idx_planilla_detalles_colaborador_id on public.planilla_detalles(colaborador_id);
+
+drop trigger if exists trg_planilla_detalles_updated_at on public.planilla_detalles;
+create trigger trg_planilla_detalles_updated_at before update on public.planilla_detalles for each row execute function public.set_updated_at();
+
+alter table public.planilla_detalles enable row level security;
+drop policy if exists planilla_detalles_authenticated_all on public.planilla_detalles;
+create policy planilla_detalles_authenticated_all on public.planilla_detalles for all to authenticated using (true) with check (auth.uid() is not null);
+

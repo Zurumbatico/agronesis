@@ -32,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Cubetas',            href: ROUTES.CUBETAS,               icon: Package,       group: 'Operaciones', featureKey: 'CUBETAS' },
   // Liquidaciones
   { label: 'Liq. Agricultores',  href: ROUTES.LIQUIDACIONES_AGRI,    icon: Receipt,       group: 'Liquidaciones' },
+  { label: 'Planilla Quincenal', href: ROUTES.PLANILLAS,             icon: Receipt,       group: 'Liquidaciones' },
   // Admin
   { label: 'Config. Precios',    href: ROUTES.CONFIG_PRECIOS,        icon: Receipt,       group: 'Admin' },
 ]
