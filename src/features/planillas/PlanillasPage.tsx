@@ -4,19 +4,29 @@ import {
   getPlanillasQuincenales,
   createPlanillaQuincenal,
   pagarPlanilla,
+  getPlanillaConDetalles,
   getResumenHidroculizadoPeriodo,
   type ResumenColaboradorPeriodo,
 } from '@/services/planillas.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { FormField } from '@/components/shared/FormField'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
 import { useAuthStore } from '@/store/auth.store'
 import { formatFecha, formatMoneda } from '@/utils/formatters'
 import { format } from 'date-fns'
+import { Eye } from 'lucide-react'
 import type { PlanillaQuincenal } from '@/types/models'
 
 const PAGO_POR_CAJA = 0.32   // S/ 0.32 por caja empaquetada (Módulo D PDF)
@@ -24,10 +34,12 @@ const PAGO_POR_CAJA = 0.32   // S/ 0.32 por caja empaquetada (Módulo D PDF)
 type DetalleForm = {
   colaborador_id: string
   nombre_display: string
+  kg_cat1_seleccion: number
+  kg_cat2_seleccion: number
+  pago_seleccion: number
   n_jabas_hidroculizado: number
   n_cajas_empaquetado: number
   otros_montos: number
-  observaciones: string
 }
 
 type PlanillaForm = {
@@ -44,6 +56,9 @@ export default function PlanillasPage() {
   const [creando, setCreando] = useState(false)
   const [cargandoResumen, setCargandoResumen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [detallePlanilla, setDetallePlanilla] = useState<PlanillaQuincenal | null>(null)
+  const [cargandoDetalle, setCargandoDetalle] = useState(false)
+  const [planillaAConfirmar, setPlanillaAConfirmar] = useState<string | null>(null)
 
   const { register, handleSubmit, watch, reset, control, formState: { errors, isSubmitting } } = useForm<PlanillaForm>({
     defaultValues: {
@@ -76,10 +91,12 @@ export default function PlanillasPage() {
       replace(resumen.map((r) => ({
         colaborador_id: r.colaborador_id,
         nombre_display: `${r.apellido}, ${r.nombre}`,
+        kg_cat1_seleccion: r.kg_cat1_seleccion,
+        kg_cat2_seleccion: r.kg_cat2_seleccion,
+        pago_seleccion: r.pago_seleccion,
         n_jabas_hidroculizado: r.n_jabas_hidroculizado,
         n_cajas_empaquetado: 0,
         otros_montos: 0,
-        observaciones: '',
       })))
     } catch (e) {
       setError((e as Error).message)
@@ -92,16 +109,18 @@ export default function PlanillasPage() {
     if (!user) return
     const detalles = data.detalles.map((d) => {
       const monto_empaquetado = d.n_cajas_empaquetado * PAGO_POR_CAJA
-      const total = monto_empaquetado + (d.otros_montos ?? 0)
+      const total = d.pago_seleccion + monto_empaquetado + (d.otros_montos ?? 0)
       return {
         colaborador_id: d.colaborador_id,
         planilla_id: '',   // se reemplaza en el service
+        kg_cat1_seleccion: d.kg_cat1_seleccion,
+        kg_cat2_seleccion: d.kg_cat2_seleccion,
+        pago_seleccion: d.pago_seleccion,
         n_jabas_hidroculizado: d.n_jabas_hidroculizado,
         n_cajas_empaquetado: d.n_cajas_empaquetado,
         monto_empaquetado,
         otros_montos: d.otros_montos ?? 0,
         total,
-        observaciones: d.observaciones || null,
       }
     })
     const total_monto = detalles.reduce((acc, d) => acc + d.total, 0)
@@ -110,7 +129,7 @@ export default function PlanillasPage() {
         periodo_inicio: data.periodo_inicio,
         periodo_fin: data.periodo_fin,
         total_monto,
-        estado: 'borrador',
+        estado: 'pendiente',
         observaciones: data.observaciones || null,
       },
       detalles,
@@ -121,17 +140,32 @@ export default function PlanillasPage() {
     cargar()
   }
 
-  const handlePagar = async (planillaId: string) => {
-    if (!confirm('¿Marcar planilla como PAGADA? Esta acción no se puede deshacer.')) return
-    await pagarPlanilla(planillaId)
+  const handleVerDetalle = async (planilla: PlanillaQuincenal) => {
+    setCargandoDetalle(true)
+    setDetallePlanilla(planilla)
+    try {
+      const full = await getPlanillaConDetalles(planilla.id)
+      setDetallePlanilla(full)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setCargandoDetalle(false)
+    }
+  }
+
+  const handlePagar = async () => {
+    if (!planillaAConfirmar) return
+    await pagarPlanilla(planillaAConfirmar)
+    setPlanillaAConfirmar(null)
     cargar()
   }
 
   // Live calculation
   const totalEstimado = fields.reduce((acc, _, i) => {
+    const pago_sel = watch(`detalles.${i}.pago_seleccion`) ?? 0
     const n_cajas = watch(`detalles.${i}.n_cajas_empaquetado`) ?? 0
     const otros = watch(`detalles.${i}.otros_montos`) ?? 0
-    return acc + (n_cajas * PAGO_POR_CAJA) + otros
+    return acc + pago_sel + (n_cajas * PAGO_POR_CAJA) + otros
   }, 0)
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando...</div>
@@ -188,72 +222,86 @@ export default function PlanillasPage() {
 
               {/* Detalle por operario */}
               {fields.length > 0 && (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="text-left px-3 py-2 font-medium">Operario</th>
-                        <th className="text-left px-3 py-2 font-medium">Jabas Hidroc.</th>
-                        <th className="text-left px-3 py-2 font-medium">Cajas Empaq.</th>
-                        <th className="text-left px-3 py-2 font-medium">Otros (S/.)</th>
-                        <th className="text-right px-3 py-2 font-medium">Total</th>
-                        <th className="px-2 py-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {fields.map((field, i) => {
-                        const nCajas = watch(`detalles.${i}.n_cajas_empaquetado`) ?? 0
-                        const otros = watch(`detalles.${i}.otros_montos`) ?? 0
-                        const total = nCajas * PAGO_POR_CAJA + otros
-                        return (
-                          <tr key={field.id} className="border-t">
-                            <td className="px-3 py-2">{field.nombre_display}</td>
-                            <td className="px-3 py-2">
+                <div className="flex flex-col gap-3">
+                  {fields.map((field, i) => {
+                    const pago_sel = watch(`detalles.${i}.pago_seleccion`) ?? 0
+                    const nCajas = watch(`detalles.${i}.n_cajas_empaquetado`) ?? 0
+                    const otros = watch(`detalles.${i}.otros_montos`) ?? 0
+                    const pago_empaque = nCajas * PAGO_POR_CAJA
+                    const total = pago_sel + pago_empaque + otros
+                    return (
+                      <div key={field.id} className="border rounded-lg overflow-hidden">
+                        {/* Header del operario */}
+                        <div className="flex items-center justify-between px-4 py-2.5 bg-muted/40 border-b">
+                          <span className="font-semibold text-sm">{field.nombre_display}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold text-base">{formatMoneda(total)}</span>
+                            <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => remove(i)}>✕</Button>
+                          </div>
+                        </div>
+                        {/* Cuerpo: 3 secciones */}
+                        <div className="grid grid-cols-3 divide-x text-sm">
+                          {/* Selección — solo lectura */}
+                          <div className="px-4 py-3 bg-green-50/40">
+                            <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-2">Selección (Tareo A)</p>
+                            <p className="text-lg font-bold text-green-700">{formatMoneda(pago_sel)}</p>
+                            <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                              <div className="flex justify-between gap-4">
+                                <span>Cat1: {field.kg_cat1_seleccion.toFixed(2)} kg × S/0.20</span>
+                                <span className="text-foreground">{formatMoneda(field.kg_cat1_seleccion * 0.20)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4">
+                                <span>Cat2: {field.kg_cat2_seleccion.toFixed(2)} kg × S/0.28</span>
+                                <span className="text-foreground">{formatMoneda(field.kg_cat2_seleccion * 0.28)}</span>
+                              </div>
+                              <div className="flex justify-between gap-4 border-t pt-0.5 mt-1">
+                                <span className="text-muted-foreground">Jabas hidroc.</span>
+                                <span>{watch(`detalles.${i}.n_jabas_hidroculizado`) || 0}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {/* Empaquetado — editable */}
+                          <div className="px-4 py-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Empaquetado (Tareo D)</p>
+                            <div className="flex items-center gap-2 mb-1">
                               <Input
                                 type="number"
                                 min="0"
-                                className="h-7 w-20"
-                                {...register(`detalles.${i}.n_jabas_hidroculizado`, { valueAsNumber: true })}
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                className="h-7 w-20"
+                                className="h-8 w-24"
                                 placeholder="0"
                                 {...register(`detalles.${i}.n_cajas_empaquetado`, { valueAsNumber: true })}
                               />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className="h-7 w-24"
-                                placeholder="0.00"
-                                {...register(`detalles.${i}.otros_montos`, { valueAsNumber: true })}
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-right font-medium">{formatMoneda(total)}</td>
-                            <td className="px-2 py-2">
-                              <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0 text-destructive" onClick={() => remove(i)}>✕</Button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                    <tfoot className="bg-muted/30">
-                      <tr>
-                        <td colSpan={4} className="px-3 py-2 text-right font-semibold">Total planilla:</td>
-                        <td className="px-3 py-2 text-right font-bold">{formatMoneda(totalEstimado)}</td>
-                        <td></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                  <p className="text-xs text-muted-foreground px-3 pb-2">
-                    Empaquetado: S/ {PAGO_POR_CAJA} × cajas. Los demás conceptos (jornal, adelantos, descuentos) van en "Otros".
-                  </p>
+                              <span className="text-xs text-muted-foreground">cajas</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {nCajas > 0
+                                ? <>{nCajas} × S/{PAGO_POR_CAJA} = <span className="font-semibold text-foreground">{formatMoneda(pago_empaque)}</span></>
+                                : <>S/{PAGO_POR_CAJA}/caja</>
+                              }
+                            </p>
+                          </div>
+                          {/* Otros — editable */}
+                          <div className="px-4 py-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Otros conceptos</p>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              className="h-8 w-28"
+                              placeholder="0.00"
+                              {...register(`detalles.${i}.otros_montos`, { valueAsNumber: true })}
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">jornal, adelantos, descuentos…</p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                  {/* Total general */}
+                  <div className="flex justify-end items-center gap-3 px-4 py-3 bg-muted/30 rounded-lg border">
+                    <span className="font-semibold text-sm">Total planilla:</span>
+                    <span className="font-bold text-lg">{formatMoneda(totalEstimado)}</span>
+                  </div>
                 </div>
               )}
 
@@ -288,10 +336,13 @@ export default function PlanillasPage() {
                   <div className="flex items-center gap-3 shrink-0">
                     <p className="font-bold text-sm">{formatMoneda(p.total_monto)}</p>
                     <Badge className={p.estado === 'pagada' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}>
-                      {p.estado === 'pagada' ? 'Pagada' : 'Borrador'}
+                      {p.estado === 'pagada' ? 'Pagada' : 'Pendiente'}
                     </Badge>
-                    {p.estado === 'borrador' && (
-                      <Button size="sm" variant="outline" onClick={() => handlePagar(p.id)}>
+                    <Button size="sm" variant="ghost" onClick={() => handleVerDetalle(p)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {p.estado === 'pendiente' && (
+                      <Button size="sm" variant="outline" onClick={() => setPlanillaAConfirmar(p.id)}>
                         Marcar pagada
                       </Button>
                     )}
@@ -302,6 +353,79 @@ export default function PlanillasPage() {
           ))}
         </div>
       )}
+      {/* Detail Dialog */}
+      <Dialog open={!!detallePlanilla} onOpenChange={(o) => { if (!o) setDetallePlanilla(null) }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          {detallePlanilla && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Planilla Quincenal</DialogTitle>
+                <DialogDescription>
+                  {formatFecha(detallePlanilla.periodo_inicio)} → {formatFecha(detallePlanilla.periodo_fin)}
+                  {detallePlanilla.observaciones && ` · ${detallePlanilla.observaciones}`}
+                </DialogDescription>
+              </DialogHeader>
+              {cargandoDetalle ? (
+                <p className="text-center text-muted-foreground py-8">Cargando detalle...</p>
+              ) : (
+                <div className="flex flex-col gap-3 mt-2">
+                  {detallePlanilla.detalles && detallePlanilla.detalles.length > 0 ? (
+                    detallePlanilla.detalles.map((d) => {
+                      const colName = d.colaborador
+                        ? `${d.colaborador.apellido}, ${d.colaborador.nombre}`
+                        : d.colaborador_id
+                      return (
+                        <div key={d.id} className="border rounded-lg overflow-hidden text-sm">
+                          <div className="flex justify-between items-center px-4 py-2 bg-muted/40 border-b">
+                            <span className="font-semibold">{colName}</span>
+                            <span className="font-bold">{formatMoneda(d.total)}</span>
+                          </div>
+                          <div className="grid grid-cols-3 divide-x">
+                            <div className="px-3 py-2 bg-green-50/40">
+                              <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-1">Selección</p>
+                              <p className="font-bold text-green-700">{formatMoneda(d.pago_seleccion)}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Cat1: {d.kg_cat1_seleccion.toFixed(2)} kg<br />
+                                Cat2: {d.kg_cat2_seleccion.toFixed(2)} kg<br />
+                                Jabas hidroc.: {d.n_jabas_hidroculizado}
+                              </p>
+                            </div>
+                            <div className="px-3 py-2">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Empaquetado</p>
+                              <p className="font-bold">{formatMoneda(d.monto_empaquetado)}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{d.n_cajas_empaquetado} cajas × S/0.32</p>
+                            </div>
+                            <div className="px-3 py-2">
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Otros</p>
+                              <p className="font-bold">{formatMoneda(d.otros_montos)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <p className="text-muted-foreground text-sm text-center py-4">Sin detalles cargados.</p>
+                  )}
+                  <div className="flex justify-between items-center px-4 py-3 bg-muted/30 rounded-lg border">
+                    <span className="text-sm font-semibold">Total planilla</span>
+                    <span className="font-bold text-base">{formatMoneda(detallePlanilla.total_monto)}</span>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm pagar */}
+      <ConfirmDialog
+        open={!!planillaAConfirmar}
+        title="¿Marcar como pagada?"
+        description="Esta acción no se puede deshacer."
+        confirmLabel="Sí, marcar pagada"
+        onConfirm={handlePagar}
+        onCancel={() => setPlanillaAConfirmar(null)}
+      />
     </div>
   )
 }

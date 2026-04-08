@@ -826,6 +826,19 @@ drop policy if exists config_precios_authenticated_all on public.config_precios;
 create policy config_precios_authenticated_all on public.config_precios for all to authenticated using (true) with check (auth.uid() is not null);
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- CLASIFICACION_APORTES — desglose kg por categoría para pago al seleccionador
+-- ─────────────────────────────────────────────────────────────────────────────
+alter table public.clasificacion_aportes add column if not exists kg_cat1 numeric(12,2) not null default 0 check (kg_cat1 >= 0);
+alter table public.clasificacion_aportes add column if not exists kg_cat2 numeric(12,2) not null default 0 check (kg_cat2 >= 0);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- PLANILLA_DETALLES — desglose de pago por selección (Tareo A)
+-- ─────────────────────────────────────────────────────────────────────────────
+alter table public.planilla_detalles add column if not exists kg_cat1_seleccion numeric(12,2) not null default 0 check (kg_cat1_seleccion >= 0);
+alter table public.planilla_detalles add column if not exists kg_cat2_seleccion numeric(12,2) not null default 0 check (kg_cat2_seleccion >= 0);
+alter table public.planilla_detalles add column if not exists pago_seleccion numeric(10,2) not null default 0 check (pago_seleccion >= 0);
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- LOTES — ampliar constraint de estado para incluir 'hidroculizado'
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.lotes drop constraint if exists lotes_estado_check;
@@ -872,7 +885,7 @@ create table if not exists public.planillas_quincenales (
   periodo_inicio date not null,
   periodo_fin date not null,
   total_monto numeric(12,2) not null default 0 check (total_monto >= 0),
-  estado text not null default 'borrador' check (estado in ('borrador', 'pagada')),
+  estado text not null default 'pendiente' check (estado in ('pendiente', 'pagada')),
   observaciones text null,
   constraint uq_planilla_periodo unique (periodo_inicio, periodo_fin)
 );

@@ -14,7 +14,8 @@ import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { FormField } from '@/components/shared/FormField'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ColaboradorPicker } from '@/components/shared/ColaboradorPicker'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/store/auth.store'
@@ -40,6 +41,7 @@ export default function HidroculizarPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [finalizando, setFinalizando] = useState(false)
+  const [confirmarFinalizar, setConfirmarFinalizar] = useState(false)
 
   const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
     defaultValues: {
@@ -94,7 +96,6 @@ export default function HidroculizarPage() {
 
   const onFinalizar = async () => {
     if (!id || !lote) return
-    if (!confirm('¿Confirmar que el hidroculizado está completo y avanzar al despacho?')) return
     setFinalizando(true)
     try {
       await actualizarEstadoLote(id, 'en_despacho')
@@ -110,6 +111,7 @@ export default function HidroculizarPage() {
   if (!lote) return null
 
   const totalJabas = tareos.reduce((acc, t) => acc + t.n_jabas, 0)
+  const totalJabasExcedido = lote.num_cubetas > 0 && totalJabas > lote.num_cubetas
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -121,10 +123,17 @@ export default function HidroculizarPage() {
 
       {/* Resumen */}
       {tareos.length > 0 && (
-        <Card className="mb-4">
+        <Card className={`mb-4 ${totalJabasExcedido ? 'border-destructive' : ''}`}>
           <CardContent className="pt-4 flex items-center justify-between">
             <p className="text-sm text-muted-foreground">{tareos.length} operario{tareos.length !== 1 ? 's' : ''} registrado{tareos.length !== 1 ? 's' : ''}</p>
-            <p className="font-semibold">{totalJabas} jabas totales</p>
+            <div className="flex flex-col items-end gap-0.5">
+              <p className={`font-semibold ${totalJabasExcedido ? 'text-destructive' : ''}`}>
+                {totalJabas} / {lote.num_cubetas} jabas
+              </p>
+              {totalJabasExcedido && (
+                <p className="text-xs text-destructive">Excede las {lote.num_cubetas} jabas del lote</p>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -169,14 +178,12 @@ export default function HidroculizarPage() {
               <div className="grid grid-cols-2 gap-3">
                 <FormField label="Operario" error={errors.colaborador_id?.message} required>
                   <Controller name="colaborador_id" control={control} rules={{ required: true }} render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                      <SelectContent>
-                        {colaboradores.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.apellido}, {c.nombre}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <ColaboradorPicker
+                      value={field.value}
+                      onChange={field.onChange}
+                      colaboradores={colaboradores}
+                      placeholder="Buscar operario..."
+                    />
                   )} />
                 </FormField>
                 <FormField label="Fecha" error={errors.fecha?.message} required>
@@ -209,12 +216,23 @@ export default function HidroculizarPage() {
           <Button variant="outline" onClick={() => navigate(`/lotes/${id}`)}>Cancelar</Button>
           <Button
             disabled={tareos.length === 0 || finalizando}
-            onClick={onFinalizar}
+            onClick={() => setConfirmarFinalizar(true)}
           >
             {finalizando ? 'Procesando...' : 'Confirmar hidroculizado → Despachar'}
           </Button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmarFinalizar}
+        title="¿Confirmar hidroculizado?"
+        description="Se marcará el proceso como completo y el lote avanzará a la etapa de despacho."
+        confirmLabel="Sí, confirmar"
+        variant="default"
+        loading={finalizando}
+        onConfirm={() => { setConfirmarFinalizar(false); onFinalizar() }}
+        onCancel={() => setConfirmarFinalizar(false)}
+      />
     </div>
   )
 }

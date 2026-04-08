@@ -29,10 +29,10 @@ export async function guardarClasificacion(
   loteId: string,
   fecha: string,
   observaciones: string | null,
-  aportes: Array<{ colaborador_id: string; peso_bueno_kg: number }>,
+  aportes: Array<{ colaborador_id: string; kg_cat1: number; kg_cat2: number }>,
   userId: string
 ): Promise<Clasificacion> {
-  const totalBuenos = aportes.reduce((acc, a) => acc + a.peso_bueno_kg, 0)
+  const totalBuenos = aportes.reduce((acc, a) => acc + a.kg_cat1 + a.kg_cat2, 0)
 
   const payloadBase: Record<string, unknown> = {
     lote_id: loteId,
@@ -83,7 +83,9 @@ export async function guardarClasificacion(
     const rowsAportes: Array<ClasificacionAporteInsert & { created_by: string }> = aportes.map((a) => ({
       clasificacion_id: clasificacionId,
       colaborador_id: a.colaborador_id,
-      peso_bueno_kg: a.peso_bueno_kg,
+      peso_bueno_kg: a.kg_cat1 + a.kg_cat2,
+      kg_cat1: a.kg_cat1,
+      kg_cat2: a.kg_cat2,
       created_by: userId,
     }))
     const { error: errInsAportes } = await supabase.from(TABLE_APORTES).insert(rowsAportes)

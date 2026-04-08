@@ -9,6 +9,7 @@ import { getDespachosPorLote, createDespacho } from '@/services/despachos.servic
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { FormField } from '@/components/shared/FormField'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,7 @@ export default function DespacharLotePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [errorCajas, setErrorCajas] = useState<string | null>(null)
+  const [confirmarFinalizar, setConfirmarFinalizar] = useState(false)
 
   const { register, handleSubmit, control, reset, watch, formState: { errors, isSubmitting } } = useForm<DespachoFormData>({
     resolver: zodResolver(despachoSchema) as any,
@@ -91,7 +93,6 @@ export default function DespacharLotePage() {
 
   const handleFinalizar = async () => {
     if (!lote) return
-    if (!confirm('¿Marcar el lote como despachado?')) return
     await actualizarEstadoLote(lote.id, 'despachado')
     navigate(`/lotes/${id}`)
   }
@@ -107,13 +108,14 @@ export default function DespacharLotePage() {
   if (!lote) return null
 
   return (
+    <>
     <div className="max-w-3xl mx-auto">
       <PageHeader
         title={`Despachar – ${lote.codigo}`}
         backHref={`/lotes/${id}`}
         actions={
           despachos.length > 0 && (
-            <Button onClick={handleFinalizar}>Fin de despacho</Button>
+            <Button onClick={() => setConfirmarFinalizar(true)}>Fin de despacho</Button>
           )
         }
       />
@@ -234,5 +236,16 @@ export default function DespacharLotePage() {
         </Card>
       )}
     </div>
+
+      <ConfirmDialog
+        open={confirmarFinalizar}
+        title="¿Marcar lote como despachado?"
+        description="Esta acción cerrará el proceso de despacho del lote."
+        confirmLabel="Sí, finalizar"
+        variant="default"
+        onConfirm={() => { setConfirmarFinalizar(false); handleFinalizar() }}
+        onCancel={() => setConfirmarFinalizar(false)}
+      />
+    </>
   )
 }

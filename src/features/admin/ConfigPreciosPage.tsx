@@ -8,6 +8,7 @@ import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { FormField } from '@/components/shared/FormField'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -37,6 +38,8 @@ export default function ConfigPreciosPage() {
   const [error, setError] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<ConfigPrecio | null>(null)
+  const [precioAEliminar, setPrecioAEliminar] = useState<ConfigPrecio | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const semanaActual = getISOWeek(new Date())
   const anioActual = getYear(new Date())
@@ -79,17 +82,16 @@ export default function ConfigPreciosPage() {
       }
       setDialogOpen(false)
     } catch (e) {
-      alert((e as Error).message)
+      setFormError((e as Error).message)
     }
   }
 
   const eliminar = async (p: ConfigPrecio) => {
-    if (!confirm(`¿Eliminar precio Sem ${p.semana}/${p.anio} — ${VARIEDAD_PRODUCTO_CONFIG[p.variedad].label} ${CALIDAD_PRODUCTO_CONFIG[p.categoria].label}?`)) return
     try {
       await deleteConfigPrecio(p.id)
       setPrecios((prev) => prev.filter((x) => x.id !== p.id))
     } catch (e) {
-      alert((e as Error).message)
+      setError((e as Error).message)
     }
   }
 
@@ -155,7 +157,7 @@ export default function ConfigPreciosPage() {
                                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => abrirEditar(p)}>
                                     <Pencil className="h-3.5 w-3.5" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => eliminar(p)}>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPrecioAEliminar(p)}>
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 </div>
@@ -171,12 +173,22 @@ export default function ConfigPreciosPage() {
         </div>
       )}
 
+      <ConfirmDialog
+        open={!!precioAEliminar}
+        title="¿Eliminar precio?"
+        description={precioAEliminar ? `Sem ${precioAEliminar.semana}/${precioAEliminar.anio} — ${VARIEDAD_PRODUCTO_CONFIG[precioAEliminar.variedad].label} ${CALIDAD_PRODUCTO_CONFIG[precioAEliminar.categoria].label}` : ''}
+        confirmLabel="Eliminar"
+        onConfirm={() => { eliminar(precioAEliminar!); setPrecioAEliminar(null) }}
+        onCancel={() => setPrecioAEliminar(null)}
+      />
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>{editando ? 'Editar precio' : 'Nuevo precio'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-2">
+            {formError && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{formError}</p>}
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Año" error={errors.anio?.message} required>
                 <Input type="number" min="2024" {...register('anio', { valueAsNumber: true })} />

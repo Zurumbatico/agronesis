@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { LoadingPage } from '@/components/shared/Spinner'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -24,6 +25,7 @@ export default function ProductosPage() {
   const [vista, setVista] = useState<'cards' | 'lista'>('lista')
   const [paginaActual, setPaginaActual] = useState(1)
   const [tamanoPagina, setTamanoPagina] = useState(12)
+  const [aEliminar, setAEliminar] = useState<string | null>(null)
 
   const filtrados = productos.filter((p) =>
     `${p.nombre} ${p.codigo}`.toLowerCase().includes(busqueda.toLowerCase())
@@ -54,7 +56,6 @@ export default function ProductosPage() {
   }
 
   const handleEliminar = async (id: string) => {
-    if (!confirm('¿Eliminar este producto?')) return
     await eliminar(id)
   }
 
@@ -137,7 +138,7 @@ export default function ProductosPage() {
               </div>
               <div className="flex gap-2 pt-2 border-t">
                 <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(p)}><Pencil className="h-3.5 w-3.5 mr-1" /> Editar</Button>
-                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleEliminar(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setAEliminar(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             </div>
           ))}
@@ -169,7 +170,7 @@ export default function ProductosPage() {
                       <Button variant="ghost" size="sm" onClick={() => abrirEditar(p)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleEliminar(p.id)}>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(p.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -211,6 +212,15 @@ export default function ProductosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!aEliminar}
+        title="¿Eliminar producto?"
+        description="Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        onConfirm={() => { handleEliminar(aEliminar!); setAEliminar(null) }}
+        onCancel={() => setAEliminar(null)}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) cerrar(); else setDialogOpen(true) }}>
         <DialogContent className="max-w-2xl">

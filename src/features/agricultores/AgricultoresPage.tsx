@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { LoadingPage, Spinner } from '@/components/shared/Spinner'
 import { EstadoActivoBadge } from '@/components/shared/StatusBadge'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -29,6 +30,7 @@ export default function AgricultoresPage() {
   const [vista, setVista] = useState<'cards' | 'lista'>('lista')
   const [paginaActual, setPaginaActual] = useState(1)
   const [tamanoPagina, setTamanoPagina] = useState(12)
+  const [aEliminar, setAEliminar] = useState<string | null>(null)
 
   const filtrados = agricultores.filter((a) =>
     `${a.nombre} ${a.apellido} ${a.codigo} ${a.dni ?? ''} ${a.numero_cuenta ?? ''} ${a.fecha_alta ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
@@ -88,7 +90,6 @@ export default function AgricultoresPage() {
   }
 
   const handleEliminar = async (id: string) => {
-    if (!confirm('¿Eliminar este agricultor? Esta acción no se puede deshacer.')) return
     await eliminar(id)
   }
 
@@ -192,7 +193,7 @@ export default function AgricultoresPage() {
                 <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(a)}>
                   <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                 </Button>
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleEliminar(a.id)}>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(a.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -234,7 +235,7 @@ export default function AgricultoresPage() {
                       <Button variant="ghost" size="sm" onClick={() => abrirEditar(a)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleEliminar(a.id)}>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(a.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -278,6 +279,15 @@ export default function AgricultoresPage() {
       )}
 
       {/* Dialog formulario */}
+      <ConfirmDialog
+        open={!!aEliminar}
+        title="¿Eliminar agricultor?"
+        description="Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        onConfirm={() => { handleEliminar(aEliminar!); setAEliminar(null) }}
+        onCancel={() => setAEliminar(null)}
+      />
+
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

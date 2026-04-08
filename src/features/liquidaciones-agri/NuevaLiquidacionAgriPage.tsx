@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -11,8 +11,10 @@ import { FormField } from '@/components/shared/FormField'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ChevronDown, Search } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useAgricultores } from '@/features/agricultores/hooks/useAgricultores'
 import { useLotes } from '@/features/lotes/hooks/useLotes'
 import { useAuthStore } from '@/store/auth.store'
@@ -42,6 +44,8 @@ type NuevaLiqFormData = z.infer<typeof nuevaLiqSchema>
 
 export default function NuevaLiquidacionAgriPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const paramAgricultorId = searchParams.get('agricultor_id') ?? undefined
   const { user } = useAuthStore()
   const { agricultores } = useAgricultores()
   const { lotes } = useLotes()
@@ -57,16 +61,30 @@ export default function NuevaLiquidacionAgriPage() {
     resolver: zodResolver(nuevaLiqSchema),
     defaultValues: {
       codigo: generarCodigoLiquidacionAgri(),
+      agricultor_id: paramAgricultorId ?? '',
       fecha_inicio: format(new Date(), 'yyyy-MM-dd'),
       fecha_fin: format(new Date(), 'yyyy-MM-dd'),
       detalles: [],
     },
   })
 
+  // Estado local para el buscador de agricultor
+  const [agricultorSearch, setAgricultorSearch] = useState('')
+  const [agricultorOpen, setAgricultorOpen] = useState(false)
+
   const { fields, append, remove } = useFieldArray({ control, name: 'detalles' })
   const agricultorId = watch('agricultor_id')
 
   const agricultoresActivos = agricultores.filter((a) => a.estado === 'activo')
+  const agricultoresFiltrados = useMemo(() => {
+    const q = agricultorSearch.trim().toLowerCase()
+    if (!q) return agricultoresActivos
+    return agricultoresActivos.filter((a) =>
+      `${a.apellido} ${a.nombre} ${a.codigo} ${a.dni ?? ''}`.toLowerCase().includes(q)
+    )
+  }, [agricultoresActivos, agricultorSearch])
+
+  const agricultorSeleccionado = agricultoresActivos.find((a) => a.id === agricultorId) ?? null
   // Solo lotes en estado 'despachado' pueden liquidarse (ya salieron del establecimiento)
   const lotesDelAgricultor = agricultorId
     ? lotes.filter((l) => l.agricultor_id === agricultorId && l.estado === 'despachado')
@@ -86,12 +104,20 @@ export default function NuevaLiquidacionAgriPage() {
     } finally { setCargandoClasif(false) }
   }
 
+  const prevAgricultorRef = useState<string | undefined>(undefined)
   useEffect(() => {
-    if (agricultorId) {
+    if (prevAgricultorRef[0] !== undefined && prevAgricultorRef[0] !== agricultorId) {
       setValue('detalles', [])
+      setClasificacionesPorLote({})
+    }
+    prevAgricultorRef[0] = agricultorId
+  }, [agricultorId])
+
+  useEffect(() => {
+    if (agricultorId && lotes.length > 0) {
       cargarClasificaciones()
     }
-  }, [agricultorId])
+  }, [agricultorId, lotes.length])
 
   const agregarDetalleLote = (loteId: string) => {
     const cls = clasificacionesPorLote[loteId] ?? []
@@ -125,7 +151,7 @@ export default function NuevaLiquidacionAgriPage() {
   const onSubmit = async (data: NuevaLiqFormData) => {
     if (!user) return
     // Recalcular subtotales
-    const detalles = data.detalles.map((d) => ({ ...d, subtotal: d.peso_kg * d.precio_kg }))
+    const detalles = data.detalles.map((d) => ({ ...d, subtotal: (Number(d.peso_kg) || 0) * (Number(d.precio_kg) || 0) }))
     const { total_kg, total_monto } = calcularTotalLiquidacionAgri(detalles)
     const liq = await createLiquidacionAgri(
       { codigo: data.codigo, agricultor_id: data.agricultor_id, fecha_inicio: data.fecha_inicio, fecha_fin: data.fecha_fin, total_kg, total_monto, estado: 'borrador', observaciones: data.observaciones ?? null },
@@ -136,8 +162,8 @@ export default function NuevaLiquidacionAgriPage() {
   }
 
   const totalEstimado = fields.reduce((acc, _field, i) => {
-    const precio = watch(`detalles.${i}.precio_kg`) ?? 0
-    const peso = watch(`detalles.${i}.peso_kg`) ?? 0
+    const precio = Number(watch(`detalles.${i}.precio_kg`)) || 0
+    const peso = Number(watch(`detalles.${i}.peso_kg`)) || 0
     return acc + (precio * peso)
   }, 0)
 
@@ -150,18 +176,60 @@ export default function NuevaLiquidacionAgriPage() {
           <CardHeader><CardTitle className="text-base">Datos generales</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Código" required>
-              <Input {...register('codigo')} />
+              <Input {...register('codigo')} readOnly className="bg-muted text-muted-foreground cursor-default" />
             </FormField>
             <FormField label="Agricultor" error={errors.agricultor_id?.message} required>
               <Controller name="agricultor_id" control={control} render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value ?? ''}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
-                  <SelectContent>
-                    {agricultoresActivos.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>{a.apellido}, {a.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={agricultorOpen} onOpenChange={(o) => { setAgricultorOpen(o); if (!o) setAgricultorSearch('') }}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                        !agricultorSeleccionado && 'text-muted-foreground'
+                      )}
+                    >
+                      <span className="line-clamp-1 text-left">
+                        {agricultorSeleccionado
+                          ? `${agricultorSeleccionado.apellido}, ${agricultorSeleccionado.nombre} (${agricultorSeleccionado.codigo})`
+                          : 'Buscar agricultor...'}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="p-0 w-80" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+                    <div className="p-2 border-b">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                          className="pl-7 h-8 text-sm"
+                          placeholder="Nombre, código o DNI..."
+                          value={agricultorSearch}
+                          onChange={(e) => setAgricultorSearch(e.target.value)}
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      {agricultoresFiltrados.length === 0 ? (
+                        <p className="px-3 py-2 text-sm text-muted-foreground">Sin resultados</p>
+                      ) : agricultoresFiltrados.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className={cn(
+                            'w-full text-left px-3 py-2 text-sm hover:bg-accent',
+                            field.value === a.id && 'bg-accent font-medium'
+                          )}
+                          onClick={() => { field.onChange(a.id); setAgricultorOpen(false); setAgricultorSearch('') }}
+                        >
+                          <span className="block">{a.apellido}, {a.nombre}</span>
+                          <span className="text-xs text-muted-foreground">{a.codigo}{a.dni ? ` · ${a.dni}` : ''}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )} />
             </FormField>
             <FormField label="Fecha inicio" error={errors.fecha_inicio?.message} required>
@@ -208,10 +276,25 @@ export default function NuevaLiquidacionAgriPage() {
                       Lote: {lote?.codigo ?? field.lote_id} · Categoría: <span className="capitalize">{field.categoria}</span>
                     </div>
                     <FormField label="Peso (kg)">
-                      <Input type="number" step="0.01" {...register(`detalles.${index}.peso_kg`, { valueAsNumber: true })} />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        readOnly
+                        className="bg-muted text-muted-foreground cursor-default"
+                        {...register(`detalles.${index}.peso_kg`, { valueAsNumber: true })}
+                      />
                     </FormField>
                     <FormField label="Precio (S/./kg)">
-                      <Input type="number" step="0.01" placeholder="0.00" {...register(`detalles.${index}.precio_kg`, { valueAsNumber: true })} />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        {...register(`detalles.${index}.precio_kg`, {
+                          valueAsNumber: true,
+                          setValueAs: (v) => (v === '' || isNaN(Number(v)) ? 0 : Number(v)),
+                        })}
+                      />
                     </FormField>
                     <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => remove(index)}>
                       Quitar

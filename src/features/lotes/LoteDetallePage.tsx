@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getLote } from '@/services/lotes.service'
 import { getClasificacionesPorLote } from '@/services/clasificaciones.service'
 import { getDespachosPorLote } from '@/services/despachos.service'
+import { getTareoHidroculizadoPorLote } from '@/services/tareo-hidroculizado.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -18,10 +19,11 @@ import {
   TIPO_PRODUCCION_CONFIG,
 } from '@/constants'
 import { formatFecha, formatPeso, formatMoneda } from '@/utils/formatters'
-import type { Lote, Clasificacion, Despacho } from '@/types/models'
+import { calcularPagoSeleccionador } from '@/utils/business-rules'
+import type { Lote, Clasificacion, Despacho, TareoHidroculizado } from '@/types/models'
 
 type CuadroLocal = {
-  filas: Array<{ colaborador_id: string; peso_bueno_kg: string }>
+  filas: Array<{ colaborador_id: string; kg_cat1?: string; kg_cat2?: string; peso_bueno_kg?: string }>
 }
 
 const getMesasStorageKey = (loteId: string) => `clasificacion-cuadros-${loteId}`
@@ -31,6 +33,7 @@ export default function LoteDetallePage() {
   const navigate = useNavigate()
   const [lote, setLote] = useState<Lote | null>(null)
   const [clasificaciones, setClasificaciones] = useState<Clasificacion[]>([])
+  const [tareos, setTareos] = useState<TareoHidroculizado[]>([])
   const [despachos, setDespachos] = useState<Despacho[]>([])
   const [cuadrosLocales, setCuadrosLocales] = useState<CuadroLocal[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -40,12 +43,13 @@ export default function LoteDetallePage() {
     if (!id) return
     setLoading(true); setError(null)
     try {
-      const [l, cls, des] = await Promise.all([
+      const [l, cls, des, tar] = await Promise.all([
         getLote(id),
         getClasificacionesPorLote(id),
         getDespachosPorLote(id),
+        getTareoHidroculizadoPorLote(id),
       ])
-      setLote(l); setClasificaciones(cls); setDespachos(des)
+      setLote(l); setClasificaciones(cls); setDespachos(des); setTareos(tar)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -113,7 +117,7 @@ export default function LoteDetallePage() {
             {lote.estado === 'despachado' && (
               <Button
                 className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold shadow-sm"
-                onClick={() => navigate(`/liquidaciones/agricultores/nueva`)}
+                onClick={() => navigate(`/liquidaciones/agricultores/nueva?agricultor_id=${lote.agricultor_id}`)}
               >
                 Crear liquidación
               </Button>
@@ -230,6 +234,8 @@ export default function LoteDetallePage() {
             const sesion = clasificaciones[0]
             const aportes = sesion.aportes ?? []
             const aportesPorColaborador = new Map(aportes.map((a) => [a.colaborador_id, a]))
+            const totalCat1 = aportes.reduce((s, a) => s + (a.kg_cat1 ?? 0), 0)
+            const totalCat2 = aportes.reduce((s, a) => s + (a.kg_cat2 ?? 0), 0)
             const aportesAgrupadosPorMesa = (cuadrosLocales ?? [])
               .map((cuadro, index) => ({
                 index,
@@ -245,10 +251,14 @@ export default function LoteDetallePage() {
                   <CardTitle className="text-base">Clasificación</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+                  <div className="grid grid-cols-3 gap-3 mb-3 text-sm">
                     <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
-                      <p className="text-xs text-green-700 mb-0.5">Buenos</p>
-                      <p className="font-bold text-lg text-green-700">{formatPeso(totalesBuenos)}</p>
+                      <p className="text-xs text-green-700 mb-0.5">Cat 1</p>
+                      <p className="font-bold text-lg text-green-700">{formatPeso(totalCat1)}</p>
+                    </div>
+                    <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-center">
+                      <p className="text-xs text-sky-700 mb-0.5">Cat 2</p>
+                      <p className="font-bold text-lg text-sky-700">{formatPeso(totalCat2)}</p>
                     </div>
                     <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
                       <p className="text-xs text-red-700 mb-0.5">Malos / descarte</p>
@@ -260,12 +270,20 @@ export default function LoteDetallePage() {
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Por seleccionador</p>
                       {aportes.map((a) => (
                         <div key={a.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                          <span className="text-muted-foreground">
-                            {a.colaborador
-                              ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
-                              : a.colaborador_id}
-                          </span>
-                          <span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span>
+                          <div className="flex flex-col">
+                            <span className="text-muted-foreground">
+                              {a.colaborador
+                                ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
+                                : a.colaborador_id}
+                            </span>
+                            <span className="text-xs text-muted-foreground mt-0.5">
+                              Cat1: {formatPeso(a.kg_cat1)} · Cat2: {formatPeso(a.kg_cat2)}
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-end">
+                            <span className="font-medium text-green-700">{formatPeso(a.kg_cat1 + a.kg_cat2)}</span>
+                            <span className="text-xs text-sky-700">{formatMoneda(calcularPagoSeleccionador(a.kg_cat1, a.kg_cat2))}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -278,18 +296,64 @@ export default function LoteDetallePage() {
                           <p className="text-xs text-muted-foreground">Mesa {mesa.index + 1}</p>
                           {mesa.aportes.map((a) => (
                             <div key={a.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                              <span className="text-muted-foreground">
-                                {a.colaborador
-                                  ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
-                                  : a.colaborador_id}
-                              </span>
-                              <span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span>
+                              <div className="flex flex-col">
+                                <span className="text-muted-foreground">
+                                  {a.colaborador
+                                    ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
+                                    : a.colaborador_id}
+                                </span>
+                                <span className="text-xs text-muted-foreground mt-0.5">
+                                  Cat1: {formatPeso(a.kg_cat1)} · Cat2: {formatPeso(a.kg_cat2)}
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <span className="font-medium text-green-700">{formatPeso(a.kg_cat1 + a.kg_cat2)}</span>
+                                <span className="text-xs text-sky-700">{formatMoneda(calcularPagoSeleccionador(a.kg_cat1, a.kg_cat2))}</span>
+                              </div>
                             </div>
                           ))}
                         </div>
                       ))}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            )
+          })()}
+
+          {/* Hidroculizado */}
+          {tareos.length > 0 && (() => {
+            const totalJabas = tareos.reduce((s, t) => s + t.n_jabas, 0)
+            // Agrupar por colaborador (puede haber varios días)
+            const porColaborador = new Map<string, { tareo: TareoHidroculizado; totalJabas: number }>()
+            for (const t of tareos) {
+              const prev = porColaborador.get(t.colaborador_id)
+              if (prev) prev.totalJabas += t.n_jabas
+              else porColaborador.set(t.colaborador_id, { tareo: t, totalJabas: t.n_jabas })
+            }
+            return (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Hidroculizado</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-center mb-3">
+                    <p className="text-xs text-blue-700 mb-0.5">Total jabas procesadas</p>
+                    <p className="font-bold text-lg text-blue-700">{totalJabas} jabas</p>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Por operario</p>
+                    {[...porColaborador.values()].map(({ tareo, totalJabas: jabs }) => (
+                      <div key={tareo.colaborador_id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
+                        <span className="text-muted-foreground">
+                          {tareo.colaborador
+                            ? `${tareo.colaborador.apellido}, ${tareo.colaborador.nombre}`
+                            : tareo.colaborador_id}
+                        </span>
+                        <span className="font-medium text-blue-700">{jabs} jabas</span>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             )

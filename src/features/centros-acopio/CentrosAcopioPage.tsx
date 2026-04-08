@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { EstadoActivoBadge } from '@/components/shared/StatusBadge'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -23,6 +24,7 @@ export default function CentrosAcopioPage() {
   const [vista, setVista] = useState<'lista' | 'cards'>('lista')
   const [paginaActual, setPaginaActual] = useState(1)
   const [tamanoPagina, setTamanoPagina] = useState(12)
+  const [aEliminar, setAEliminar] = useState<string | null>(null)
 
   const filtrados = centros.filter((c) =>
     `${c.nombre} ${c.codigo} ${c.responsable ?? ''} ${c.ubicacion ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
@@ -132,7 +134,7 @@ export default function CentrosAcopioPage() {
                       <Button variant="ghost" size="sm" onClick={() => abrirEditar(c)}>
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este centro?')) eliminar(c.id) }}>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(c.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -159,7 +161,7 @@ export default function CentrosAcopioPage() {
               </div>
               <div className="flex gap-2 pt-2 border-t">
                 <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(c)}><Pencil className="h-3.5 w-3.5 mr-1" /> Editar</Button>
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este centro?')) eliminar(c.id) }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             </div>
           ))}
@@ -196,6 +198,15 @@ export default function CentrosAcopioPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!aEliminar}
+        title="¿Eliminar centro de acopio?"
+        description="Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        onConfirm={() => { eliminar(aEliminar!); setAEliminar(null) }}
+        onCancel={() => setAEliminar(null)}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">

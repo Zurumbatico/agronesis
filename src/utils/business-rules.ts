@@ -11,6 +11,12 @@ export const PCT_DESHIDRATACION = 0.05
 export const CAJAS_POR_PALLET = 172
 /** 3% del peso neto que corresponde al socio Alan Melendrez (Módulo 1 PDF) */
 export const PCT_ALAN_MELENDREZ = 0.03
+/** Tarifa de pago al seleccionador por kg procesado Cat 1 (S/ 0.20/kg) */
+export const PRECIO_SELECCION_CAT1 = 0.20
+/** Tarifa de pago al seleccionador por kg procesado Cat 2 (S/ 0.28/kg) */
+export const PRECIO_SELECCION_CAT2 = 0.28
+/** Tarifa de pago al empacador por caja completada (S/ 0.32/caja) */
+export const PRECIO_EMPAQUE_CAJA = 0.32
 
 /**
  * Calcula el peso neto que corresponde al agricultor: descuenta 3% de Alan Melendrez.
@@ -18,6 +24,14 @@ export const PCT_ALAN_MELENDREZ = 0.03
  */
 export function calcularPesoAgricultor(pesoKgBuenos: number): number {
   return Math.round(pesoKgBuenos * (1 - PCT_ALAN_MELENDREZ) * 100) / 100
+}
+
+/**
+ * Calcula el pago a un seleccionador dado sus kg de Cat1 y Cat2.
+ * Cat1: S/ 0.20/kg, Cat2: S/ 0.28/kg
+ */
+export function calcularPagoSeleccionador(kgCat1: number, kgCat2: number): number {
+  return Math.round((kgCat1 * PRECIO_SELECCION_CAT1 + kgCat2 * PRECIO_SELECCION_CAT2) * 100) / 100
 }
 
 // ─────────────────────────────────────────────

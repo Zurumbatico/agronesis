@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { EstadoActivoBadge } from '@/components/shared/StatusBadge'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -24,6 +25,7 @@ export default function AcopiadoresPage() {
   const [vista, setVista] = useState<'cards' | 'lista'>('lista')
   const [paginaActual, setPaginaActual] = useState(1)
   const [tamanoPagina, setTamanoPagina] = useState(12)
+  const [aEliminar, setAEliminar] = useState<string | null>(null)
 
   const filtrados = acopiadores.filter((a) =>
     `${a.nombre} ${a.apellido} ${a.codigo} ${a.dni ?? ''} ${a.telefono ?? ''} ${a.numero_cuenta ?? ''} ${a.ubicacion ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
@@ -137,7 +139,7 @@ export default function AcopiadoresPage() {
                 <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(a)}>
                   <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                 </Button>
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este acopiador?')) eliminar(a.id) }}>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(a.id)}>
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -173,7 +175,7 @@ export default function AcopiadoresPage() {
                       <Button variant="ghost" size="sm" onClick={() => abrirEditar(a)}>
                         <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
                       </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => { if (confirm('¿Eliminar este acopiador?')) eliminar(a.id) }}>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(a.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -215,6 +217,15 @@ export default function AcopiadoresPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!aEliminar}
+        title="¿Eliminar acopiador?"
+        description="Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        onConfirm={() => { eliminar(aEliminar!); setAEliminar(null) }}
+        onCancel={() => setAEliminar(null)}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl">

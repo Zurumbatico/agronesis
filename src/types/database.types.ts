@@ -194,12 +194,16 @@ export interface Database {
           clasificacion_id: string
           colaborador_id: string
           peso_bueno_kg: number
+          kg_cat1: number
+          kg_cat2: number
         }
         Insert: {
           created_by: string
           clasificacion_id: string
           colaborador_id: string
           peso_bueno_kg: number
+          kg_cat1?: number
+          kg_cat2?: number
         }
         Update: Partial<Database['public']['Tables']['clasificacion_aportes']['Insert']>
         Relationships: []
@@ -374,7 +378,7 @@ export interface Database {
           periodo_inicio: string
           periodo_fin: string
           total_monto: number
-          estado: 'borrador' | 'pagada'
+          estado: 'pendiente' | 'pagada'
           observaciones: string | null
         }
         Insert: Omit<Database['public']['Tables']['planillas_quincenales']['Row'], 'id' | 'created_at' | 'updated_at'>
@@ -389,12 +393,14 @@ export interface Database {
           created_by: string
           planilla_id: string
           colaborador_id: string
+          kg_cat1_seleccion: number
+          kg_cat2_seleccion: number
+          pago_seleccion: number
           n_jabas_hidroculizado: number
           n_cajas_empaquetado: number
           monto_empaquetado: number
           otros_montos: number
           total: number
-          observaciones: string | null
         }
         Insert: Omit<Database['public']['Tables']['planilla_detalles']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['planilla_detalles']['Insert']>

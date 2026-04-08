@@ -158,6 +158,8 @@ export interface ClasificacionAporte extends BaseEntity {
   clasificacion_id: UUID
   colaborador_id: UUID
   peso_bueno_kg: number
+  kg_cat1: number
+  kg_cat2: number
   // relaciones
   colaborador?: Colaborador
 }
@@ -252,7 +254,7 @@ export type TareoHidroculizadoUpdate = Partial<TareoHidroculizadoInsert>
 // ─────────────────────────────────────────────
 // PLANILLA QUINCENAL (Módulo 9 PDF)
 // ─────────────────────────────────────────────
-export type EstadoPlanilla = 'borrador' | 'pagada'
+export type EstadoPlanilla = 'pendiente' | 'pagada'
 
 export interface PlanillaQuincenal extends BaseEntity {
   periodo_inicio: string   // ISO date (ej. 2026-04-01)
@@ -270,12 +272,14 @@ export type PlanillaQuincenalUpdate = Partial<PlanillaQuincenalInsert>
 export interface PlanillaDetalle extends BaseEntity {
   planilla_id: UUID
   colaborador_id: UUID
+  kg_cat1_seleccion: number       // Tareo A — kg seleccionados Cat 1
+  kg_cat2_seleccion: number       // Tareo A — kg seleccionados Cat 2
+  pago_seleccion: number          // kg_cat1 × 0.20 + kg_cat2 × 0.28
   n_jabas_hidroculizado: number   // Módulo 4 / Tareo B — jornal base (sin destajo)
   n_cajas_empaquetado: number     // Módulo 6 / Tareo D — S/ 0.32 / caja
   monto_empaquetado: number       // n_cajas * 0.32
   otros_montos: number            // jornal, adelantos, descuentos, etc.
   total: number
-  observaciones: string | null
   // relaciones
   colaborador?: Colaborador
 }

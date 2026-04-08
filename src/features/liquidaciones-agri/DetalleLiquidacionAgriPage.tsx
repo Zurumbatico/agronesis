@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { EstadoLiquidacionBadge } from '@/components/shared/StatusBadge'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -17,6 +18,7 @@ export default function DetalleLiquidacionAgriPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cambiando, setCambiando] = useState(false)
+  const [accionPendiente, setAccionPendiente] = useState<'confirmada' | 'pagada' | null>(null)
 
   const cargar = async () => {
     if (!id) return
@@ -36,17 +38,9 @@ export default function DetalleLiquidacionAgriPage() {
 
   const cambiarEstado = async (nuevoEstado: 'confirmada' | 'pagada') => {
     if (!liquidacion) return
-
-    const msg = nuevoEstado === 'confirmada'
-      ? '¿Confirmar esta liquidación?'
-      : '¿Marcar como pagada? Esto marcará todos los lotes asociados como LIQUIDADO.'
-
-    if (!confirm(msg)) return
-
     setCambiando(true)
     try {
       if (nuevoEstado === 'pagada') {
-        // Marca la liquidación como pagada y actualiza los lotes a 'liquidado'
         await pagarLiquidacionAgri(liquidacion.id)
       } else {
         await actualizarEstadoLiquidacionAgri(liquidacion.id, nuevoEstado)
@@ -72,12 +66,12 @@ export default function DetalleLiquidacionAgriPage() {
         actions={
           <div className="flex gap-2">
             {liquidacion.estado === 'borrador' && (
-              <Button variant="outline" disabled={cambiando} onClick={() => cambiarEstado('confirmada')}>
+              <Button variant="outline" disabled={cambiando} onClick={() => setAccionPendiente('confirmada')}>
                 Confirmar
               </Button>
             )}
             {liquidacion.estado === 'confirmada' && (
-              <Button disabled={cambiando} onClick={() => cambiarEstado('pagada')}>
+              <Button disabled={cambiando} onClick={() => setAccionPendiente('pagada')}>
                 Marcar pagada
               </Button>
             )}
@@ -148,6 +142,17 @@ export default function DetalleLiquidacionAgriPage() {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!accionPendiente}
+        title={accionPendiente === 'pagada' ? '¿Marcar como pagada?' : '¿Confirmar liquidación?'}
+        description={accionPendiente === 'pagada' ? 'Todos los lotes asociados quedarán marcados como LIQUIDADO.' : undefined}
+        confirmLabel={accionPendiente === 'pagada' ? 'Sí, marcar pagada' : 'Sí, confirmar'}
+        variant={accionPendiente === 'pagada' ? 'default' : 'default'}
+        loading={cambiando}
+        onConfirm={() => { cambiarEstado(accionPendiente!); setAccionPendiente(null) }}
+        onCancel={() => setAccionPendiente(null)}
+      />
     </div>
   )
 }
