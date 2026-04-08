@@ -147,7 +147,7 @@ export default function HidroculizarPage() {
                   <span className="text-muted-foreground ml-2">· {formatFecha(t.fecha)} · {t.n_jabas} jabas</span>
                   {t.observaciones && <p className="text-xs text-muted-foreground">{t.observaciones}</p>}
                 </div>
-                {lote.estado === 'pesado_pe' && (
+                {lote.estado === 'clasificado' && (
                   <Button variant="ghost" size="sm" className="text-destructive h-7 w-7 p-0" onClick={() => onDelete(t.id)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -159,7 +159,7 @@ export default function HidroculizarPage() {
       )}
 
       {/* Formulario agregar */}
-      {lote.estado === 'pesado_pe' && (
+      {lote.estado === 'clasificado' && (
         <Card className="mb-4">
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Agregar operario</CardTitle>
@@ -204,7 +204,7 @@ export default function HidroculizarPage() {
       )}
 
       {/* Finalizar */}
-      {lote.estado === 'pesado_pe' && (
+      {lote.estado === 'clasificado' && (
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => navigate(`/lotes/${id}`)}>Cancelar</Button>
           <Button

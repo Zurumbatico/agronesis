@@ -197,7 +197,7 @@ export default function NuevaLiquidacionAgriPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Detalles</CardTitle>
-              <p className="text-xs text-muted-foreground">El peso ya incluye el descuento del 3% (Alan Melendrez). El precio se pre-carga desde la tabla de configuración si existe para la semana del lote.</p>
+              <p className="text-xs text-muted-foreground">El peso ya incluye el descuento del porcentaje de deshidratación.</p>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               {fields.map((field, index) => {

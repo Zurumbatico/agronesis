@@ -15,7 +15,6 @@ import CentrosAcopioPage from '@/features/centros-acopio/CentrosAcopioPage'
 import LotesPage from '@/features/lotes/LotesPage'
 import LoteDetallePage from '@/features/lotes/LoteDetallePage'
 import ClasificarLotePage from '@/features/lotes/ClasificarLotePage'
-import PesadoPEPage from '@/features/lotes/PesadoPEPage'
 import HidroculizarPage from '@/features/lotes/HidroculizarPage'
 import DespacharLotePage from '@/features/lotes/DespacharLotePage'
 import LiquidacionesAgriPage from '@/features/liquidaciones-agri/LiquidacionesAgriPage'
@@ -52,7 +51,6 @@ export default function App() {
             <Route path={ROUTES.LOTES} element={<LotesPage />} />
             <Route path={ROUTES.LOTES_DETALLE} element={<LoteDetallePage />} />
             <Route path={ROUTES.CLASIFICACIONES} element={<ClasificarLotePage />} />
-            <Route path={ROUTES.PESADO_PE} element={<PesadoPEPage />} />
             <Route path={ROUTES.HIDROCULIZAR} element={<HidroculizarPage />} />
             <Route path={ROUTES.DESPACHOS} element={<DespacharLotePage />} />
             <Route

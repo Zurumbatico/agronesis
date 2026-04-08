@@ -161,15 +161,19 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
         </FormField>
 
         <FormField label="Tara por jaba (kg)" error={errors.peso_tara_kg?.message} required>
-          <Input
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="0"
-            {...register('peso_tara_kg', {
-              setValueAs: (value) => value === '' ? 0 : Number(value),
-            })}
-          />
+          <Controller name="peso_tara_kg" control={control} render={({ field }) => (
+            <Select
+              onValueChange={(val) => field.onChange(Number(val))}
+              value={field.value != null ? String(field.value) : ''}
+            >
+              <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+              <SelectContent>
+                {[1.3, 1.8].map((v) => (
+                  <SelectItem key={v} value={String(v)}>{v.toFixed(1)} kg</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )} />
         </FormField>
 
         <FormField label="Peso neto (kg)" error={errors.peso_neto_kg?.message} required>

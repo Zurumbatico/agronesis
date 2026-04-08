@@ -396,7 +396,7 @@ create table if not exists public.lotes (
   num_cubetas integer not null default 0,
   codigo_lote_agricultor text null,
   observaciones text null,
-  estado text not null default 'ingresado' check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'pesado_pe', 'en_despacho', 'despachado', 'liquidado'))
+  estado text not null default 'ingresado' check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'en_despacho', 'despachado', 'liquidado'))
 );
 
 alter table public.lotes alter column codigo set default public.generate_lote_codigo();
@@ -830,7 +830,7 @@ create policy config_precios_authenticated_all on public.config_precios for all 
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.lotes drop constraint if exists lotes_estado_check;
 alter table public.lotes add constraint lotes_estado_check
-  check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'pesado_pe', 'hidroculizado', 'en_despacho', 'despachado', 'liquidado'));
+  check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'hidroculizado', 'en_despacho', 'despachado', 'liquidado'));
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAREO_HIDROCULIZADO — Módulo 4 / Tareo B

@@ -24,6 +24,7 @@ import {
   calcularPallets,
   validarCajasDespacho,
   calcularValorDespacho,
+  PESO_CAJA_EXPORTACION_KG,
 } from '@/utils/business-rules'
 import { format } from 'date-fns'
 import type { Lote, Clasificacion, Despacho } from '@/types/models'
@@ -134,7 +135,7 @@ export default function DespacharLotePage() {
             <div>
               <p className="text-muted-foreground text-xs">Disponibles</p>
               <p className={`font-bold text-lg ${cajasDisponibles <= 0 ? 'text-destructive' : ''}`}>{cajasDisponibles}</p>
-              <p className="text-muted-foreground text-[11px]">{cajasDisponibles <= 0 ? 'Sin stock' : `${formatPeso(cajasDisponibles * 4.65)} est.`}</p>
+              <p className="text-muted-foreground text-[11px]">{cajasDisponibles <= 0 ? 'Sin stock' : `${formatPeso(cajasDisponibles * PESO_CAJA_EXPORTACION_KG)} est.`}</p>
             </div>
           </div>
         </CardContent>

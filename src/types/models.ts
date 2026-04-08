@@ -101,7 +101,6 @@ export type EstadoLote =
   | 'ingresado'
   | 'en_clasificacion'
   | 'clasificado'
-  | 'pesado_pe'
   | 'hidroculizado'
   | 'en_despacho'
   | 'despachado'
