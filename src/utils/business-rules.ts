@@ -27,11 +27,12 @@ export function calcularPesoAgricultor(pesoKgBuenos: number): number {
 }
 
 /**
- * Calcula el pago a un seleccionador dado sus kg de Cat1 y Cat2.
+ * Calcula el pago a un seleccionador dado los kg buenos y la calidad del lote.
  * Cat1: S/ 0.20/kg, Cat2: S/ 0.28/kg
  */
-export function calcularPagoSeleccionador(kgCat1: number, kgCat2: number): number {
-  return Math.round((kgCat1 * PRECIO_SELECCION_CAT1 + kgCat2 * PRECIO_SELECCION_CAT2) * 100) / 100
+export function calcularPagoSeleccionador(kgBueno: number, calidad: 'cat1' | 'cat2'): number {
+  const precio = calidad === 'cat1' ? PRECIO_SELECCION_CAT1 : PRECIO_SELECCION_CAT2
+  return Math.round(kgBueno * precio * 100) / 100
 }
 
 // ─────────────────────────────────────────────

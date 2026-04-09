@@ -48,7 +48,7 @@ export default function DespacharLotePage() {
       lote_id: id ?? '',
       fecha_despacho: format(new Date(), 'yyyy-MM-dd'),
       destino: 'exportacion',
-      precio_venta_kg: 0,
+      precio_venta_kg: undefined,
     },
   })
 
@@ -88,7 +88,7 @@ export default function DespacharLotePage() {
     }
 
     setDespachos((prev) => [...prev, nuevo])
-    reset({ lote_id: id ?? '', fecha_despacho: format(new Date(), 'yyyy-MM-dd'), destino: 'exportacion', precio_venta_kg: 0 })
+    reset({ lote_id: id ?? '', fecha_despacho: format(new Date(), 'yyyy-MM-dd'), destino: 'exportacion', precio_venta_kg: undefined })
   }
 
   const handleFinalizar = async () => {
@@ -192,7 +192,7 @@ export default function DespacharLotePage() {
               </FormField>
 
               <FormField label="Precio venta (S/./kg)" error={errors.precio_venta_kg?.message}>
-                <Input type="number" step="0.01" min="0" placeholder="0.00 — opcional" {...register('precio_venta_kg', { valueAsNumber: true })} />
+                <Input type="number" step="0.01" min="0" placeholder="0.00" {...register('precio_venta_kg', { valueAsNumber: true })} />
               </FormField>
 
               {subtotal > 0 && (

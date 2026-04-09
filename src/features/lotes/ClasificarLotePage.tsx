@@ -19,7 +19,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Lote, Colaborador } from '@/types/models'
 
-type Fila = { key: string; colaborador_id: string; kg_cat1: string; kg_cat2: string }
+type Fila = { key: string; colaborador_id: string; kg_bueno: string }
 type MesaBloque = { key: string; filas: Fila[] }
 
 const getMesasStorageKey = (loteId: string) => `clasificacion-cuadros-${loteId}`
@@ -33,8 +33,7 @@ export default function ClasificarLotePage() {
   const crearFila = (suffix: string): Fila => ({
     key: `${uid}-f-${suffix}`,
     colaborador_id: '',
-    kg_cat1: '',
-    kg_cat2: '',
+    kg_bueno: '',
   })
 
   const crearMesa = (suffix: string, conFilaInicial = true): MesaBloque => ({
@@ -56,9 +55,10 @@ export default function ClasificarLotePage() {
   const [mesas, setMesas] = useState<MesaBloque[]>([crearMesa('inicial')])
 
   const todasFilas = mesas.flatMap((m) => m.filas)
-  const totalBuenos = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_cat1) || 0) + (parseFloat(f.kg_cat2) || 0), 0)
+  const calidad = lote?.producto?.calidad ?? 'cat1'
+  const totalBuenos = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_bueno) || 0), 0)
   const totalPagoSeleccionadores = todasFilas.reduce((acc, f) =>
-    acc + calcularPagoSeleccionador(parseFloat(f.kg_cat1) || 0, parseFloat(f.kg_cat2) || 0), 0)
+    acc + calcularPagoSeleccionador(parseFloat(f.kg_bueno) || 0, calidad), 0)
   const totalMalos = Math.max(0, (lote?.peso_neto_kg ?? 0) - totalBuenos)
   const porcentajeBuenos = lote ? Math.min(100, (totalBuenos / lote.peso_neto_kg) * 100) : 0
 
@@ -82,8 +82,7 @@ export default function ClasificarLotePage() {
         const aportesCargados = (sesion.aportes ?? []).map((a, i) => ({
           key: `${uid}-loaded-${i}`,
           colaborador_id: a.colaborador_id,
-          kg_cat1: String(a.kg_cat1 > 0 || a.kg_cat2 > 0 ? a.kg_cat1 : a.peso_bueno_kg),
-          kg_cat2: String(a.kg_cat2),
+          kg_bueno: String(a.peso_bueno_kg),
         }))
 
         if (aportesCargados.length > 0) {
@@ -94,7 +93,7 @@ export default function ClasificarLotePage() {
         try {
           const raw = localStorage.getItem(getMesasStorageKey(id))
           if (raw) {
-            const parsed = JSON.parse(raw) as Array<{ filas: Array<{ colaborador_id: string; kg_cat1?: string; kg_cat2?: string; peso_bueno_kg?: string }> }>
+            const parsed = JSON.parse(raw) as Array<{ filas: Array<{ colaborador_id: string; kg_bueno?: string; peso_bueno_kg?: string }> }>
             if (Array.isArray(parsed) && parsed.length > 0) {
               const mesasDesdeLocal: MesaBloque[] = parsed
                 .map((m, i) => ({
@@ -103,8 +102,7 @@ export default function ClasificarLotePage() {
                     ? m.filas.map((f, j) => ({
                         key: `${uid}-fila-local-${i}-${j}`,
                         colaborador_id: f.colaborador_id ?? '',
-                        kg_cat1: String(f.kg_cat1 ?? f.peso_bueno_kg ?? ''),
-                        kg_cat2: String(f.kg_cat2 ?? ''),
+                        kg_bueno: String(f.kg_bueno ?? f.peso_bueno_kg ?? ''),
                       }))
                     : [],
                 }))
@@ -200,14 +198,13 @@ export default function ClasificarLotePage() {
     const filasActuales = mesas.flatMap((m) => m.filas)
 
     const hayFilaIncompleta = filasActuales.some((f) => {
-      const cat1 = parseFloat(f.kg_cat1)
-      const cat2 = parseFloat(f.kg_cat2)
-      return !f.colaborador_id || (f.kg_cat1.trim() === '' && f.kg_cat2.trim() === '') || Number.isNaN(cat1) || Number.isNaN(cat2) || cat1 < 0 || cat2 < 0
+      const bueno = parseFloat(f.kg_bueno)
+      return !f.colaborador_id || f.kg_bueno.trim() === '' || Number.isNaN(bueno) || bueno < 0
     })
 
     const neto = lote.peso_neto_kg
     const hayFilaMayorAlNeto = filasActuales.some((f) => {
-      const peso = (parseFloat(f.kg_cat1) || 0) + (parseFloat(f.kg_cat2) || 0)
+      const peso = parseFloat(f.kg_bueno) || 0
       return !Number.isNaN(peso) && peso > neto
     })
 
@@ -233,11 +230,10 @@ export default function ClasificarLotePage() {
 
     const filasValidas = filasActuales.map((f) => ({
       colaborador_id: f.colaborador_id,
-      kg_cat1: parseFloat(f.kg_cat1) || 0,
-      kg_cat2: parseFloat(f.kg_cat2) || 0,
+      kg_bueno: parseFloat(f.kg_bueno) || 0,
     }))
 
-    const totalBuenosCalculado = filasValidas.reduce((acc, f) => acc + f.kg_cat1 + f.kg_cat2, 0)
+    const totalBuenosCalculado = filasValidas.reduce((acc, f) => acc + f.kg_bueno, 0)
     if (totalBuenosCalculado > neto) {
       notifyFormError(`La suma de kg buenos (${formatPeso(totalBuenosCalculado)}) no puede ser mayor al neto (${formatPeso(neto)}).`)
       return
@@ -250,6 +246,7 @@ export default function ClasificarLotePage() {
         fecha,
         observaciones || null,
         filasValidas,
+        lote.producto?.calidad ?? 'cat1',
         user.id
       )
 
@@ -261,8 +258,7 @@ export default function ClasificarLotePage() {
               mesas.map((m) => ({
                 filas: m.filas.map((f) => ({
                   colaborador_id: f.colaborador_id,
-                  kg_cat1: f.kg_cat1,
-                  kg_cat2: f.kg_cat2,
+                  kg_bueno: f.kg_bueno,
                 })),
               }))
             )
@@ -386,7 +382,7 @@ export default function ClasificarLotePage() {
               )}
 
               {mesa.filas.map((fila, idx) => {
-                const pagoFila = calcularPagoSeleccionador(parseFloat(fila.kg_cat1) || 0, parseFloat(fila.kg_cat2) || 0)
+                const pagoFila = calcularPagoSeleccionador(parseFloat(fila.kg_bueno) || 0, lote.producto?.calidad ?? 'cat1')
                 return (
                 <div key={fila.key} className="flex items-end gap-2">
                   <span className="text-xs text-muted-foreground w-5 text-right mb-2">{idx + 1}.</span>
@@ -398,26 +394,15 @@ export default function ClasificarLotePage() {
                       disabledIds={colaboradoresSeleccionados}
                     />
                   </div>
-                  <div className="w-24">
-                    <p className="text-[10px] text-muted-foreground mb-0.5">Cat 1 (kg)</p>
+                  <div className="w-28">
+                    <p className="text-[10px] text-muted-foreground mb-0.5">Kg buenos</p>
                     <Input
                       type="number"
                       min="0"
                       step="0.01"
                       placeholder="0.00"
-                      value={fila.kg_cat1}
-                      onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_cat1', e.target.value)}
-                    />
-                  </div>
-                  <div className="w-24">
-                    <p className="text-[10px] text-muted-foreground mb-0.5">Cat 2 (kg)</p>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={fila.kg_cat2}
-                      onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_cat2', e.target.value)}
+                      value={fila.kg_bueno}
+                      onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_bueno', e.target.value)}
                     />
                   </div>
                   <div className="w-20 text-right mb-1">

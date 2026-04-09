@@ -234,8 +234,7 @@ export default function LoteDetallePage() {
             const sesion = clasificaciones[0]
             const aportes = sesion.aportes ?? []
             const aportesPorColaborador = new Map(aportes.map((a) => [a.colaborador_id, a]))
-            const totalCat1 = aportes.reduce((s, a) => s + (a.kg_cat1 ?? 0), 0)
-            const totalCat2 = aportes.reduce((s, a) => s + (a.kg_cat2 ?? 0), 0)
+            const calidad = lote.producto?.calidad ?? 'cat1'
             const aportesAgrupadosPorMesa = (cuadrosLocales ?? [])
               .map((cuadro, index) => ({
                 index,
@@ -251,14 +250,10 @@ export default function LoteDetallePage() {
                   <CardTitle className="text-base">Clasificación</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-3 gap-3 mb-3 text-sm">
+                  <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
                     <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
-                      <p className="text-xs text-green-700 mb-0.5">Cat 1</p>
-                      <p className="font-bold text-lg text-green-700">{formatPeso(totalCat1)}</p>
-                    </div>
-                    <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-center">
-                      <p className="text-xs text-sky-700 mb-0.5">Cat 2</p>
-                      <p className="font-bold text-lg text-sky-700">{formatPeso(totalCat2)}</p>
+                      <p className="text-xs text-green-700 mb-0.5">Buenos</p>
+                      <p className="font-bold text-lg text-green-700">{formatPeso(sesion.peso_bueno_kg)}</p>
                     </div>
                     <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
                       <p className="text-xs text-red-700 mb-0.5">Malos / descarte</p>
@@ -276,13 +271,10 @@ export default function LoteDetallePage() {
                                 ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
                                 : a.colaborador_id}
                             </span>
-                            <span className="text-xs text-muted-foreground mt-0.5">
-                              Cat1: {formatPeso(a.kg_cat1)} · Cat2: {formatPeso(a.kg_cat2)}
-                            </span>
                           </div>
                           <div className="flex flex-col items-end">
-                            <span className="font-medium text-green-700">{formatPeso(a.kg_cat1 + a.kg_cat2)}</span>
-                            <span className="text-xs text-sky-700">{formatMoneda(calcularPagoSeleccionador(a.kg_cat1, a.kg_cat2))}</span>
+                            <span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span>
+                            <span className="text-xs text-sky-700">{formatMoneda(calcularPagoSeleccionador(a.peso_bueno_kg, calidad))}</span>
                           </div>
                         </div>
                       ))}
@@ -302,13 +294,10 @@ export default function LoteDetallePage() {
                                     ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
                                     : a.colaborador_id}
                                 </span>
-                                <span className="text-xs text-muted-foreground mt-0.5">
-                                  Cat1: {formatPeso(a.kg_cat1)} · Cat2: {formatPeso(a.kg_cat2)}
-                                </span>
                               </div>
                               <div className="flex flex-col items-end">
-                                <span className="font-medium text-green-700">{formatPeso(a.kg_cat1 + a.kg_cat2)}</span>
-                                <span className="text-xs text-sky-700">{formatMoneda(calcularPagoSeleccionador(a.kg_cat1, a.kg_cat2))}</span>
+                                <span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span>
+                                <span className="text-xs text-sky-700">{formatMoneda(calcularPagoSeleccionador(a.peso_bueno_kg, calidad))}</span>
                               </div>
                             </div>
                           ))}
