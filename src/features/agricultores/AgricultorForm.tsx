@@ -28,6 +28,7 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
     numero_cuenta: defaultValues?.numero_cuenta ?? '',
     fecha_alta: defaultValues?.fecha_alta ?? new Date().toISOString().slice(0, 10),
     ubicacion: defaultValues?.ubicacion ?? '',
+    ggn: defaultValues?.ggn ?? '',
   }), [defaultValues])
 
   const {
@@ -121,6 +122,10 @@ export function AgricultorForm({ defaultValues, onSubmit, onCancel, isEditing }:
 
       <FormField label="Ubicación" error={errors.ubicacion?.message}>
         <Textarea placeholder="Sector, dirección o referencia..." rows={2} {...register('ubicacion')} />
+      </FormField>
+
+      <FormField label="GGN (GlobalG.A.P.)" error={errors.ggn?.message}>
+        <Input placeholder="Ej: 4069453354340" maxLength={50} {...register('ggn')} />
       </FormField>
 
       <div className="flex gap-3 justify-end pt-2">

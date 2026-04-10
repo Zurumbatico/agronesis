@@ -156,6 +156,7 @@ export interface Database {
           peso_tara_kg: number
           peso_neto_kg: number
           num_cubetas: number
+          jabas_prestadas: number
           codigo_lote_agricultor: string | null
           observaciones: string | null
           estado: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'hidroculizado' | 'en_despacho' | 'despachado' | 'liquidado'
@@ -236,12 +237,14 @@ export interface Database {
           lote_id: string
           fecha_despacho: string
           destino: 'exportacion' | 'mercado_local' | 'planta_proceso'
+          tipo_despacho: 'maritima' | 'aerea' | 'terrestre'
           transportista: string | null
           placa_vehiculo: string | null
           num_cajas_despachadas: number
           peso_neto_kg: number
           precio_venta_kg: number
           observaciones: string | null
+          numero_senasa: string | null
         }
         Insert: Omit<Database['public']['Tables']['despachos']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['despachos']['Insert']>

@@ -44,6 +44,7 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
     peso_tara_kg: defaultValues?.peso_tara_kg,
     peso_neto_kg: defaultValues?.peso_neto_kg ?? 0,
     num_cubetas: defaultValues?.num_cubetas,
+    jabas_prestadas: defaultValues?.jabas_prestadas,
     ...defaultValues,
     observaciones: defaultValues?.observaciones ?? '',
   }), [defaultValues])
@@ -194,6 +195,18 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
             step="1"
             placeholder="0"
             {...register('num_cubetas', {
+              setValueAs: (value) => value === '' ? 0 : Number(value),
+            })}
+          />
+        </FormField>
+
+        <FormField label="Jabas prestadas (por devolver)" error={errors.jabas_prestadas?.message}>
+          <Input
+            type="number"
+            min="0"
+            step="1"
+            placeholder="0"
+            {...register('jabas_prestadas', {
               setValueAs: (value) => value === '' ? 0 : Number(value),
             })}
           />

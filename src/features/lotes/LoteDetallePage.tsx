@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { Printer } from 'lucide-react'
 import { getLote } from '@/services/lotes.service'
 import { getClasificacionesPorLote } from '@/services/clasificaciones.service'
 import { getDespachosPorLote } from '@/services/despachos.service'
@@ -11,9 +12,12 @@ import { EstadoLoteBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoteTimeline } from './LoteTimeline'
+import { printLoteTicket } from './printLoteTicket'
+import { printDespachoLabel, getTraceabilityCode } from './printDespachoLabel'
 import {
   ROUTES,
   DESTINO_DESPACHO_CONFIG,
+  TIPO_DESPACHO_CONFIG,
   VARIEDAD_PRODUCTO_CONFIG,
   CALIDAD_PRODUCTO_CONFIG,
   TIPO_PRODUCCION_CONFIG,
@@ -86,10 +90,16 @@ export default function LoteDetallePage() {
     <div className="max-w-5xl mx-auto">
       <PageHeader
         title={`Lote ${lote.codigo}`}
-        description={`${lote.centro_acopio?.nombre ?? '-'} · ${formatFecha(lote.fecha_ingreso)}${lote.codigo_lote_agricultor ? ` · Cod. agricultor: ${lote.codigo_lote_agricultor}` : ''} · N° JABAS INGRESADAS: ${lote.num_cubetas} · Bruto: ${formatPeso(lote.peso_bruto_kg)} · Tara: ${formatPeso(lote.peso_tara_kg)} · Neto: ${formatPeso(lote.peso_neto_kg)}`}
+        description={`${lote.centro_acopio?.nombre ?? '-'} · ${formatFecha(lote.fecha_ingreso)}${lote.codigo_lote_agricultor ? ` · Cod. agricultor: ${lote.codigo_lote_agricultor}` : ''} · N° JABAS INGRESADAS: ${lote.num_cubetas}${lote.jabas_prestadas > 0 ? ` · Jabas prestadas: ${lote.jabas_prestadas}` : ''} · Bruto: ${formatPeso(lote.peso_bruto_kg)} · Tara: ${formatPeso(lote.peso_tara_kg)} · Neto: ${formatPeso(lote.peso_neto_kg)}`}
         backHref={ROUTES.LOTES}
         actions={
           <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => printLoteTicket(lote)}
+            >
+              <Printer className="h-4 w-4" /> Imprimir ticket
+            </Button>
             {(lote.estado === 'ingresado' || lote.estado === 'en_clasificacion') && (
               <Button
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
@@ -198,6 +208,10 @@ export default function LoteDetallePage() {
                   <div>
                     <p className="text-xs text-muted-foreground">N° Jabas ingresadas</p>
                     <p className="font-medium">{lote.num_cubetas}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Jabas prestadas (por devolver)</p>
+                    <p className="font-medium">{lote.jabas_prestadas ?? 0}</p>
                   </div>
                 </section>
 
@@ -355,15 +369,21 @@ export default function LoteDetallePage() {
               <CardContent className="flex flex-col gap-2">
                 {despachos.map((d) => (
                   <div key={d.id} className="border rounded-lg p-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="font-medium">{DESTINO_DESPACHO_CONFIG[d.destino].label}</span>
-                      <span className="text-muted-foreground">{formatFecha(d.fecha_despacho)}</span>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-medium">{DESTINO_DESPACHO_CONFIG[d.destino].label}</span>
+                        <span className="text-muted-foreground ml-2">{formatFecha(d.fecha_despacho)}</span>
+                        <div className="flex gap-4 mt-1 text-muted-foreground">
+                          <span>{d.num_cajas_despachadas} cajas · {formatPeso(d.peso_neto_kg)}</span>
+                          <span className="text-foreground font-medium">{formatMoneda(d.peso_neto_kg * d.precio_venta_kg)}</span>
+                        </div>
+                        <p className="text-muted-foreground text-xs mt-0.5">Vía: {TIPO_DESPACHO_CONFIG[d.tipo_despacho]?.label ?? d.tipo_despacho}{d.transportista ? ` · Transportista: ${d.transportista}` : ''}{d.placa_vehiculo ? ` · ${d.placa_vehiculo}` : ''}</p>
+                        <p className="font-mono text-xs text-muted-foreground mt-0.5">Traz.: {getTraceabilityCode(lote, d)}</p>
+                      </div>
+                      <Button variant="ghost" size="icon" title="Imprimir etiqueta de caja" onClick={() => printDespachoLabel(lote, d)}>
+                        <Printer className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="flex gap-4 mt-1 text-muted-foreground">
-                      <span>{d.num_cajas_despachadas} cajas · {formatPeso(d.peso_neto_kg)}</span>
-                      <span className="text-foreground font-medium">{formatMoneda(d.peso_neto_kg * d.precio_venta_kg)}</span>
-                    </div>
-                    {d.transportista && <p className="text-muted-foreground text-xs mt-0.5">Transportista: {d.transportista}{d.placa_vehiculo ? ` · ${d.placa_vehiculo}` : ''}</p>}
                   </div>
                 ))}
               </CardContent>

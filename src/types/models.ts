@@ -12,6 +12,7 @@ export interface Agricultor extends BaseEntity {
   numero_cuenta: string | null
   fecha_alta: string
   ubicacion: string | null
+  ggn: string | null
   estado: EstadoActivo
   hectareas?: AgricultorHectarea[]
 }
@@ -118,6 +119,7 @@ export interface Lote extends BaseEntity {
   peso_tara_kg: number
   peso_neto_kg: number
   num_cubetas: number
+  jabas_prestadas: number
   codigo_lote_agricultor: string | null
   observaciones: string | null
   estado: EstadoLote
@@ -181,17 +183,20 @@ export type ClasificacionMesaUpdate = Partial<ClasificacionMesaInsert>
 // DESPACHO
 // ─────────────────────────────────────────────
 export type DestinoDespacho = 'exportacion' | 'mercado_local' | 'planta_proceso'
+export type TipoDespacho = 'maritima' | 'aerea' | 'terrestre'
 
 export interface Despacho extends BaseEntity {
   lote_id: UUID
   fecha_despacho: string
   destino: DestinoDespacho
+  tipo_despacho: TipoDespacho
   transportista: string | null
   placa_vehiculo: string | null
   num_cajas_despachadas: number
   peso_neto_kg: number
   precio_venta_kg: number
   observaciones: string | null
+  numero_senasa: string | null
   // relaciones
   lote?: Lote
 }

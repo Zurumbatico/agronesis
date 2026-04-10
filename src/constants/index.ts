@@ -49,6 +49,12 @@ export const DESTINO_DESPACHO_CONFIG = {
   planta_proceso: { label: 'Planta de Proceso' },
 } as const
 
+export const TIPO_DESPACHO_CONFIG = {
+  maritima:  { label: 'Marítima'  },
+  aerea:     { label: 'Aérea'     },
+  terrestre: { label: 'Terrestre' },
+} as const
+
 export const TIPO_MOVIMIENTO_CUBETA_CONFIG = {
   entrega:     { label: 'Entrega',     color: 'bg-blue-100 text-blue-800' },
   devolucion:  { label: 'Devolución',  color: 'bg-green-100 text-green-800' },

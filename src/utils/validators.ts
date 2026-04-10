@@ -77,6 +77,7 @@ export const agricultorSchema = z.object({
   numero_cuenta: z.preprocess(nullableUpperTrim, z.string().max(50, 'Maximo 50 caracteres').nullable()),
   fecha_alta: z.string().min(1, 'Ingrese la fecha de alta'),
   ubicacion: z.preprocess(nullableUpperTrim, z.string().max(200).nullable()),
+  ggn:       z.preprocess(nullableUpperTrim, z.string().max(50, 'Máximo 50 caracteres').nullable()),
   estado:    z.enum(['activo', 'inactivo']),
 })
 
@@ -135,6 +136,7 @@ export const loteSchema = z.object({
     .max(50000, 'Peso fuera de rango (máx 50,000 kg)'),
   peso_neto_kg:     pesoKgSchema,
   num_cubetas:      cantidadEnteraSchema,
+  jabas_prestadas:  cantidadEnteraSchema,
   codigo_lote_agricultor: z.preprocess(nullableUpperTrim, z.string().max(30, 'Maximo 30 caracteres').nullable()),
   observaciones:    observacionesSchema,
 }).superRefine((data, ctx) => {
@@ -184,6 +186,7 @@ export const despachoSchema = z.object({
   lote_id:              z.string().uuid(),
   fecha_despacho:       z.string().min(1, 'Ingrese la fecha'),
   destino:              z.enum(['exportacion', 'mercado_local', 'planta_proceso']),
+  tipo_despacho:        z.enum(['maritima', 'aerea', 'terrestre']),
   transportista:        z.preprocess(nullableUpperTrim, z.string().max(100).nullable()),
   placa_vehiculo:       z.preprocess(nullableUpperTrim, z.string().max(20).nullable()),
   num_cajas_despachadas: cantidadEnteraSchema,
@@ -193,6 +196,7 @@ export const despachoSchema = z.object({
     z.number().nonnegative('El precio no puede ser negativo').max(1000, 'Precio fuera de rango').default(0)
   ),
   observaciones:        observacionesSchema,
+  numero_senasa:        z.preprocess(nullableUpperTrim, z.string().max(60, 'Máximo 60 carácteres').nullable()),
 })
 
 export const movimientoCubetaSchema = z.object({

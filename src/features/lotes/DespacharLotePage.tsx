@@ -28,6 +28,9 @@ import {
   PESO_CAJA_EXPORTACION_KG,
 } from '@/utils/business-rules'
 import { format } from 'date-fns'
+import { Printer } from 'lucide-react'
+import { printDespachoLabel, getTraceabilityCode } from './printDespachoLabel'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { Lote, Clasificacion, Despacho } from '@/types/models'
 
 export default function DespacharLotePage() {
@@ -41,6 +44,7 @@ export default function DespacharLotePage() {
   const [error, setError] = useState<string | null>(null)
   const [errorCajas, setErrorCajas] = useState<string | null>(null)
   const [confirmarFinalizar, setConfirmarFinalizar] = useState(false)
+  const [labelDespacho, setLabelDespacho] = useState<Despacho | null>(null)
 
   const { register, handleSubmit, control, reset, watch, formState: { errors, isSubmitting } } = useForm<DespachoFormData>({
     resolver: zodResolver(despachoSchema) as any,
@@ -48,6 +52,7 @@ export default function DespacharLotePage() {
       lote_id: id ?? '',
       fecha_despacho: format(new Date(), 'yyyy-MM-dd'),
       destino: 'exportacion',
+      tipo_despacho: 'terrestre',
       precio_venta_kg: undefined,
     },
   })
@@ -88,7 +93,8 @@ export default function DespacharLotePage() {
     }
 
     setDespachos((prev) => [...prev, nuevo])
-    reset({ lote_id: id ?? '', fecha_despacho: format(new Date(), 'yyyy-MM-dd'), destino: 'exportacion', precio_venta_kg: undefined })
+    setLabelDespacho(nuevo)
+    reset({ lote_id: id ?? '', fecha_despacho: format(new Date(), 'yyyy-MM-dd'), destino: 'exportacion', tipo_despacho: 'terrestre', precio_venta_kg: undefined })
   }
 
   const handleFinalizar = async () => {
@@ -168,6 +174,19 @@ export default function DespacharLotePage() {
                 )} />
               </FormField>
 
+              <FormField label="Tipo de despacho" error={errors.tipo_despacho?.message} required>
+                <Controller name="tipo_despacho" control={control} render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="maritima">Marítima</SelectItem>
+                      <SelectItem value="aerea">Aérea</SelectItem>
+                      <SelectItem value="terrestre">Terrestre</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )} />
+              </FormField>
+
               <FormField label="Transportista" error={errors.transportista?.message}>
                 <Input placeholder="Nombre del transportista" {...register('transportista')} />
               </FormField>
@@ -206,6 +225,10 @@ export default function DespacharLotePage() {
               <Textarea rows={2} {...register('observaciones')} />
             </FormField>
 
+            <FormField label="N° MIDAGRI-SENASA" error={errors.numero_senasa?.message}>
+              <Input placeholder="Ej: 000299-MIDAGRI-SENASA-ANCASH" maxLength={60} {...register('numero_senasa')} />
+            </FormField>
+
             {errorCajas && <p className="text-sm text-destructive">{errorCajas}</p>}
 
             <Button type="submit" loading={isSubmitting} className="w-full sm:w-auto sm:self-end">
@@ -225,10 +248,20 @@ export default function DespacharLotePage() {
                 <div>
                   <span className="font-medium uppercase">{d.destino.replace('_', ' ')}</span>
                   <span className="text-muted-foreground ml-2">{formatFecha(d.fecha_despacho)}</span>
+                  {lote && (
+                    <p className="font-mono text-xs text-muted-foreground mt-0.5">Traz.: {getTraceabilityCode(lote, d)}</p>
+                  )}
                 </div>
-                <div className="text-right">
-                  <p className="font-medium">{d.num_cajas_despachadas} cjs · {formatPeso(d.peso_neto_kg)}</p>
-                <p className="text-muted-foreground text-xs">{formatMoneda(d.precio_venta_kg ?? 0)}/kg · Total: {formatMoneda(calcularValorDespacho({ peso_neto_kg: d.peso_neto_kg ?? 0, precio_venta_kg: d.precio_venta_kg ?? 0 }))}</p>
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <p className="font-medium">{d.num_cajas_despachadas} cjs · {formatPeso(d.peso_neto_kg)}</p>
+                    <p className="text-muted-foreground text-xs">{formatMoneda(d.precio_venta_kg ?? 0)}/kg · Total: {formatMoneda(calcularValorDespacho({ peso_neto_kg: d.peso_neto_kg ?? 0, precio_venta_kg: d.precio_venta_kg ?? 0 }))}</p>
+                  </div>
+                  {lote && (
+                    <Button variant="ghost" size="icon" title="Imprimir etiqueta" onClick={() => printDespachoLabel(lote, d)}>
+                      <Printer className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -236,6 +269,32 @@ export default function DespacharLotePage() {
         </Card>
       )}
     </div>
+
+      {/* Diálogo: imprimir etiqueta de caja */}
+      <Dialog open={Boolean(labelDespacho)} onOpenChange={(open) => { if (!open) setLabelDespacho(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Despacho registrado</DialogTitle>
+          </DialogHeader>
+          {labelDespacho && lote && (
+            <div className="space-y-4">
+              <div className="text-sm space-y-1">
+                <p><span className="text-muted-foreground">Cajas:</span> <strong>{labelDespacho.num_cajas_despachadas}</strong></p>
+                <p><span className="text-muted-foreground">Peso neto:</span> <strong>{formatPeso(labelDespacho.peso_neto_kg)}</strong></p>
+                <p><span className="text-muted-foreground">Fecha:</span> <strong>{formatFecha(labelDespacho.fecha_despacho)}</strong></p>
+              </div>
+              <div className="flex gap-2">
+                <Button className="flex-1" onClick={() => { printDespachoLabel(lote, labelDespacho) }}>
+                  <Printer className="h-4 w-4 mr-1" /> Imprimir etiqueta
+                </Button>
+                <Button variant="outline" className="flex-1" onClick={() => setLabelDespacho(null)}>
+                  Continuar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmarFinalizar}

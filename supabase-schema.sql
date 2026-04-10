@@ -206,6 +206,7 @@ create table if not exists public.agricultores (
   numero_cuenta text null,
   fecha_alta date not null default current_date,
   ubicacion text null,
+  ggn text null,
   estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
 );
 
@@ -221,8 +222,7 @@ create table if not exists public.acopiadores (
   telefono text null,
   numero_cuenta text null,
   fecha_alta date not null default current_date,
-  ubicacion text null,
-  estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
+  ubicacion text null,  ggn text null,  estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
 );
 
 create table if not exists public.colaboradores (
@@ -394,6 +394,7 @@ create table if not exists public.lotes (
   peso_tara_kg numeric(12,2) not null default 0 check (peso_tara_kg >= 0),
   peso_neto_kg numeric(12,2) not null default 0 check (peso_neto_kg >= 0),
   num_cubetas integer not null default 0,
+  jabas_prestadas integer not null default 0,
   codigo_lote_agricultor text null,
   observaciones text null,
   estado text not null default 'ingresado' check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'en_despacho', 'despachado', 'liquidado'))
@@ -445,6 +446,22 @@ set peso_neto_kg = coalesce(peso_neto_kg, greatest(peso_bruto_kg - coalesce(peso
 where peso_neto_kg is null;
 alter table public.lotes alter column peso_neto_kg set default 0;
 alter table public.lotes alter column peso_neto_kg set not null;
+alter table public.lotes add column if not exists jabas_prestadas integer not null default 0;
+
+alter table public.despachos add column if not exists tipo_despacho text not null default 'terrestre';
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.constraint_column_usage
+    where table_schema = 'public' and table_name = 'despachos' and constraint_name = 'despachos_tipo_despacho_check'
+  ) then
+    alter table public.despachos add constraint despachos_tipo_despacho_check
+      check (tipo_despacho in ('maritima', 'aerea', 'terrestre'));
+  end if;
+end;
+$$;
+alter table public.despachos add column if not exists numero_senasa text null;
+alter table public.agricultores add column if not exists ggn text null;
 
 create table if not exists public.clasificaciones (
   id uuid primary key default gen_random_uuid(),
@@ -465,12 +482,14 @@ create table if not exists public.despachos (
   lote_id uuid not null references public.lotes(id) on delete cascade,
   fecha_despacho date not null,
   destino text not null check (destino in ('exportacion', 'mercado_local', 'planta_proceso')),
+  tipo_despacho text not null default 'terrestre' check (tipo_despacho in ('maritima', 'aerea', 'terrestre')),
   transportista text null,
   placa_vehiculo text null,
   num_cajas_despachadas integer not null default 0,
   peso_neto_kg numeric(12,2) not null,
   precio_venta_kg numeric(12,2) not null,
-  observaciones text null
+  observaciones text null,
+  numero_senasa text null
 );
 
 create table if not exists public.liquidaciones_agri (
@@ -485,7 +504,8 @@ create table if not exists public.liquidaciones_agri (
   total_kg numeric(12,2) not null default 0,
   total_monto numeric(12,2) not null default 0,
   estado text not null default 'borrador' check (estado in ('borrador', 'confirmada', 'pagada')),
-  observaciones text null
+  observaciones text null,
+  numero_senasa text null
 );
 
 create table if not exists public.liquidacion_agri_detalle (
