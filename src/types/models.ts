@@ -14,10 +14,9 @@ export interface Agricultor extends BaseEntity {
   ubicacion: string | null
   ggn: string | null
   estado: EstadoActivo
-  hectareas?: AgricultorHectarea[]
 }
 
-export type AgricultorInsert = Omit<Agricultor, keyof BaseEntity | 'hectareas'>
+export type AgricultorInsert = Omit<Agricultor, keyof BaseEntity>
 export type AgricultorUpdate = Partial<AgricultorInsert>
 
 export interface Acopiador extends BaseEntity {
@@ -52,16 +51,6 @@ export interface Colaborador extends BaseEntity {
 
 export type ColaboradorInsert = Omit<Colaborador, keyof BaseEntity>
 export type ColaboradorUpdate = Partial<ColaboradorInsert>
-
-export interface AgricultorHectarea extends BaseEntity {
-  agricultor_id: UUID
-  producto_id: UUID
-  hectareas: number
-  producto?: Producto
-}
-
-export type AgricultorHectareaInsert = Omit<AgricultorHectarea, keyof BaseEntity | 'producto'>
-export type AgricultorHectareaUpdate = Partial<AgricultorHectareaInsert>
 
 // ─────────────────────────────────────────────
 // PRODUCTO

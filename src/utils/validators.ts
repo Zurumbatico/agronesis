@@ -51,22 +51,12 @@ export const cantidadEnteraSchema = z
   .int('Debe ser un número entero')
   .nonnegative('Debe ser mayor o igual a 0')
 
-export const hectareasSchema = z
-  .number({ message: 'Ingrese un número válido' })
-  .positive('Las hectáreas deben ser mayores a 0')
-  .max(10000, 'Hectáreas fuera de rango')
-
 export const observacionesSchema = z
   .preprocess(nullableUpperTrim, z.string().max(500).nullable())
 
 // ─────────────────────────────────────────────
 // SCHEMAS DE ENTIDADES
 // ─────────────────────────────────────────────
-
-export const agricultorHectareaSchema = z.object({
-  producto_id: z.string().uuid('Seleccione un producto'),
-  hectareas: hectareasSchema,
-})
 
 export const agricultorSchema = z.object({
   codigo:    codigoSchema,

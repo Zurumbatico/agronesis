@@ -88,20 +88,6 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['productos']['Insert']>
         Relationships: []
       }
-      agricultor_producto_hectareas: {
-        Row: {
-          id: string
-          created_at: string
-          updated_at: string
-          created_by: string
-          agricultor_id: string
-          producto_id: string
-          hectareas: number
-        }
-        Insert: Omit<Database['public']['Tables']['agricultor_producto_hectareas']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['agricultor_producto_hectareas']['Insert']>
-        Relationships: []
-      }
       personal_campo: {
         Row: {
           id: string
@@ -411,16 +397,7 @@ export interface Database {
       }
     }
     Views: Record<string, never>
-    Functions: {
-      replace_agricultor_hectareas: {
-        Args: {
-          p_agricultor_id: string
-          p_created_by: string
-          p_items: Json
-        }
-        Returns: undefined
-      }
-    }
+    Functions: Record<string, never>
     Enums: {
       estado_activo: 'activo' | 'inactivo'
       estado_lote: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'hidroculizado' | 'en_despacho' | 'despachado' | 'liquidado'

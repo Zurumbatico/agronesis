@@ -2,22 +2,8 @@ import { supabase } from '@/lib/supabase'
 import type { Agricultor, AgricultorInsert, AgricultorUpdate } from '@/types/models'
 
 const TABLE = 'agricultores' as const
-const SELECT_LISTA = `
-  *,
-  hectareas:agricultor_producto_hectareas(
-    id,
-    hectareas,
-    producto_id,
-    producto:productos(id, nombre)
-  )
-`
-const SELECT_DETALLE = `
-  *,
-  hectareas:agricultor_producto_hectareas(
-    *,
-    producto:productos(*)
-  )
-`
+const SELECT_LISTA = `*`
+const SELECT_DETALLE = `*`
 
 export async function getAgricultores(): Promise<Agricultor[]> {
   const { data, error } = await supabase
