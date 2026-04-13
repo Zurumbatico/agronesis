@@ -206,6 +206,10 @@ export default function LoteDetallePage() {
                     <p className="font-medium">{formatFecha(lote.fecha_ingreso)}</p>
                   </div>
                   <div>
+                    <p className="text-xs text-muted-foreground">Fecha cosecha</p>
+                    <p className="font-medium">{formatFecha(lote.fecha_cosecha)}</p>
+                  </div>
+                  <div>
                     <p className="text-xs text-muted-foreground">N° Jabas ingresadas</p>
                     <p className="font-medium">{lote.num_cubetas}</p>
                   </div>

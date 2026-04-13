@@ -105,7 +105,7 @@ export default function LotesPage() {
                   {l.agricultor?.apellido}, {l.agricultor?.nombre} · {l.producto?.nombre}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {l.centro_acopio?.nombre} · {formatFecha(l.fecha_ingreso)} · N° JABAS: {l.num_cubetas} · Bruto: {formatPeso(l.peso_bruto_kg)} · Tara: {formatPeso(l.peso_tara_kg)} · Neto: {formatPeso(l.peso_neto_kg)}
+                  {l.centro_acopio?.nombre} · Ingreso: {formatFecha(l.fecha_ingreso)} · Cosecha: {formatFecha(l.fecha_cosecha)} · N° JABAS: {l.num_cubetas} · Bruto: {formatPeso(l.peso_bruto_kg)} · Tara: {formatPeso(l.peso_tara_kg)} · Neto: {formatPeso(l.peso_neto_kg)}
                 </p>
               </div>
               <div className="flex gap-1.5 shrink-0">
@@ -185,14 +185,18 @@ export default function LotesPage() {
                     <p className="font-medium">{formatPeso(ticketLote.peso_neto_kg)}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
                     <p className="text-xs text-muted-foreground">Jabas ingresadas</p>
                     <p className="font-medium">{ticketLote.num_cubetas}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Fecha</p>
+                    <p className="text-xs text-muted-foreground">Fecha ingreso</p>
                     <p className="font-medium">{formatFecha(ticketLote.fecha_ingreso)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Fecha cosecha</p>
+                    <p className="font-medium">{formatFecha(ticketLote.fecha_cosecha)}</p>
                   </div>
                 </div>
                 {ticketLote.jabas_prestadas > 0 && (

@@ -30,24 +30,29 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
   const { productos } = useProductos()
   const { centros } = useCentrosAcopio()
 
-  const normalizedDefaults = useMemo<Partial<LoteFormInput>>(() => ({
-    codigo: defaultValues?.codigo ?? 'AUTO',
-    agricultor_id: defaultValues?.agricultor_id ?? '',
-    acopiador_combined: defaultValues?.acopiador_agricultor_id
-      ? `agri:${defaultValues.acopiador_agricultor_id}`
-      : defaultValues?.acopiador_id
-      ? `aco:${defaultValues.acopiador_id}`
-      : '',
-    producto_id: defaultValues?.producto_id ?? '',
-    centro_acopio_id: defaultValues?.centro_acopio_id ?? '',
-    fecha_ingreso: defaultValues?.fecha_ingreso ?? format(new Date(), 'yyyy-MM-dd'),
-    peso_tara_kg: defaultValues?.peso_tara_kg,
-    peso_neto_kg: defaultValues?.peso_neto_kg ?? 0,
-    num_cubetas: defaultValues?.num_cubetas,
-    jabas_prestadas: defaultValues?.jabas_prestadas,
-    ...defaultValues,
-    observaciones: defaultValues?.observaciones ?? '',
-  }), [defaultValues])
+  const normalizedDefaults = useMemo<Partial<LoteFormInput>>(() => {
+    const fechaIngreso = defaultValues?.fecha_ingreso ?? format(new Date(), 'yyyy-MM-dd')
+
+    return {
+      codigo: defaultValues?.codigo ?? 'AUTO',
+      agricultor_id: defaultValues?.agricultor_id ?? '',
+      acopiador_combined: defaultValues?.acopiador_agricultor_id
+        ? `agri:${defaultValues.acopiador_agricultor_id}`
+        : defaultValues?.acopiador_id
+        ? `aco:${defaultValues.acopiador_id}`
+        : '',
+      producto_id: defaultValues?.producto_id ?? '',
+      centro_acopio_id: defaultValues?.centro_acopio_id ?? '',
+      fecha_ingreso: fechaIngreso,
+      fecha_cosecha: defaultValues?.fecha_cosecha ?? fechaIngreso,
+      peso_tara_kg: defaultValues?.peso_tara_kg,
+      peso_neto_kg: defaultValues?.peso_neto_kg ?? 0,
+      num_cubetas: defaultValues?.num_cubetas,
+      jabas_prestadas: defaultValues?.jabas_prestadas,
+      ...defaultValues,
+      observaciones: defaultValues?.observaciones ?? '',
+    }
+  }, [defaultValues])
 
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<LoteFormInput>({
     resolver: zodResolver(loteSchema) as any,
@@ -87,6 +92,10 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <FormField label="Fecha de ingreso" error={errors.fecha_ingreso?.message} required>
           <Input type="date" {...register('fecha_ingreso')} />
+        </FormField>
+
+        <FormField label="Fecha de cosecha" error={errors.fecha_cosecha?.message} required>
+          <Input type="date" {...register('fecha_cosecha')} />
         </FormField>
 
         <FormField label="Código de lote por agricultor" error={errors.codigo_lote_agricultor?.message}>

@@ -104,6 +104,7 @@ export interface Lote extends BaseEntity {
   producto_id: UUID
   centro_acopio_id: UUID
   fecha_ingreso: string           // ISO date
+  fecha_cosecha: string           // ISO date
   peso_bruto_kg: number
   peso_tara_kg: number
   peso_neto_kg: number
@@ -185,7 +186,6 @@ export interface Despacho extends BaseEntity {
   peso_neto_kg: number
   precio_venta_kg: number
   observaciones: string | null
-  numero_senasa: string | null
   // relaciones
   lote?: Lote
 }

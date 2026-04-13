@@ -11,6 +11,14 @@ function escapeHtml(value: string) {
     .replaceAll("'", '&#39;')
 }
 
+function getJulianDay(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return '001'
+  const start = new Date(d.getFullYear(), 0, 0)
+  const day = Math.floor((d.getTime() - start.getTime()) / 86_400_000)
+  return String(day).padStart(3, '0')
+}
+
 function getAcopiadorLabel(lote: Lote) {
   if (lote.acopiador) return `${lote.acopiador.apellido}, ${lote.acopiador.nombre}`
   if (lote.acopiador_agricultor) return `${lote.acopiador_agricultor.apellido}, ${lote.acopiador_agricultor.nombre}`
@@ -25,6 +33,7 @@ export function printLoteTicket(lote: Lote) {
   const calidad = lote.producto ? CALIDAD_PRODUCTO_CONFIG[lote.producto.calidad].label : '-'
   const tipo = lote.producto ? TIPO_PRODUCCION_CONFIG[lote.producto.tipo_produccion].label : '-'
   const centroAcopio = lote.centro_acopio?.nombre ?? '-'
+  const julianoCosecha = getJulianDay(lote.fecha_cosecha)
 
   const printWindow = window.open('', '_blank', 'width=420,height=720')
   if (!printWindow) return
@@ -105,6 +114,17 @@ export function printLoteTicket(lote: Lote) {
             <div>
               <div class="metric-label">Fecha</div>
               <div class="metric-value">${escapeHtml(formatFecha(lote.fecha_ingreso))}</div>
+            </div>
+          </div>
+
+          <div class="grid2">
+            <div>
+              <div class="metric-label">Fecha de cosecha</div>
+              <div class="metric-value">${escapeHtml(formatFecha(lote.fecha_cosecha))}</div>
+            </div>
+            <div>
+              <div class="metric-label">Juliano de cosecha</div>
+              <div class="metric-value">${escapeHtml(julianoCosecha)}</div>
             </div>
           </div>
 

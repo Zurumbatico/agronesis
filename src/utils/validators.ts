@@ -119,6 +119,7 @@ export const loteSchema = z.object({
   producto_id:        z.string().uuid('Seleccione un producto'),
   centro_acopio_id:   z.string().uuid('Seleccione un centro de acopio'),
   fecha_ingreso:    z.string().min(1, 'Ingrese la fecha de ingreso'),
+  fecha_cosecha:    z.string().min(1, 'Ingrese la fecha de cosecha'),
   peso_bruto_kg:    pesoKgSchema,
   peso_tara_kg:     z
     .number({ message: 'Ingrese un número válido' })
@@ -186,7 +187,6 @@ export const despachoSchema = z.object({
     z.number().nonnegative('El precio no puede ser negativo').max(1000, 'Precio fuera de rango').default(0)
   ),
   observaciones:        observacionesSchema,
-  numero_senasa:        z.preprocess(nullableUpperTrim, z.string().max(60, 'Máximo 60 carácteres').nullable()),
 })
 
 export const movimientoCubetaSchema = z.object({

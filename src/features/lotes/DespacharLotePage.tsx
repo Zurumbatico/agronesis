@@ -225,10 +225,6 @@ export default function DespacharLotePage() {
               <Textarea rows={2} {...register('observaciones')} />
             </FormField>
 
-            <FormField label="N° MIDAGRI-SENASA" error={errors.numero_senasa?.message}>
-              <Input placeholder="Ej: 000299-MIDAGRI-SENASA-ANCASH" maxLength={60} {...register('numero_senasa')} />
-            </FormField>
-
             {errorCajas && <p className="text-sm text-destructive">{errorCajas}</p>}
 
             <Button type="submit" loading={isSubmitting} className="w-full sm:w-auto sm:self-end">

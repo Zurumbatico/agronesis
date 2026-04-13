@@ -390,6 +390,7 @@ create table if not exists public.lotes (
   producto_id uuid not null references public.productos(id) on delete restrict,
   centro_acopio_id uuid not null references public.centros_acopio(id) on delete restrict,
   fecha_ingreso date not null,
+  fecha_cosecha date not null default current_date,
   peso_bruto_kg numeric(12,2) not null,
   peso_tara_kg numeric(12,2) not null default 0 check (peso_tara_kg >= 0),
   peso_neto_kg numeric(12,2) not null default 0 check (peso_neto_kg >= 0),
@@ -439,6 +440,12 @@ begin
 end;
 $$;
 alter table public.lotes add column if not exists codigo_lote_agricultor text null;
+alter table public.lotes add column if not exists fecha_cosecha date;
+update public.lotes
+set fecha_cosecha = coalesce(fecha_cosecha, fecha_ingreso)
+where fecha_cosecha is null;
+alter table public.lotes alter column fecha_cosecha set default current_date;
+alter table public.lotes alter column fecha_cosecha set not null;
 alter table public.lotes add column if not exists peso_tara_kg numeric(12,2) not null default 0;
 alter table public.lotes add column if not exists peso_neto_kg numeric(12,2);
 update public.lotes
@@ -460,7 +467,7 @@ begin
   end if;
 end;
 $$;
-alter table public.despachos add column if not exists numero_senasa text null;
+alter table public.despachos drop column if exists numero_senasa;
 alter table public.agricultores add column if not exists ggn text null;
 
 create table if not exists public.clasificaciones (
@@ -488,8 +495,7 @@ create table if not exists public.despachos (
   num_cajas_despachadas integer not null default 0,
   peso_neto_kg numeric(12,2) not null,
   precio_venta_kg numeric(12,2) not null,
-  observaciones text null,
-  numero_senasa text null
+  observaciones text null
 );
 
 create table if not exists public.liquidaciones_agri (

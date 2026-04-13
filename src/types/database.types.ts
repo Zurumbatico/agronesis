@@ -138,6 +138,7 @@ export interface Database {
           producto_id: string
           centro_acopio_id: string
           fecha_ingreso: string
+          fecha_cosecha: string
           peso_bruto_kg: number
           peso_tara_kg: number
           peso_neto_kg: number
@@ -230,7 +231,6 @@ export interface Database {
           peso_neto_kg: number
           precio_venta_kg: number
           observaciones: string | null
-          numero_senasa: string | null
         }
         Insert: Omit<Database['public']['Tables']['despachos']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['despachos']['Insert']>
