@@ -23,11 +23,21 @@ import {
   TIPO_PRODUCCION_CONFIG,
 } from '@/constants'
 import { formatFecha, formatPeso, formatMoneda } from '@/utils/formatters'
-import { calcularPagoSeleccionador } from '@/utils/business-rules'
+import { calcularPagoSeleccionador, calcularPesoPorJaba } from '@/utils/business-rules'
 import type { Lote, Clasificacion, Despacho, TareoHidroculizado } from '@/types/models'
 
 type CuadroLocal = {
-  filas: Array<{ colaborador_id: string; kg_cat1?: string; kg_cat2?: string; peso_bueno_kg?: string }>
+  filas: Array<{
+    colaborador_id: string
+    kg_cat1?: string
+    kg_cat2?: string
+    peso_bueno_kg?: string
+    kg_bruto?: string
+    kg_exportable?: string
+    jabas_descartadas?: string
+    kg_bruto_descartable?: string
+    kg_neto_descartable?: string
+  }>
 }
 
 const getMesasStorageKey = (loteId: string) => `clasificacion-cuadros-${loteId}`
@@ -85,12 +95,13 @@ export default function LoteDetallePage() {
     : lote.acopiador_agricultor
       ? `${lote.acopiador_agricultor.apellido}, ${lote.acopiador_agricultor.nombre}`
       : '-'
+  const pesoPorJaba = calcularPesoPorJaba(lote.peso_neto_kg, lote.num_cubetas)
 
   return (
     <div className="max-w-5xl mx-auto">
       <PageHeader
         title={`Lote ${lote.codigo}`}
-        description={`${lote.centro_acopio?.nombre ?? '-'} · ${formatFecha(lote.fecha_ingreso)}${lote.codigo_lote_agricultor ? ` · Cod. agricultor: ${lote.codigo_lote_agricultor}` : ''} · N° JABAS INGRESADAS: ${lote.num_cubetas}${lote.jabas_prestadas > 0 ? ` · Jabas prestadas: ${lote.jabas_prestadas}` : ''} · Bruto: ${formatPeso(lote.peso_bruto_kg)} · Tara: ${formatPeso(lote.peso_tara_kg)} · Neto: ${formatPeso(lote.peso_neto_kg)}`}
+        description={`${lote.centro_acopio?.nombre ?? '-'} · ${formatFecha(lote.fecha_ingreso)}${lote.codigo_lote_agricultor ? ` · Cod. agricultor: ${lote.codigo_lote_agricultor}` : ''} · N° JABAS INGRESADAS: ${lote.num_cubetas}${lote.jabas_prestadas > 0 ? ` · Jabas prestadas: ${lote.jabas_prestadas}` : ''} · Bruto: ${formatPeso(lote.peso_bruto_kg)} · Tara: ${formatPeso(lote.peso_tara_kg)} · Neto: ${formatPeso(lote.peso_neto_kg)} · Peso/jaba: ${formatPeso(pesoPorJaba)}`}
         backHref={ROUTES.LOTES}
         actions={
           <div className="flex gap-2">
@@ -219,20 +230,35 @@ export default function LoteDetallePage() {
                   </div>
                 </section>
 
-                <section className="rounded-lg border bg-muted/20 p-3 space-y-2">
-                  <p className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Pesos</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-md bg-background p-2 border">
-                      <p className="text-[11px] text-muted-foreground">Bruto</p>
-                      <p className="font-semibold">{formatPeso(lote.peso_bruto_kg)}</p>
+                <section className="md:col-span-2 rounded-xl border bg-card p-5 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase">Pesos del lote</p>
+                    <span className="rounded-full bg-primary/10 text-primary px-3 py-0.5 text-[11px] font-semibold whitespace-nowrap">
+                      {lote.num_cubetas} jabas
+                    </span>
+                  </div>
+
+                  {/* Fila principal: Neto + Peso por jaba */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl bg-primary px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-foreground/70">Neto</p>
+                      <p className="mt-1 text-3xl font-extrabold leading-tight text-primary-foreground tracking-tight">{formatPeso(lote.peso_neto_kg)}</p>
                     </div>
-                    <div className="rounded-md bg-background p-2 border">
-                      <p className="text-[11px] text-muted-foreground">Tara</p>
-                      <p className="font-semibold">{formatPeso(lote.peso_tara_kg)}</p>
+                    <div className="rounded-xl border-2 border-primary/20 bg-primary/5 px-4 py-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Peso por jaba</p>
+                      <p className="mt-1 text-3xl font-extrabold leading-tight text-foreground tracking-tight">{formatPeso(pesoPorJaba)}</p>
                     </div>
-                    <div className="rounded-md bg-background p-2 border">
-                      <p className="text-[11px] text-muted-foreground">Neto</p>
-                      <p className="font-semibold text-primary">{formatPeso(lote.peso_neto_kg)}</p>
+                  </div>
+
+                  {/* Fila secundaria: Bruto + Tara */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border bg-muted/30 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Bruto</p>
+                      <p className="mt-1 text-lg font-bold text-foreground">{formatPeso(lote.peso_bruto_kg)}</p>
+                    </div>
+                    <div className="rounded-lg border bg-muted/30 px-4 py-3">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tara × jaba</p>
+                      <p className="mt-1 text-lg font-bold text-foreground">{formatPeso(lote.peso_tara_kg)}</p>
                     </div>
                   </div>
                 </section>
@@ -253,6 +279,10 @@ export default function LoteDetallePage() {
             const aportes = sesion.aportes ?? []
             const aportesPorColaborador = new Map(aportes.map((a) => [a.colaborador_id, a]))
             const calidad = lote.producto?.calidad ?? 'cat1'
+            const totalBrutoClasif = aportes.reduce((s, a) => s + (a.kg_bruto ?? 0), 0)
+            const totalJabasDesc = aportes.reduce((s, a) => s + (a.jabas_descartadas ?? 0), 0)
+            const totalBrutoDesc = aportes.reduce((s, a) => s + (a.kg_bruto_descartable ?? 0), 0)
+            const totalNetoDesc = aportes.reduce((s, a) => s + (a.kg_neto_descartable ?? 0), 0)
             const aportesAgrupadosPorMesa = (cuadrosLocales ?? [])
               .map((cuadro, index) => ({
                 index,
@@ -262,40 +292,62 @@ export default function LoteDetallePage() {
               }))
               .filter((mesa) => mesa.aportes.length > 0)
 
+            const renderAporteRow = (a: NonNullable<(typeof aportes)[0]>) => (
+              <div key={a.id} className="text-sm border rounded-lg px-3 py-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    {a.colaborador
+                      ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
+                      : a.colaborador_id}
+                  </span>
+                  <span className="text-xs text-primary font-medium">{formatMoneda(calcularPagoSeleccionador(a.peso_bueno_kg, calidad))}</span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <div><span className="block text-[10px]">Kg bruto</span><span className="font-medium text-foreground">{formatPeso(a.kg_bruto ?? 0)}</span></div>
+                  <div><span className="block text-[10px]">Exportables</span><span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span></div>
+                  <div><span className="block text-[10px]">Jabas desc.</span><span className="font-medium text-foreground">{a.jabas_descartadas ?? 0}</span></div>
+                  <div><span className="block text-[10px]">Kg bruto desc.</span><span className="font-medium text-foreground">{formatPeso(a.kg_bruto_descartable ?? 0)}</span></div>
+                  <div><span className="block text-[10px]">Kg neto desc.</span><span className="font-medium text-foreground">{formatPeso(a.kg_neto_descartable ?? 0)}</span></div>
+                </div>
+              </div>
+            )
+
             return (
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base">Clasificación</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3 text-sm">
                     <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
-                      <p className="text-xs text-green-700 mb-0.5">Buenos</p>
+                      <p className="text-xs text-green-700 mb-0.5">Exportables</p>
                       <p className="font-bold text-lg text-green-700">{formatPeso(sesion.peso_bueno_kg)}</p>
                     </div>
                     <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
                       <p className="text-xs text-red-700 mb-0.5">Malos / descarte</p>
                       <p className="font-bold text-lg text-red-700">{formatPeso(totalesMalos)}</p>
                     </div>
+                    <div className="rounded-lg bg-muted/30 border p-3 text-center">
+                      <p className="text-xs text-muted-foreground mb-0.5">Kg bruto total</p>
+                      <p className="font-bold text-lg">{formatPeso(totalBrutoClasif)}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/30 border p-3 text-center">
+                      <p className="text-xs text-muted-foreground mb-0.5">Jabas descartadas</p>
+                      <p className="font-bold text-lg">{totalJabasDesc}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/30 border p-3 text-center">
+                      <p className="text-xs text-muted-foreground mb-0.5">Kg bruto descartable</p>
+                      <p className="font-bold text-lg">{formatPeso(totalBrutoDesc)}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/30 border p-3 text-center">
+                      <p className="text-xs text-muted-foreground mb-0.5">Kg neto descartable</p>
+                      <p className="font-bold text-lg">{formatPeso(totalNetoDesc)}</p>
+                    </div>
                   </div>
                   {aportes.length > 0 && aportesAgrupadosPorMesa.length === 0 && (
                     <div className="flex flex-col gap-1.5">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Por seleccionador</p>
-                      {aportes.map((a) => (
-                        <div key={a.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                          <div className="flex flex-col">
-                            <span className="text-muted-foreground">
-                              {a.colaborador
-                                ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
-                                : a.colaborador_id}
-                            </span>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span>
-                            <span className="text-xs text-sky-700">{formatMoneda(calcularPagoSeleccionador(a.peso_bueno_kg, calidad))}</span>
-                          </div>
-                        </div>
-                      ))}
+                      {aportes.map(renderAporteRow)}
                     </div>
                   )}
                   {aportesAgrupadosPorMesa.length > 0 && (
@@ -304,21 +356,7 @@ export default function LoteDetallePage() {
                       {aportesAgrupadosPorMesa.map((mesa) => (
                         <div key={mesa.index} className="flex flex-col gap-1.5">
                           <p className="text-xs text-muted-foreground">Mesa {mesa.index + 1}</p>
-                          {mesa.aportes.map((a) => (
-                            <div key={a.id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                              <div className="flex flex-col">
-                                <span className="text-muted-foreground">
-                                  {a.colaborador
-                                    ? `${a.colaborador.apellido}, ${a.colaborador.nombre}`
-                                    : a.colaborador_id}
-                                </span>
-                              </div>
-                              <div className="flex flex-col items-end">
-                                <span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span>
-                                <span className="text-xs text-sky-700">{formatMoneda(calcularPagoSeleccionador(a.peso_bueno_kg, calidad))}</span>
-                              </div>
-                            </div>
-                          ))}
+                          {mesa.aportes.map(renderAporteRow)}
                         </div>
                       ))}
                     </div>

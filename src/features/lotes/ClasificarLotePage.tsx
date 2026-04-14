@@ -19,7 +19,15 @@ import { Plus, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Lote, Colaborador } from '@/types/models'
 
-type Fila = { key: string; colaborador_id: string; kg_bueno: string }
+type Fila = {
+  key: string
+  colaborador_id: string
+  kg_bruto: string
+  kg_exportable: string
+  jabas_descartadas: string
+  kg_bruto_descartable: string
+  kg_neto_descartable: string
+}
 type MesaBloque = { key: string; filas: Fila[] }
 
 const getMesasStorageKey = (loteId: string) => `clasificacion-cuadros-${loteId}`
@@ -33,7 +41,11 @@ export default function ClasificarLotePage() {
   const crearFila = (suffix: string): Fila => ({
     key: `${uid}-f-${suffix}`,
     colaborador_id: '',
-    kg_bueno: '',
+    kg_bruto: '',
+    kg_exportable: '',
+    jabas_descartadas: '',
+    kg_bruto_descartable: '',
+    kg_neto_descartable: '',
   })
 
   const crearMesa = (suffix: string, conFilaInicial = true): MesaBloque => ({
@@ -56,11 +68,15 @@ export default function ClasificarLotePage() {
 
   const todasFilas = mesas.flatMap((m) => m.filas)
   const calidad = lote?.producto?.calidad ?? 'cat1'
-  const totalBuenos = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_bueno) || 0), 0)
+  const totalExportables = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_exportable) || 0), 0)
+  const totalBruto = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_bruto) || 0), 0)
+  const totalJabasDescartadas = todasFilas.reduce((acc, f) => acc + (parseInt(f.jabas_descartadas) || 0), 0)
+  const totalBrutoDescartable = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_bruto_descartable) || 0), 0)
+  const totalNetoDescartable = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_neto_descartable) || 0), 0)
   const totalPagoSeleccionadores = todasFilas.reduce((acc, f) =>
-    acc + calcularPagoSeleccionador(parseFloat(f.kg_bueno) || 0, calidad), 0)
-  const totalMalos = Math.max(0, (lote?.peso_neto_kg ?? 0) - totalBuenos)
-  const porcentajeBuenos = lote ? Math.min(100, (totalBuenos / lote.peso_neto_kg) * 100) : 0
+    acc + calcularPagoSeleccionador(parseFloat(f.kg_exportable) || 0, calidad), 0)
+  const totalMalos = Math.max(0, (lote?.peso_neto_kg ?? 0) - totalExportables)
+  const porcentajeBuenos = lote ? Math.min(100, (totalExportables / lote.peso_neto_kg) * 100) : 0
 
   const cargar = async () => {
     if (!id) return
@@ -82,7 +98,11 @@ export default function ClasificarLotePage() {
         const aportesCargados = (sesion.aportes ?? []).map((a, i) => ({
           key: `${uid}-loaded-${i}`,
           colaborador_id: a.colaborador_id,
-          kg_bueno: String(a.peso_bueno_kg),
+          kg_bruto: String(a.kg_bruto ?? 0),
+          kg_exportable: String(a.peso_bueno_kg),
+          jabas_descartadas: String(a.jabas_descartadas ?? 0),
+          kg_bruto_descartable: String(a.kg_bruto_descartable ?? 0),
+          kg_neto_descartable: String(a.kg_neto_descartable ?? 0),
         }))
 
         if (aportesCargados.length > 0) {
@@ -93,7 +113,16 @@ export default function ClasificarLotePage() {
         try {
           const raw = localStorage.getItem(getMesasStorageKey(id))
           if (raw) {
-            const parsed = JSON.parse(raw) as Array<{ filas: Array<{ colaborador_id: string; kg_bueno?: string; peso_bueno_kg?: string }> }>
+            const parsed = JSON.parse(raw) as Array<{ filas: Array<{
+              colaborador_id: string
+              kg_bruto?: string
+              kg_exportable?: string
+              kg_bueno?: string
+              peso_bueno_kg?: string
+              jabas_descartadas?: string
+              kg_bruto_descartable?: string
+              kg_neto_descartable?: string
+            }> }>
             if (Array.isArray(parsed) && parsed.length > 0) {
               const mesasDesdeLocal: MesaBloque[] = parsed
                 .map((m, i) => ({
@@ -102,7 +131,11 @@ export default function ClasificarLotePage() {
                     ? m.filas.map((f, j) => ({
                         key: `${uid}-fila-local-${i}-${j}`,
                         colaborador_id: f.colaborador_id ?? '',
-                        kg_bueno: String(f.kg_bueno ?? f.peso_bueno_kg ?? ''),
+                        kg_bruto: String(f.kg_bruto ?? ''),
+                        kg_exportable: String(f.kg_exportable ?? f.kg_bueno ?? f.peso_bueno_kg ?? ''),
+                        jabas_descartadas: String(f.jabas_descartadas ?? ''),
+                        kg_bruto_descartable: String(f.kg_bruto_descartable ?? ''),
+                        kg_neto_descartable: String(f.kg_neto_descartable ?? ''),
                       }))
                     : [],
                 }))
@@ -198,14 +231,24 @@ export default function ClasificarLotePage() {
     const filasActuales = mesas.flatMap((m) => m.filas)
 
     const hayFilaIncompleta = filasActuales.some((f) => {
-      const bueno = parseFloat(f.kg_bueno)
-      return !f.colaborador_id || f.kg_bueno.trim() === '' || Number.isNaN(bueno) || bueno < 0
+      const exportable = parseFloat(f.kg_exportable)
+      const bruto = parseFloat(f.kg_bruto)
+      return !f.colaborador_id
+        || f.kg_exportable.trim() === '' || Number.isNaN(exportable) || exportable < 0
+        || f.kg_bruto.trim() === '' || Number.isNaN(bruto) || bruto < 0
     })
 
     const neto = lote.peso_neto_kg
-    const hayFilaMayorAlNeto = filasActuales.some((f) => {
-      const peso = parseFloat(f.kg_bueno) || 0
-      return !Number.isNaN(peso) && peso > neto
+
+    const hayExportableMayorQueBruto = filasActuales.some((f) => {
+      const exportable = parseFloat(f.kg_exportable) || 0
+      const bruto = parseFloat(f.kg_bruto) || 0
+      return exportable > bruto
+    })
+
+    const hayBrutoMayorQueNeto = filasActuales.some((f) => {
+      const bruto = parseFloat(f.kg_bruto) || 0
+      return bruto > neto
     })
 
     if (mesas.length === 0) {
@@ -219,23 +262,32 @@ export default function ClasificarLotePage() {
     }
 
     if (hayFilaIncompleta) {
-      notifyFormError('Complete todos los trabajadores: seleccionador y kg buenos (0 o mayor).')
+      notifyFormError('Complete todos los trabajadores: seleccionador, kg bruto y kg exportables (0 o mayor).')
       return
     }
 
-    if (hayFilaMayorAlNeto) {
-      notifyFormError(`Un valor de kg buenos no puede ser mayor al neto ingresado (${formatPeso(neto)}).`)
+    if (hayBrutoMayorQueNeto) {
+      notifyFormError(`El kg bruto de un trabajador no puede ser mayor al neto del lote (${formatPeso(neto)}).`)
+      return
+    }
+
+    if (hayExportableMayorQueBruto) {
+      notifyFormError('Los kg exportables no pueden ser mayores que los kg bruto del mismo trabajador.')
       return
     }
 
     const filasValidas = filasActuales.map((f) => ({
       colaborador_id: f.colaborador_id,
-      kg_bueno: parseFloat(f.kg_bueno) || 0,
+      kg_bueno: parseFloat(f.kg_exportable) || 0,
+      kg_bruto: parseFloat(f.kg_bruto) || 0,
+      jabas_descartadas: parseInt(f.jabas_descartadas) || 0,
+      kg_bruto_descartable: parseFloat(f.kg_bruto_descartable) || 0,
+      kg_neto_descartable: parseFloat(f.kg_neto_descartable) || 0,
     }))
 
     const totalBuenosCalculado = filasValidas.reduce((acc, f) => acc + f.kg_bueno, 0)
     if (totalBuenosCalculado > neto) {
-      notifyFormError(`La suma de kg buenos (${formatPeso(totalBuenosCalculado)}) no puede ser mayor al neto (${formatPeso(neto)}).`)
+      notifyFormError(`La suma de kg exportables (${formatPeso(totalBuenosCalculado)}) no puede ser mayor al neto (${formatPeso(neto)}).`)
       return
     }
 
@@ -258,7 +310,11 @@ export default function ClasificarLotePage() {
               mesas.map((m) => ({
                 filas: m.filas.map((f) => ({
                   colaborador_id: f.colaborador_id,
-                  kg_bueno: f.kg_bueno,
+                  kg_bruto: f.kg_bruto,
+                  kg_exportable: f.kg_exportable,
+                  jabas_descartadas: f.jabas_descartadas,
+                  kg_bruto_descartable: f.kg_bruto_descartable,
+                  kg_neto_descartable: f.kg_neto_descartable,
                 })),
               }))
             )
@@ -292,7 +348,7 @@ export default function ClasificarLotePage() {
   const colaboradoresSeleccionados = new Set(mesas.flatMap((m) => m.filas.map((f) => f.colaborador_id)).filter(Boolean))
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       <ToastContainer toasts={toasts} onRemove={remove} />
 
       <PageHeader
@@ -312,18 +368,34 @@ export default function ClasificarLotePage() {
       {/* Resumen de pesos – se actualiza en tiempo real */}
       <Card className="mb-4">
         <CardContent className="pt-4">
-          <div className="grid grid-cols-3 gap-3 text-sm mb-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm mb-3">
             <div className="rounded-lg bg-muted/30 border p-3 text-center">
               <p className="text-xs text-muted-foreground mb-0.5">Neto ingresado</p>
               <p className="font-bold text-base">{formatPeso(lote.peso_neto_kg)}</p>
             </div>
             <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
-              <p className="text-xs text-green-700 mb-0.5">Buenos</p>
-              <p className="font-bold text-base text-green-700">{formatPeso(totalBuenos)}</p>
+              <p className="text-xs text-green-700 mb-0.5">Exportables</p>
+              <p className="font-bold text-base text-green-700">{formatPeso(totalExportables)}</p>
             </div>
             <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
               <p className="text-xs text-red-700 mb-0.5">Pendiente / malos</p>
               <p className="font-bold text-base text-red-700">{formatPeso(totalMalos)}</p>
+            </div>
+            <div className="rounded-lg bg-muted/30 border p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-0.5">Kg bruto total</p>
+              <p className="font-bold text-base">{formatPeso(totalBruto)}</p>
+            </div>
+            <div className="rounded-lg bg-muted/30 border p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-0.5">Jabas descartadas</p>
+              <p className="font-bold text-base">{totalJabasDescartadas}</p>
+            </div>
+            <div className="rounded-lg bg-muted/30 border p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-0.5">Kg bruto descartable</p>
+              <p className="font-bold text-base">{formatPeso(totalBrutoDescartable)}</p>
+            </div>
+            <div className="rounded-lg bg-muted/30 border p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-0.5">Kg neto descartable</p>
+              <p className="font-bold text-base">{formatPeso(totalNetoDescartable)}</p>
             </div>
           </div>
           {/* Barra de progreso de lo clasificado como bueno */}
@@ -382,42 +454,90 @@ export default function ClasificarLotePage() {
               )}
 
               {mesa.filas.map((fila, idx) => {
-                const pagoFila = calcularPagoSeleccionador(parseFloat(fila.kg_bueno) || 0, lote.producto?.calidad ?? 'cat1')
+                const pagoFila = calcularPagoSeleccionador(parseFloat(fila.kg_exportable) || 0, lote.producto?.calidad ?? 'cat1')
                 return (
-                <div key={fila.key} className="flex items-end gap-2">
-                  <span className="text-xs text-muted-foreground w-5 text-right mb-2">{idx + 1}.</span>
-                  <div className="flex-1">
-                    <ColaboradorPicker
-                      value={fila.colaborador_id}
-                      onChange={(v) => actualizarFilaEnMesa(mesa.key, fila.key, 'colaborador_id', v)}
-                      colaboradores={seleccionadores}
-                      disabledIds={colaboradoresSeleccionados}
-                    />
+                <div key={fila.key} className="space-y-2 border rounded-lg p-3">
+                  <div className="flex items-end gap-2">
+                    <span className="text-xs text-muted-foreground w-5 text-right mb-2">{idx + 1}.</span>
+                    <div className="flex-1">
+                      <ColaboradorPicker
+                        value={fila.colaborador_id}
+                        onChange={(v) => actualizarFilaEnMesa(mesa.key, fila.key, 'colaborador_id', v)}
+                        colaboradores={seleccionadores}
+                        disabledIds={colaboradoresSeleccionados}
+                      />
+                    </div>
+                    <div className="w-20 text-right mb-1">
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Pago</p>
+                      <p className="text-sm font-semibold text-green-700">S/ {pagoFila.toFixed(2)}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive mb-1"
+                      onClick={() => eliminarFilaEnMesa(mesa.key, fila.key)}
+                      disabled={todasFilas.length <= 1}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <div className="w-28">
-                    <p className="text-[10px] text-muted-foreground mb-0.5">Kg buenos</p>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={fila.kg_bueno}
-                      onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_bueno', e.target.value)}
-                    />
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pl-7">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg bruto</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={fila.kg_bruto}
+                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_bruto', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg exportables</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={fila.kg_exportable}
+                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_exportable', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Jabas descart.</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                        value={fila.jabas_descartadas}
+                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'jabas_descartadas', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg bruto desc.</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={fila.kg_bruto_descartable}
+                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_bruto_descartable', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg neto desc.</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={fila.kg_neto_descartable}
+                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_neto_descartable', e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="w-20 text-right mb-1">
-                    <p className="text-[10px] text-muted-foreground mb-0.5">Pago</p>
-                    <p className="text-sm font-semibold text-green-700">S/ {pagoFila.toFixed(2)}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:text-destructive mb-1"
-                    onClick={() => eliminarFilaEnMesa(mesa.key, fila.key)}
-                    disabled={todasFilas.length <= 1}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
                 </div>
                 )
               })}
@@ -438,7 +558,7 @@ export default function ClasificarLotePage() {
         ))}
 
         <div className="flex justify-between pt-2 border-t text-sm">
-          <span className="font-semibold text-green-700">Total buenos: {formatPeso(totalBuenos)}</span>
+          <span className="font-semibold text-green-700">Total exportables: {formatPeso(totalExportables)}</span>
           <span className="text-muted-foreground">Pago est. seleccionadores: <strong className="text-green-700">S/ {totalPagoSeleccionadores.toFixed(2)}</strong></span>
         </div>
       </div>

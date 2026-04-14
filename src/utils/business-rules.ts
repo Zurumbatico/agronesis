@@ -19,6 +19,15 @@ export const PRECIO_SELECCION_CAT2 = 0.28
 export const PRECIO_EMPAQUE_CAJA = 0.32
 
 /**
+ * Calcula el peso neto promedio por jaba de un lote.
+ * Si no hay jabas registradas, retorna 0 para evitar divisiones inválidas.
+ */
+export function calcularPesoPorJaba(pesoNetoKg: number, numJabas: number): number {
+  if (!Number.isFinite(pesoNetoKg) || !Number.isFinite(numJabas) || numJabas <= 0) return 0
+  return Math.round((pesoNetoKg / numJabas) * 100) / 100
+}
+
+/**
  * Calcula el peso neto que corresponde al agricultor: descuenta 3% de Alan Melendrez.
  * Resultado redondeado a 2 decimales.
  */

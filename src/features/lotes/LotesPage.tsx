@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CALIDAD_PRODUCTO_CONFIG, ESTADO_LOTE_CONFIG, TIPO_PRODUCCION_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
 import { formatFecha, formatPeso } from '@/utils/formatters'
+import { calcularPesoPorJaba } from '@/utils/business-rules'
 import type { LoteFormData } from '@/utils/validators'
 import type { EstadoLote, Lote } from '@/types/models'
 
@@ -105,7 +106,7 @@ export default function LotesPage() {
                   {l.agricultor?.apellido}, {l.agricultor?.nombre} · {l.producto?.nombre}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {l.centro_acopio?.nombre} · Ingreso: {formatFecha(l.fecha_ingreso)} · Cosecha: {formatFecha(l.fecha_cosecha)} · N° JABAS: {l.num_cubetas} · Bruto: {formatPeso(l.peso_bruto_kg)} · Tara: {formatPeso(l.peso_tara_kg)} · Neto: {formatPeso(l.peso_neto_kg)}
+                  {l.centro_acopio?.nombre} · Ingreso: {formatFecha(l.fecha_ingreso)} · Cosecha: {formatFecha(l.fecha_cosecha)} · N° JABAS: {l.num_cubetas} · Bruto: {formatPeso(l.peso_bruto_kg)} · Tara: {formatPeso(l.peso_tara_kg)} · Neto: {formatPeso(l.peso_neto_kg)} · Peso/jaba: {formatPeso(calcularPesoPorJaba(l.peso_neto_kg, l.num_cubetas))}
                 </p>
               </div>
               <div className="flex gap-1.5 shrink-0">
@@ -171,7 +172,7 @@ export default function LotesPage() {
                     <p>-</p>
                   )}
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   <div>
                     <p className="text-xs text-muted-foreground">Bruto</p>
                     <p className="font-medium">{formatPeso(ticketLote.peso_bruto_kg)}</p>
@@ -183,6 +184,10 @@ export default function LotesPage() {
                   <div>
                     <p className="text-xs text-muted-foreground">Neto</p>
                     <p className="font-medium">{formatPeso(ticketLote.peso_neto_kg)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Peso por jaba</p>
+                    <p className="font-medium">{formatPeso(calcularPesoPorJaba(ticketLote.peso_neto_kg, ticketLote.num_cubetas))}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">

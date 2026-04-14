@@ -1,5 +1,6 @@
 import { CALIDAD_PRODUCTO_CONFIG, TIPO_PRODUCCION_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
 import { formatFecha, formatPeso } from '@/utils/formatters'
+import { calcularPesoPorJaba } from '@/utils/business-rules'
 import type { Lote } from '@/types/models'
 
 function escapeHtml(value: string) {
@@ -34,6 +35,7 @@ export function printLoteTicket(lote: Lote) {
   const tipo = lote.producto ? TIPO_PRODUCCION_CONFIG[lote.producto.tipo_produccion].label : '-'
   const centroAcopio = lote.centro_acopio?.nombre ?? '-'
   const julianoCosecha = getJulianDay(lote.fecha_cosecha)
+  const pesoPorJaba = calcularPesoPorJaba(lote.peso_neto_kg, lote.num_cubetas)
 
   const printWindow = window.open('', '_blank', 'width=420,height=720')
   if (!printWindow) return
@@ -91,7 +93,7 @@ export function printLoteTicket(lote: Lote) {
             <div class="row"><span class="label">Tipo</span><span class="value">${escapeHtml(tipo)}</span></div>
           </section>
 
-          <div class="grid3">
+          <div class="grid4">
             <div>
               <div class="metric-label">Bruto</div>
               <div class="metric-value">${escapeHtml(formatPeso(lote.peso_bruto_kg))}</div>
@@ -103,6 +105,10 @@ export function printLoteTicket(lote: Lote) {
             <div>
               <div class="metric-label">Neto</div>
               <div class="metric-value">${escapeHtml(formatPeso(lote.peso_neto_kg))}</div>
+            </div>
+            <div>
+              <div class="metric-label">Peso por jaba</div>
+              <div class="metric-value">${escapeHtml(formatPeso(pesoPorJaba))}</div>
             </div>
           </div>
 
@@ -221,7 +227,13 @@ export function printLoteTicket(lote: Lote) {
             gap: 2mm;
             margin-top: 2mm;
           }
-          .grid3 > div, .grid2 > div {
+          .grid4 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2mm;
+            margin-top: 2mm;
+          }
+          .grid4 > div, .grid3 > div, .grid2 > div {
             border-top: 1px dashed #999;
             padding-top: 1.5mm;
           }

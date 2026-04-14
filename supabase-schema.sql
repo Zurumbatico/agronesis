@@ -857,6 +857,12 @@ create policy config_precios_authenticated_all on public.config_precios for all 
 alter table public.clasificacion_aportes add column if not exists kg_cat1 numeric(12,2) not null default 0 check (kg_cat1 >= 0);
 alter table public.clasificacion_aportes add column if not exists kg_cat2 numeric(12,2) not null default 0 check (kg_cat2 >= 0);
 
+-- Campos ampliados de clasificación por trabajador
+alter table public.clasificacion_aportes add column if not exists kg_bruto numeric(12,2) not null default 0 check (kg_bruto >= 0);
+alter table public.clasificacion_aportes add column if not exists jabas_descartadas integer not null default 0 check (jabas_descartadas >= 0);
+alter table public.clasificacion_aportes add column if not exists kg_bruto_descartable numeric(12,2) not null default 0 check (kg_bruto_descartable >= 0);
+alter table public.clasificacion_aportes add column if not exists kg_neto_descartable numeric(12,2) not null default 0 check (kg_neto_descartable >= 0);
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- PLANILLA_DETALLES — desglose de pago por selección (Tareo A)
 -- ─────────────────────────────────────────────────────────────────────────────

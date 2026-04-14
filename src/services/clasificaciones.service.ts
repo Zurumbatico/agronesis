@@ -29,7 +29,14 @@ export async function guardarClasificacion(
   loteId: string,
   fecha: string,
   observaciones: string | null,
-  aportes: Array<{ colaborador_id: string; kg_bueno: number }>,
+  aportes: Array<{
+    colaborador_id: string
+    kg_bueno: number
+    kg_bruto: number
+    jabas_descartadas: number
+    kg_bruto_descartable: number
+    kg_neto_descartable: number
+  }>,
   calidad: 'cat1' | 'cat2',
   userId: string
 ): Promise<Clasificacion> {
@@ -87,6 +94,10 @@ export async function guardarClasificacion(
       peso_bueno_kg: a.kg_bueno,
       kg_cat1: calidad === 'cat1' ? a.kg_bueno : 0,
       kg_cat2: calidad === 'cat2' ? a.kg_bueno : 0,
+      kg_bruto: a.kg_bruto,
+      jabas_descartadas: a.jabas_descartadas,
+      kg_bruto_descartable: a.kg_bruto_descartable,
+      kg_neto_descartable: a.kg_neto_descartable,
       created_by: userId,
     }))
     const { error: errInsAportes } = await supabase.from(TABLE_APORTES).insert(rowsAportes)

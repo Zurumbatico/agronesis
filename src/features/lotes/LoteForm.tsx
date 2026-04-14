@@ -13,6 +13,7 @@ import { useAgricultores } from '@/features/agricultores/hooks/useAgricultores'
 import { useAcopiadores } from '@/features/acopiadores/hooks/useAcopiadores'
 import { useProductos } from '@/features/productos/hooks/useProductos'
 import { useCentrosAcopio } from '@/features/centros-acopio/hooks/useCentrosAcopio'
+import { calcularPesoPorJaba } from '@/utils/business-rules'
 import { format } from 'date-fns'
 
 type LoteFormInput = z.input<typeof loteSchema>
@@ -66,6 +67,11 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
   const pesoBruto = watch('peso_bruto_kg')
   const pesoTara = watch('peso_tara_kg')
   const numCubetas = watch('num_cubetas')
+  const pesoNeto = watch('peso_neto_kg')
+  const pesoPorJaba = calcularPesoPorJaba(
+    Number.isFinite(pesoNeto) ? Number(pesoNeto) : 0,
+    Number.isFinite(numCubetas) ? Number(numCubetas) : 0,
+  )
 
   useEffect(() => {
     const bruto = Number.isFinite(pesoBruto) ? Number(pesoBruto) : 0
@@ -206,6 +212,17 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
             {...register('num_cubetas', {
               setValueAs: (value) => value === '' ? 0 : Number(value),
             })}
+          />
+        </FormField>
+
+        <FormField label="Peso por jaba (kg)">
+          <Input
+            type="number"
+            step="0.01"
+            value={pesoPorJaba.toFixed(2)}
+            readOnly
+            aria-disabled="true"
+            className="cursor-not-allowed border-dashed bg-muted text-foreground"
           />
         </FormField>
 

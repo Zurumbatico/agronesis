@@ -152,6 +152,10 @@ export interface ClasificacionAporte extends BaseEntity {
   peso_bueno_kg: number
   kg_cat1: number
   kg_cat2: number
+  kg_bruto: number
+  jabas_descartadas: number
+  kg_bruto_descartable: number
+  kg_neto_descartable: number
   // relaciones
   colaborador?: Colaborador
 }

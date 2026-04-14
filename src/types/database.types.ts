@@ -184,6 +184,10 @@ export interface Database {
           peso_bueno_kg: number
           kg_cat1: number
           kg_cat2: number
+          kg_bruto: number
+          jabas_descartadas: number
+          kg_bruto_descartable: number
+          kg_neto_descartable: number
         }
         Insert: {
           created_by: string
@@ -192,6 +196,10 @@ export interface Database {
           peso_bueno_kg: number
           kg_cat1?: number
           kg_cat2?: number
+          kg_bruto?: number
+          jabas_descartadas?: number
+          kg_bruto_descartable?: number
+          kg_neto_descartable?: number
         }
         Update: Partial<Database['public']['Tables']['clasificacion_aportes']['Insert']>
         Relationships: []
