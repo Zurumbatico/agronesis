@@ -186,19 +186,25 @@ export const clasificacionSchema = z.object({
 })
 
 export const despachoSchema = z.object({
-  lote_id:              z.string().uuid(),
   fecha_despacho:       z.string().min(1, 'Ingrese la fecha'),
   destino:              z.enum(['exportacion', 'mercado_local', 'planta_proceso']),
   tipo_despacho:        z.enum(['maritima', 'aerea', 'terrestre']),
+  exportador:           z.preprocess(nullableUpperTrim, z.string().max(120).nullable()),
+  marca_caja:           z.preprocess(nullableUpperTrim, z.string().max(120).nullable()),
   transportista:        z.preprocess(nullableUpperTrim, z.string().max(100).nullable()),
   placa_vehiculo:       z.preprocess(nullableUpperTrim, z.string().max(20).nullable()),
+  pallet_keys:          z.array(z.string().min(1)).min(1, 'Seleccione al menos un pallet'),
   num_cajas_despachadas: cantidadEnteraSchema,
   peso_neto_kg:         pesoKgSchema,
-  precio_venta_kg:      z.preprocess(
-    (v) => (v === '' || v === null || v === undefined ? 0 : Number(v)),
-    z.number().nonnegative('El precio no puede ser negativo').max(1000, 'Precio fuera de rango').default(0)
-  ),
   observaciones:        observacionesSchema,
+}).superRefine((data, ctx) => {
+  if ((data.tipo_despacho === 'maritima' || data.tipo_despacho === 'aerea') && data.num_cajas_despachadas > 3440) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'El despacho marítimo o aéreo no puede exceder 3440 cajas.',
+      path: ['num_cajas_despachadas'],
+    })
+  }
 })
 
 export const empaquetadoSchema = z.object({

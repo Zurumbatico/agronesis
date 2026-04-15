@@ -10,6 +10,7 @@ import {
   getConfigSistemaPorClave,
   upsertConfigSistemaNumerico,
   CLAVE_PESO_CAJA_EXPORTACION,
+  CLAVE_PESO_CAJA_DESPACHO,
 } from '@/services/config-precios.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
@@ -25,7 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuthStore } from '@/store/auth.store'
 import { VARIEDAD_PRODUCTO_CONFIG, CALIDAD_PRODUCTO_CONFIG } from '@/constants'
-import { DEFAULT_PESO_CAJA_EXPORTACION_KG } from '@/utils/business-rules'
+import { DEFAULT_PESO_CAJA_DESPACHO_KG, DEFAULT_PESO_CAJA_EXPORTACION_KG } from '@/utils/business-rules'
 import { Plus, Settings, Pencil, Trash2 } from 'lucide-react'
 import { getISOWeek, getYear } from 'date-fns'
 import type { ConfigPrecio } from '@/types/models'
@@ -42,6 +43,7 @@ type FormData = z.infer<typeof configPrecioSchema>
 
 const parametroCajaSchema = z.object({
   peso_caja_exportacion_kg: z.number({ message: 'Ingrese un número' }).positive().max(100),
+  peso_caja_despacho_kg: z.number({ message: 'Ingrese un número' }).positive().max(100),
 })
 
 type ParametroCajaFormData = z.infer<typeof parametroCajaSchema>
@@ -80,10 +82,16 @@ export default function ConfigPreciosPage() {
     try {
       const [preciosDb, pesoCajaConfig] = await Promise.all([
         getConfigPrecios(),
-        getConfigSistemaPorClave(CLAVE_PESO_CAJA_EXPORTACION),
+        Promise.all([
+          getConfigSistemaPorClave(CLAVE_PESO_CAJA_EXPORTACION),
+          getConfigSistemaPorClave(CLAVE_PESO_CAJA_DESPACHO),
+        ]),
       ])
       setPrecios(preciosDb)
-      resetParametro({ peso_caja_exportacion_kg: Number(pesoCajaConfig?.valor_numerico ?? DEFAULT_PESO_CAJA_EXPORTACION_KG) })
+      resetParametro({
+        peso_caja_exportacion_kg: Number(pesoCajaConfig[0]?.valor_numerico ?? DEFAULT_PESO_CAJA_EXPORTACION_KG),
+        peso_caja_despacho_kg: Number(pesoCajaConfig[1]?.valor_numerico ?? DEFAULT_PESO_CAJA_DESPACHO_KG),
+      })
     }
     catch (e) { setError((e as Error).message) }
     finally { setLoading(false) }
@@ -124,13 +132,24 @@ export default function ConfigPreciosPage() {
     if (!user) return
     try {
       setParametroError(null)
-      const updated = await upsertConfigSistemaNumerico({
-        clave: CLAVE_PESO_CAJA_EXPORTACION,
-        nombre: 'Peso por caja de exportación',
-        descripcion: 'Peso objetivo en kg usado para convertir kg buenos clasificados a cajas exportables.',
-        valor_numerico: data.peso_caja_exportacion_kg,
-      }, user.id)
-      resetParametro({ peso_caja_exportacion_kg: Number(updated.valor_numerico ?? DEFAULT_PESO_CAJA_EXPORTACION_KG) })
+      const [pesoExportacion, pesoDespacho] = await Promise.all([
+        upsertConfigSistemaNumerico({
+          clave: CLAVE_PESO_CAJA_EXPORTACION,
+          nombre: 'Peso por caja de exportación',
+          descripcion: 'Peso objetivo en kg usado para convertir kg buenos clasificados a cajas exportables.',
+          valor_numerico: data.peso_caja_exportacion_kg,
+        }, user.id),
+        upsertConfigSistemaNumerico({
+          clave: CLAVE_PESO_CAJA_DESPACHO,
+          nombre: 'Peso por caja de despacho',
+          descripcion: 'Peso en kg por caja usado para calcular el peso neto total de los despachos.',
+          valor_numerico: data.peso_caja_despacho_kg,
+        }, user.id),
+      ])
+      resetParametro({
+        peso_caja_exportacion_kg: Number(pesoExportacion.valor_numerico ?? DEFAULT_PESO_CAJA_EXPORTACION_KG),
+        peso_caja_despacho_kg: Number(pesoDespacho.valor_numerico ?? DEFAULT_PESO_CAJA_DESPACHO_KG),
+      })
     } catch (e) {
       setParametroError((e as Error).message)
     }
@@ -172,11 +191,14 @@ export default function ConfigPreciosPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="text-sm font-semibold">Parámetros de empaquetado</p>
-              <p className="text-sm text-muted-foreground">Estos valores se usan para calcular cajas exportables en empaquetado y despacho.</p>
+              <p className="text-sm text-muted-foreground">Estos valores se usan para calcular cajas exportables y el peso neto automático en despacho.</p>
             </div>
             <form onSubmit={handleSubmitParametro(onSubmitParametro)} className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <FormField label="Peso por caja (kg)" error={parametroErrors.peso_caja_exportacion_kg?.message} required>
                 <Input type="number" step="0.01" min="0.01" placeholder="4.65" {...registerParametro('peso_caja_exportacion_kg', { valueAsNumber: true })} />
+              </FormField>
+              <FormField label="Peso caja despacho (kg)" error={parametroErrors.peso_caja_despacho_kg?.message} required>
+                <Input type="number" step="0.01" min="0.01" placeholder="4.50" {...registerParametro('peso_caja_despacho_kg', { valueAsNumber: true })} />
               </FormField>
               <Button type="submit" loading={guardandoParametro}>Guardar parámetro</Button>
             </form>

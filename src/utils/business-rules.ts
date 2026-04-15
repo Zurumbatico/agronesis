@@ -7,8 +7,11 @@ import type { CategoriaClasificacion, Clasificacion, Despacho } from '@/types/mo
 // Fallbacks por defecto cuando aún no existe configuración en DB
 // ─────────────────────────────────────────────
 export const DEFAULT_PESO_CAJA_EXPORTACION_KG = 4.65
+export const DEFAULT_PESO_CAJA_DESPACHO_KG = 4.5
 export const PCT_DESHIDRATACION = 0.05
 export const CAJAS_POR_PALLET = 172
+export const MAX_PALLETS_POR_DESPACHO_MAR_AER = 20
+export const MAX_CAJAS_DESPACHO_MAR_AER = CAJAS_POR_PALLET * MAX_PALLETS_POR_DESPACHO_MAR_AER
 /** 3% del peso neto que corresponde al socio Alan Melendrez (Módulo 1 PDF) */
 export const PCT_ALAN_MELENDREZ = 0.03
 /** Tarifa de pago al seleccionador por kg procesado Cat 1 (S/ 0.20/kg) */
@@ -101,6 +104,13 @@ export function calcularPallets(nCajas: number): { completos: number; restantes:
     completos: Math.floor(nCajas / CAJAS_POR_PALLET),
     restantes: nCajas % CAJAS_POR_PALLET,
   }
+}
+
+export function calcularPesoNetoDespacho(
+  numCajas: number,
+  pesoCajaKg: number = DEFAULT_PESO_CAJA_DESPACHO_KG
+): number {
+  return Math.round(numCajas * pesoCajaKg * 100) / 100
 }
 
 /**
@@ -214,9 +224,12 @@ export function validarCajasDespacho(
   return null
 }
 
-/**
- * Calcula el valor total de un despacho
- */
-export function calcularValorDespacho(despacho: Pick<Despacho, 'peso_neto_kg' | 'precio_venta_kg'>): number {
-  return Math.round(despacho.peso_neto_kg * despacho.precio_venta_kg * 100) / 100
+export function validarLimiteCajasPorTipoDespacho(
+  tipoDespacho: Despacho['tipo_despacho'],
+  cajasADespachar: number
+): string | null {
+  if ((tipoDespacho === 'maritima' || tipoDespacho === 'aerea') && cajasADespachar > MAX_CAJAS_DESPACHO_MAR_AER) {
+    return `El despacho ${tipoDespacho === 'maritima' ? 'marítimo' : 'aéreo'} no puede exceder ${MAX_CAJAS_DESPACHO_MAR_AER} cajas.`
+  }
+  return null
 }

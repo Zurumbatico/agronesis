@@ -178,8 +178,10 @@ export default function EmpaquetarLotePage() {
     if (!id || !lote) return
     setFinalizando(true)
     try {
-      await actualizarEstadoLote(id, 'en_despacho')
-      navigate(`/lotes/${id}/despachar`)
+      if (lote.estado !== 'empaquetado') {
+        await actualizarEstadoLote(id, 'empaquetado')
+      }
+      navigate(`/lotes/${id}`)
     } catch (e) {
       setError((e as Error).message)
       setFinalizando(false)
@@ -318,7 +320,7 @@ export default function EmpaquetarLotePage() {
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => navigate(`/lotes/${id}`)}>Cancelar</Button>
             <Button disabled={empaquetados.length === 0 || finalizando} onClick={() => setConfirmarFinalizar(true)}>
-              {finalizando ? 'Procesando...' : 'Confirmar empaquetado → Despacho'}
+              {finalizando ? 'Procesando...' : 'Confirmar empaquetado'}
             </Button>
           </div>
         )}
@@ -327,7 +329,7 @@ export default function EmpaquetarLotePage() {
       <ConfirmDialog
         open={confirmarFinalizar}
         title="¿Confirmar empaquetado?"
-        description="El lote avanzará a la etapa de despacho con las cajas registradas en pallets."
+        description="El lote quedará listo para que sus pallets se usen luego en el módulo de despachos."
         confirmLabel="Sí, confirmar"
         variant="default"
         loading={finalizando}

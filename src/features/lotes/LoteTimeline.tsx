@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 const PASOS: EstadoLote[] = [
   'ingresado', 'en_clasificacion', 'clasificado',
-  'empaquetado', 'en_despacho', 'despachado', 'liquidado',
+  'empaquetado', 'liquidado',
 ]
 
 interface LoteTimelineProps {
@@ -13,7 +13,10 @@ interface LoteTimelineProps {
 }
 
 export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
-  const indexActual = PASOS.indexOf(estadoActual)
+  const estadoVisual = estadoActual === 'en_despacho' || estadoActual === 'despachado'
+    ? 'empaquetado'
+    : estadoActual
+  const indexActual = PASOS.indexOf(estadoVisual)
 
   return (
     <div className="flex flex-col gap-0">
@@ -21,7 +24,6 @@ export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
         const esFinal = i === PASOS.length - 1
         const completado = i < indexActual || (esFinal && i === indexActual)
         const activo = i === indexActual && !esFinal
-        const esPasoDespacho = paso === 'en_despacho'
         const { label } = ESTADO_LOTE_CONFIG[paso]
 
         return (
@@ -31,9 +33,7 @@ export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
               <div className={cn(
                 'flex items-center justify-center w-8 h-8 rounded-full border-2 shrink-0 transition-colors',
                 completado && 'bg-emerald-600 border-emerald-600 text-white',
-                esPasoDespacho && !completado && !activo && 'border-sky-300 bg-sky-50 text-sky-500',
                 activo && 'bg-amber-500 border-amber-500 text-white',
-                activo && esPasoDespacho && 'bg-sky-600 border-sky-600 text-white',
                 !completado && !activo && 'border-slate-300 bg-slate-50 text-slate-400'
               )}>
                 {completado ? (
@@ -55,8 +55,6 @@ export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
                 'text-sm font-medium',
                 completado && 'text-emerald-700',
                 activo && 'text-amber-700 font-semibold',
-                esPasoDespacho && !completado && !activo && 'text-sky-700',
-                activo && esPasoDespacho && 'text-sky-700 font-semibold',
                 !completado && !activo && 'text-slate-500'
               )}>
                 {label}

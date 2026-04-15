@@ -97,12 +97,14 @@ export const ROUTES = {
   LOTES_DETALLE:            '/lotes/:id',
   CLASIFICACIONES:          '/lotes/:id/clasificar',
   EMPAQUETAR:              '/lotes/:id/empaquetar',
-  DESPACHOS:                '/lotes/:id/despachar',
   LIQUIDACIONES_AGRI:       '/liquidaciones/agricultores',
   LIQUIDACIONES_AGRI_NUEVA: '/liquidaciones/agricultores/nueva',
   LIQUIDACIONES_AGRI_DETALLE: '/liquidaciones/agricultores/:id',
   PLANILLAS:                '/planillas',
   CUBETAS:                  '/cubetas',
+  DESPACHOS:                '/despachos',
+  DESPACHOS_NUEVO:          '/despachos/nuevo',
+  DESPACHOS_DETALLE:        '/despachos/:id',
   CONFIG_PRECIOS:           '/admin/config-precios',
 } as const
 

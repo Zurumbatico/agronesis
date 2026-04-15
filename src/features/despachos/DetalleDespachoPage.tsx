@@ -1,0 +1,89 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ErrorMessage } from '@/components/shared/ErrorMessage'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { LoadingPage } from '@/components/shared/Spinner'
+import { DESTINO_DESPACHO_CONFIG, ROUTES, TIPO_DESPACHO_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
+import { getDespacho } from '@/services/despachos.service'
+import { formatFecha, formatPeso } from '@/utils/formatters'
+import type { Despacho } from '@/types/models'
+
+export default function DetalleDespachoPage() {
+  const { id } = useParams<{ id: string }>()
+  const [despacho, setDespacho] = useState<Despacho | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const cargar = async () => {
+    if (!id) return
+    setLoading(true)
+    try {
+      setDespacho(await getDespacho(id))
+      setError(null)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { cargar() }, [id])
+
+  const resumenVariedad = useMemo(() => (despacho?.pallets ?? []).reduce((acc, pallet) => {
+    const variedad = pallet.lote?.producto?.variedad
+    if (!variedad) return acc
+    acc[variedad] += pallet.num_cajas
+    return acc
+  }, { snow_peas: 0, sugar: 0 }), [despacho])
+
+  if (loading) return <LoadingPage />
+  if (error) return <ErrorMessage message={error} onRetry={cargar} />
+  if (!despacho) return null
+
+  return (
+    <div className="max-w-5xl mx-auto flex flex-col gap-4">
+      <PageHeader
+        title={`Despacho ${formatFecha(despacho.fecha_despacho)}`}
+        description={`${DESTINO_DESPACHO_CONFIG[despacho.destino].label} · ${TIPO_DESPACHO_CONFIG[despacho.tipo_despacho].label}`}
+        backHref={ROUTES.DESPACHOS}
+      />
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+        <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Pallets</p><p className="font-bold text-lg">{(despacho.pallets ?? []).length}</p></CardContent></Card>
+        <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Cajas</p><p className="font-bold text-lg">{despacho.num_cajas_despachadas}</p></CardContent></Card>
+        <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Peso neto</p><p className="font-bold text-lg">{formatPeso(despacho.peso_neto_kg)}</p></CardContent></Card>
+        <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Snow Peas</p><p className="font-bold text-lg">{resumenVariedad.snow_peas}</p></CardContent></Card>
+        <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Sugar</p><p className="font-bold text-lg">{resumenVariedad.sugar}</p></CardContent></Card>
+      </div>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Datos generales</CardTitle></CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div><p className="text-xs text-muted-foreground">Exportador</p><p className="font-medium">{despacho.exportador || '-'}</p></div>
+          <div><p className="text-xs text-muted-foreground">Marca de caja</p><p className="font-medium">{despacho.marca_caja || '-'}</p></div>
+          <div><p className="text-xs text-muted-foreground">Transportista</p><p className="font-medium">{despacho.transportista || '-'}</p></div>
+          <div><p className="text-xs text-muted-foreground">Placa</p><p className="font-medium">{despacho.placa_vehiculo || '-'}</p></div>
+          <div className="md:col-span-2"><p className="text-xs text-muted-foreground">Observaciones</p><p className="font-medium">{despacho.observaciones || '-'}</p></div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Pallets del despacho</CardTitle></CardHeader>
+        <CardContent className="flex flex-col gap-2">
+          {(despacho.pallets ?? []).map((pallet) => (
+            <div key={pallet.id} className="rounded-lg border px-3 py-3 text-sm flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">Pallet {pallet.numero_pallet} · {pallet.lote?.codigo || 'Sin lote'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {pallet.lote?.producto?.variedad ? VARIEDAD_PRODUCTO_CONFIG[pallet.lote.producto.variedad].label : '-'} · {pallet.lote?.producto?.nombre || '-'}
+                </p>
+              </div>
+              <p className="font-semibold">{pallet.num_cajas} cajas</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

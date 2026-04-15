@@ -147,14 +147,6 @@ export default function LoteDetallePage() {
                 Empaquetar
               </Button>
             )}
-            {lote.estado === 'en_despacho' && (
-              <Button
-                className="bg-agro-green hover:bg-agro-green/90 text-white font-semibold shadow-sm"
-                onClick={() => navigate(`/lotes/${id}/despachar`)}
-              >
-                Despachar
-              </Button>
-            )}
             {lote.estado === 'despachado' && (
               <Button
                 className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold shadow-sm"
@@ -495,9 +487,9 @@ export default function LoteDetallePage() {
                         <span className="text-muted-foreground ml-2">{formatFecha(d.fecha_despacho)}</span>
                         <div className="flex gap-4 mt-1 text-muted-foreground">
                           <span>{d.num_cajas_despachadas} cajas · {formatPeso(d.peso_neto_kg)}</span>
-                          <span className="text-foreground font-medium">{formatMoneda(d.peso_neto_kg * d.precio_venta_kg)}</span>
+                          <span className="text-foreground font-medium">{d.exportador || 'Sin exportador'}</span>
                         </div>
-                        <p className="text-muted-foreground text-xs mt-0.5">Vía: {TIPO_DESPACHO_CONFIG[d.tipo_despacho]?.label ?? d.tipo_despacho}{d.transportista ? ` · Transportista: ${d.transportista}` : ''}{d.placa_vehiculo ? ` · ${d.placa_vehiculo}` : ''}</p>
+                        <p className="text-muted-foreground text-xs mt-0.5">Vía: {TIPO_DESPACHO_CONFIG[d.tipo_despacho]?.label ?? d.tipo_despacho}{d.marca_caja ? ` · Marca: ${d.marca_caja}` : ''}{d.transportista ? ` · Transportista: ${d.transportista}` : ''}{d.placa_vehiculo ? ` · ${d.placa_vehiculo}` : ''}</p>
                       </div>
                     </div>
                   </div>

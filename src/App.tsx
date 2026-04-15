@@ -16,7 +16,9 @@ import LotesPage from '@/features/lotes/LotesPage'
 import LoteDetallePage from '@/features/lotes/LoteDetallePage'
 import ClasificarLotePage from '@/features/lotes/ClasificarLotePage'
 import EmpaquetarLotePage from '@/features/lotes/EmpaquetarLotePage'
-import DespacharLotePage from '@/features/lotes/DespacharLotePage'
+import DespachosPage from '@/features/despachos/DespachosPage'
+import NuevoDespachoPage from '@/features/despachos/NuevoDespachoPage'
+import DetalleDespachoPage from '@/features/despachos/DetalleDespachoPage'
 import LiquidacionesAgriPage from '@/features/liquidaciones-agri/LiquidacionesAgriPage'
 import NuevaLiquidacionAgriPage from '@/features/liquidaciones-agri/NuevaLiquidacionAgriPage'
 import DetalleLiquidacionAgriPage from '@/features/liquidaciones-agri/DetalleLiquidacionAgriPage.tsx'
@@ -52,7 +54,9 @@ export default function App() {
             <Route path={ROUTES.LOTES_DETALLE} element={<LoteDetallePage />} />
             <Route path={ROUTES.CLASIFICACIONES} element={<ClasificarLotePage />} />
             <Route path={ROUTES.EMPAQUETAR} element={<EmpaquetarLotePage />} />
-            <Route path={ROUTES.DESPACHOS} element={<DespacharLotePage />} />
+            <Route path={ROUTES.DESPACHOS} element={<DespachosPage />} />
+            <Route path={ROUTES.DESPACHOS_NUEVO} element={<NuevoDespachoPage />} />
+            <Route path={ROUTES.DESPACHOS_DETALLE} element={<DetalleDespachoPage />} />
             <Route
               path={ROUTES.CUBETAS}
               element={ENABLED_MODULES.CUBETAS ? <CubetasPage /> : <Navigate to={ROUTES.DASHBOARD} replace />}

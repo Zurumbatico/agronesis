@@ -2,7 +2,7 @@ import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Package, Warehouse,
-  Layers, Receipt,
+  Layers, Receipt, Truck,
   LogOut, ChevronLeft, Leaf, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Centros de Acopio',  href: ROUTES.CENTROS_ACOPIO,        icon: Warehouse,     group: 'Maestros' },
   // Operaciones
   { label: 'Lotes',              href: ROUTES.LOTES,                 icon: Layers,        group: 'Operaciones' },
+  { label: 'Despachos',          href: ROUTES.DESPACHOS,             icon: Truck,         group: 'Operaciones' },
   { label: 'Cubetas',            href: ROUTES.CUBETAS,               icon: Package,       group: 'Operaciones', featureKey: 'CUBETAS' },
   // Liquidaciones
   { label: 'Liq. Agricultores',  href: ROUTES.LIQUIDACIONES_AGRI,    icon: Receipt,       group: 'Liquidaciones' },

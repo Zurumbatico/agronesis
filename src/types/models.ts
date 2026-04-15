@@ -202,22 +202,34 @@ export type DestinoDespacho = 'exportacion' | 'mercado_local' | 'planta_proceso'
 export type TipoDespacho = 'maritima' | 'aerea' | 'terrestre'
 
 export interface Despacho extends BaseEntity {
-  lote_id: UUID
+  lote_id: UUID | null
   fecha_despacho: string
   destino: DestinoDespacho
   tipo_despacho: TipoDespacho
+  exportador: string | null
+  marca_caja: string | null
   transportista: string | null
   placa_vehiculo: string | null
   num_cajas_despachadas: number
   peso_neto_kg: number
-  precio_venta_kg: number
   observaciones: string | null
   // relaciones
   lote?: Lote
+  pallets?: DespachoPallet[]
 }
 
-export type DespachoInsert = Omit<Despacho, keyof BaseEntity | 'lote'>
+export interface DespachoPallet extends BaseEntity {
+  despacho_id: UUID
+  lote_id: UUID
+  numero_pallet: string
+  num_cajas: number
+  lote?: Lote
+  despacho?: Despacho
+}
+
+export type DespachoInsert = Omit<Despacho, keyof BaseEntity | 'lote' | 'pallets'>
 export type DespachoUpdate = Partial<DespachoInsert>
+export type DespachoPalletInsert = Omit<DespachoPallet, keyof BaseEntity | 'lote' | 'despacho'>
 
 // ─────────────────────────────────────────────
 // LIQUIDACIÓN AGRICULTOR

@@ -468,6 +468,12 @@ begin
 end;
 $$;
 alter table public.despachos drop column if exists numero_senasa;
+alter table public.despachos alter column lote_id drop not null;
+alter table public.despachos add column if not exists exportador text null;
+alter table public.despachos add column if not exists marca_caja text null;
+alter table public.despachos alter column precio_venta_kg set default 0;
+update public.despachos set precio_venta_kg = coalesce(precio_venta_kg, 0) where precio_venta_kg is null;
+alter table public.despachos alter column precio_venta_kg set not null;
 alter table public.agricultores add column if not exists ggn text null;
 
 create table if not exists public.clasificaciones (
@@ -500,16 +506,30 @@ create table if not exists public.despachos (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
-  lote_id uuid not null references public.lotes(id) on delete cascade,
+  lote_id uuid null references public.lotes(id) on delete cascade,
   fecha_despacho date not null,
   destino text not null check (destino in ('exportacion', 'mercado_local', 'planta_proceso')),
   tipo_despacho text not null default 'terrestre' check (tipo_despacho in ('maritima', 'aerea', 'terrestre')),
+  exportador text null,
+  marca_caja text null,
   transportista text null,
   placa_vehiculo text null,
   num_cajas_despachadas integer not null default 0,
   peso_neto_kg numeric(12,2) not null,
-  precio_venta_kg numeric(12,2) not null,
+  precio_venta_kg numeric(12,2) not null default 0,
   observaciones text null
+);
+
+create table if not exists public.despacho_pallets (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  despacho_id uuid not null references public.despachos(id) on delete cascade,
+  lote_id uuid not null references public.lotes(id) on delete restrict,
+  numero_pallet text not null,
+  num_cajas integer not null default 0 check (num_cajas > 0),
+  unique (lote_id, numero_pallet)
 );
 
 create table if not exists public.liquidaciones_agri (
@@ -558,6 +578,8 @@ create index if not exists idx_agricultores_codigo on public.agricultores(codigo
 create index if not exists idx_acopiadores_codigo on public.acopiadores(codigo);
 create index if not exists idx_colaboradores_codigo on public.colaboradores(codigo);
 create index if not exists idx_productos_codigo on public.productos(codigo);
+create index if not exists idx_despacho_pallets_despacho on public.despacho_pallets(despacho_id);
+create index if not exists idx_despacho_pallets_lote_pallet on public.despacho_pallets(lote_id, numero_pallet);
 create index if not exists idx_agricultor_producto_hectareas_agricultor_id on public.agricultor_producto_hectareas(agricultor_id);
 create index if not exists idx_agricultor_producto_hectareas_producto_id on public.agricultor_producto_hectareas(producto_id);
 create index if not exists idx_centros_acopio_codigo on public.centros_acopio(codigo);
@@ -732,6 +754,9 @@ create trigger trg_empaquetados_updated_at before update on public.empaquetados 
 drop trigger if exists trg_despachos_updated_at on public.despachos;
 create trigger trg_despachos_updated_at before update on public.despachos for each row execute function public.set_updated_at();
 
+drop trigger if exists trg_despacho_pallets_updated_at on public.despacho_pallets;
+create trigger trg_despacho_pallets_updated_at before update on public.despacho_pallets for each row execute function public.set_updated_at();
+
 drop trigger if exists trg_liquidaciones_agri_updated_at on public.liquidaciones_agri;
 create trigger trg_liquidaciones_agri_updated_at before update on public.liquidaciones_agri for each row execute function public.set_updated_at();
 
@@ -751,6 +776,7 @@ alter table public.lotes enable row level security;
 alter table public.clasificaciones enable row level security;
 alter table public.empaquetados enable row level security;
 alter table public.despachos enable row level security;
+alter table public.despacho_pallets enable row level security;
 alter table public.liquidaciones_agri enable row level security;
 alter table public.liquidacion_agri_detalle enable row level security;
 alter table public.movimientos_cubetas enable row level security;
@@ -784,6 +810,9 @@ create policy empaquetados_authenticated_all on public.empaquetados for all to a
 
 drop policy if exists despachos_authenticated_all on public.despachos;
 create policy despachos_authenticated_all on public.despachos for all to authenticated using (true) with check (auth.uid() is not null);
+
+drop policy if exists despacho_pallets_authenticated_all on public.despacho_pallets;
+create policy despacho_pallets_authenticated_all on public.despacho_pallets for all to authenticated using (true) with check (auth.uid() is not null);
 
 drop policy if exists liquidaciones_agri_authenticated_all on public.liquidaciones_agri;
 create policy liquidaciones_agri_authenticated_all on public.liquidaciones_agri for all to authenticated using (true) with check (auth.uid() is not null);

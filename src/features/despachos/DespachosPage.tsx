@@ -1,0 +1,113 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Search, Truck } from 'lucide-react'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { LoadingPage } from '@/components/shared/Spinner'
+import { ErrorMessage } from '@/components/shared/ErrorMessage'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { DESTINO_DESPACHO_CONFIG, ROUTES, TIPO_DESPACHO_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
+import { getDespachos } from '@/services/despachos.service'
+import { formatFecha, formatPeso } from '@/utils/formatters'
+import type { Despacho } from '@/types/models'
+
+function resumirPorVariedad(despacho: Despacho) {
+  return (despacho.pallets ?? []).reduce((acc, pallet) => {
+    const variedad = pallet.lote?.producto?.variedad
+    if (!variedad) return acc
+    acc[variedad] += pallet.num_cajas
+    return acc
+  }, { snow_peas: 0, sugar: 0 })
+}
+
+export default function DespachosPage() {
+  const navigate = useNavigate()
+  const [despachos, setDespachos] = useState<Despacho[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [busqueda, setBusqueda] = useState('')
+
+  const cargar = async () => {
+    setLoading(true)
+    try {
+      setDespachos(await getDespachos())
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { cargar() }, [])
+
+  if (loading) return <LoadingPage />
+  if (error) return <ErrorMessage message={error} onRetry={cargar} />
+
+  const filtrados = despachos.filter((despacho) => {
+    if (!busqueda) return true
+    const q = busqueda.toLowerCase()
+    return despacho.exportador?.toLowerCase().includes(q)
+      || despacho.marca_caja?.toLowerCase().includes(q)
+      || despacho.transportista?.toLowerCase().includes(q)
+      || despacho.placa_vehiculo?.toLowerCase().includes(q)
+      || despacho.fecha_despacho.includes(q)
+  })
+
+  return (
+    <div>
+      <PageHeader
+        title="Despachos"
+        description="Registro operativo de despachos a partir de pallets empaquetados."
+        actions={
+          <Button onClick={() => navigate(ROUTES.DESPACHOS_NUEVO)}>
+            <Plus className="h-4 w-4 mr-2" /> Nuevo despacho
+          </Button>
+        }
+      />
+
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input className="pl-9" placeholder="Buscar por exportador, marca, placa o fecha..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+      </div>
+
+      {filtrados.length === 0 ? (
+        <EmptyState icon={<Truck className="h-8 w-8" />} title="Sin despachos" description="Registra el primer despacho seleccionando pallets empaquetados." />
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filtrados.map((despacho) => {
+            const resumen = resumirPorVariedad(despacho)
+            return (
+              <Card key={despacho.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/despachos/${despacho.id}`)}>
+                <CardContent className="pt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-sm">{formatFecha(despacho.fecha_despacho)}</p>
+                      <span className="text-xs rounded-full bg-muted px-2 py-0.5">{DESTINO_DESPACHO_CONFIG[despacho.destino].label}</span>
+                      <span className="text-xs rounded-full bg-muted px-2 py-0.5">{TIPO_DESPACHO_CONFIG[despacho.tipo_despacho].label}</span>
+                    </div>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      {despacho.exportador || 'Sin exportador'} · {despacho.marca_caja || 'Sin marca de caja'}
+                    </p>
+                    <p className="text-xs mt-2 text-muted-foreground">
+                      {VARIEDAD_PRODUCTO_CONFIG.snow_peas.label}: <strong className="text-foreground">{resumen.snow_peas}</strong> cajas · {VARIEDAD_PRODUCTO_CONFIG.sugar.label}: <strong className="text-foreground">{resumen.sugar}</strong> cajas
+                    </p>
+                  </div>
+
+                  <div className="text-left sm:text-right">
+                    <p className="font-bold text-sm">{despacho.num_cajas_despachadas} cajas</p>
+                    <p className="text-xs text-muted-foreground">{formatPeso(despacho.peso_neto_kg)} · {(despacho.pallets ?? []).length} pallet(es)</p>
+                    {(despacho.transportista || despacho.placa_vehiculo) && (
+                      <p className="text-xs text-muted-foreground mt-1">{despacho.transportista || '-'}{despacho.placa_vehiculo ? ` · ${despacho.placa_vehiculo}` : ''}</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

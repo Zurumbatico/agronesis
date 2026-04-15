@@ -253,19 +253,35 @@ export interface Database {
           created_at: string
           updated_at: string
           created_by: string
-          lote_id: string
+          lote_id: string | null
           fecha_despacho: string
           destino: 'exportacion' | 'mercado_local' | 'planta_proceso'
           tipo_despacho: 'maritima' | 'aerea' | 'terrestre'
+          exportador: string | null
+          marca_caja: string | null
           transportista: string | null
           placa_vehiculo: string | null
           num_cajas_despachadas: number
           peso_neto_kg: number
-          precio_venta_kg: number
           observaciones: string | null
         }
         Insert: Omit<Database['public']['Tables']['despachos']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['despachos']['Insert']>
+        Relationships: []
+      }
+      despacho_pallets: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          despacho_id: string
+          lote_id: string
+          numero_pallet: string
+          num_cajas: number
+        }
+        Insert: Omit<Database['public']['Tables']['despacho_pallets']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['despacho_pallets']['Insert']>
         Relationships: []
       }
       liquidaciones_agri: {
