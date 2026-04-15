@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import {
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -104,7 +103,7 @@ function PorcentajePieCard({
       <CardContent>
         {total > 0 ? (
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_220px] gap-4 items-center">
-            <div className="h-[280px]">
+            <div className="h-[245px]">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -117,7 +116,6 @@ function PorcentajePieCard({
                     stroke="#ffffff"
                     strokeWidth={3}
                     labelLine={false}
-                    label={({ percent }) => ((percent ?? 0) >= 0.08 ? `${((percent ?? 0) * 100).toFixed(1)}%` : '')}
                   >
                     {data.map((item) => (
                       <Cell key={item.name} fill={item.color} />
@@ -128,7 +126,6 @@ function PorcentajePieCard({
                     const percentage = item?.payload?.percentage ?? 0
                     return [`${metricValue.toFixed(2)} kg · ${percentage.toFixed(1)}%`, item?.payload?.name ?? '']
                   }) as never} />
-                  <Legend wrapperStyle={{ fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
