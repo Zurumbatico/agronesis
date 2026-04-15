@@ -98,8 +98,8 @@ export default function HidroculizarPage() {
     if (!id || !lote) return
     setFinalizando(true)
     try {
-      await actualizarEstadoLote(id, 'en_despacho')
-      navigate(`/lotes/${id}`)
+      await actualizarEstadoLote(id, 'hidroculizado')
+      navigate(`/lotes/${id}/empaquetar`)
     } catch (e) {
       setError((e as Error).message)
       setFinalizando(false)
@@ -218,7 +218,7 @@ export default function HidroculizarPage() {
             disabled={tareos.length === 0 || finalizando}
             onClick={() => setConfirmarFinalizar(true)}
           >
-            {finalizando ? 'Procesando...' : 'Confirmar hidroculizado → Despachar'}
+            {finalizando ? 'Procesando...' : 'Confirmar hidroculizado → Empaquetar'}
           </Button>
         </div>
       )}
@@ -226,7 +226,7 @@ export default function HidroculizarPage() {
       <ConfirmDialog
         open={confirmarFinalizar}
         title="¿Confirmar hidroculizado?"
-        description="Se marcará el proceso como completo y el lote avanzará a la etapa de despacho."
+        description="Se marcará el proceso como completo y el lote avanzará a la etapa de empaquetado."
         confirmLabel="Sí, confirmar"
         variant="default"
         loading={finalizando}

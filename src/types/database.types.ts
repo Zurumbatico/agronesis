@@ -146,7 +146,7 @@ export interface Database {
           jabas_prestadas: number
           codigo_lote_agricultor: string | null
           observaciones: string | null
-          estado: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'hidroculizado' | 'en_despacho' | 'despachado' | 'liquidado'
+          estado: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'hidroculizado' | 'empaquetado' | 'en_despacho' | 'despachado' | 'liquidado'
         }
         Insert: Omit<Database['public']['Tables']['lotes']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['lotes']['Insert']>
@@ -185,8 +185,11 @@ export interface Database {
           kg_cat1: number
           kg_cat2: number
           kg_bruto: number
+          num_jabas: number
+          peso_tara_kg: number
           jabas_descartadas: number
           kg_bruto_descartable: number
+          peso_tara_descartable_kg: number
           kg_neto_descartable: number
         }
         Insert: {
@@ -197,8 +200,11 @@ export interface Database {
           kg_cat1?: number
           kg_cat2?: number
           kg_bruto?: number
+          num_jabas?: number
+          peso_tara_kg?: number
           jabas_descartadas?: number
           kg_bruto_descartable?: number
+          peso_tara_descartable_kg?: number
           kg_neto_descartable?: number
         }
         Update: Partial<Database['public']['Tables']['clasificacion_aportes']['Insert']>
@@ -221,6 +227,24 @@ export interface Database {
           num_jabas?: number
         }
         Update: Partial<Database['public']['Tables']['clasificacion_mesas']['Insert']>
+        Relationships: []
+      }
+      empaquetados: {
+        Row: {
+          id: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          lote_id: string
+          fecha_empaquetado: string
+          destino: 'europa'
+          codigo_trazabilidad: string
+          numero_pallet: string
+          num_cajas: number
+          observaciones: string | null
+        }
+        Insert: Omit<Database['public']['Tables']['empaquetados']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['empaquetados']['Insert']>
         Relationships: []
       }
       despachos: {
@@ -408,7 +432,7 @@ export interface Database {
     Functions: Record<string, never>
     Enums: {
       estado_activo: 'activo' | 'inactivo'
-      estado_lote: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'hidroculizado' | 'en_despacho' | 'despachado' | 'liquidado'
+      estado_lote: 'ingresado' | 'en_clasificacion' | 'clasificado' | 'hidroculizado' | 'empaquetado' | 'en_despacho' | 'despachado' | 'liquidado'
       estado_liquidacion: 'borrador' | 'confirmada' | 'pagada'
       tipo_producto: 'holantao' | 'snow_peas' | 'otro'
       tipo_personal: 'clasificador' | 'cosechador' | 'empacador' | 'supervisor'

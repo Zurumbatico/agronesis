@@ -481,6 +481,20 @@ create table if not exists public.clasificaciones (
   observaciones text null
 );
 
+create table if not exists public.empaquetados (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  lote_id uuid not null references public.lotes(id) on delete cascade,
+  fecha_empaquetado date not null,
+  destino text not null default 'europa' check (destino in ('europa')),
+  codigo_trazabilidad text not null,
+  numero_pallet text not null,
+  num_cajas integer not null check (num_cajas > 0),
+  observaciones text null
+);
+
 create table if not exists public.despachos (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -554,6 +568,8 @@ create index if not exists idx_lotes_acopiador_agricultor_id on public.lotes(aco
 create index if not exists idx_lotes_producto_id on public.lotes(producto_id);
 create index if not exists idx_lotes_centro_acopio_id on public.lotes(centro_acopio_id);
 create index if not exists idx_clasificaciones_lote_id on public.clasificaciones(lote_id);
+create index if not exists idx_empaquetados_lote_id on public.empaquetados(lote_id);
+create index if not exists idx_empaquetados_numero_pallet on public.empaquetados(numero_pallet);
 create index if not exists idx_despachos_lote_id on public.despachos(lote_id);
 create index if not exists idx_liquidaciones_agri_agricultor_id on public.liquidaciones_agri(agricultor_id);
 create index if not exists idx_liquidacion_agri_detalle_liquidacion_id on public.liquidacion_agri_detalle(liquidacion_id);
@@ -710,6 +726,9 @@ create trigger trg_lotes_updated_at before update on public.lotes for each row e
 drop trigger if exists trg_clasificaciones_updated_at on public.clasificaciones;
 create trigger trg_clasificaciones_updated_at before update on public.clasificaciones for each row execute function public.set_updated_at();
 
+drop trigger if exists trg_empaquetados_updated_at on public.empaquetados;
+create trigger trg_empaquetados_updated_at before update on public.empaquetados for each row execute function public.set_updated_at();
+
 drop trigger if exists trg_despachos_updated_at on public.despachos;
 create trigger trg_despachos_updated_at before update on public.despachos for each row execute function public.set_updated_at();
 
@@ -730,6 +749,7 @@ alter table public.agricultor_producto_hectareas enable row level security;
 alter table public.centros_acopio enable row level security;
 alter table public.lotes enable row level security;
 alter table public.clasificaciones enable row level security;
+alter table public.empaquetados enable row level security;
 alter table public.despachos enable row level security;
 alter table public.liquidaciones_agri enable row level security;
 alter table public.liquidacion_agri_detalle enable row level security;
@@ -758,6 +778,9 @@ create policy lotes_authenticated_all on public.lotes for all to authenticated u
 
 drop policy if exists clasificaciones_authenticated_all on public.clasificaciones;
 create policy clasificaciones_authenticated_all on public.clasificaciones for all to authenticated using (true) with check (auth.uid() is not null);
+
+drop policy if exists empaquetados_authenticated_all on public.empaquetados;
+create policy empaquetados_authenticated_all on public.empaquetados for all to authenticated using (true) with check (auth.uid() is not null);
 
 drop policy if exists despachos_authenticated_all on public.despachos;
 create policy despachos_authenticated_all on public.despachos for all to authenticated using (true) with check (auth.uid() is not null);
@@ -859,8 +882,11 @@ alter table public.clasificacion_aportes add column if not exists kg_cat2 numeri
 
 -- Campos ampliados de clasificación por trabajador
 alter table public.clasificacion_aportes add column if not exists kg_bruto numeric(12,2) not null default 0 check (kg_bruto >= 0);
+alter table public.clasificacion_aportes add column if not exists num_jabas integer not null default 0 check (num_jabas >= 0);
+alter table public.clasificacion_aportes add column if not exists peso_tara_kg numeric(12,2) not null default 0 check (peso_tara_kg >= 0);
 alter table public.clasificacion_aportes add column if not exists jabas_descartadas integer not null default 0 check (jabas_descartadas >= 0);
 alter table public.clasificacion_aportes add column if not exists kg_bruto_descartable numeric(12,2) not null default 0 check (kg_bruto_descartable >= 0);
+alter table public.clasificacion_aportes add column if not exists peso_tara_descartable_kg numeric(12,2) not null default 0 check (peso_tara_descartable_kg >= 0);
 alter table public.clasificacion_aportes add column if not exists kg_neto_descartable numeric(12,2) not null default 0 check (kg_neto_descartable >= 0);
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -875,7 +901,7 @@ alter table public.planilla_detalles add column if not exists pago_seleccion num
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.lotes drop constraint if exists lotes_estado_check;
 alter table public.lotes add constraint lotes_estado_check
-  check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'hidroculizado', 'en_despacho', 'despachado', 'liquidado'));
+  check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'hidroculizado', 'empaquetado', 'en_despacho', 'despachado', 'liquidado'));
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAREO_HIDROCULIZADO — Módulo 4 / Tareo B

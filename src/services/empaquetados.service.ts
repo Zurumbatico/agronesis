@@ -1,0 +1,47 @@
+import { supabase } from '@/lib/supabase'
+import type { Empaquetado, EmpaquetadoInsert } from '@/types/models'
+
+const TABLE = 'empaquetados' as const
+
+export async function getEmpaquetadosPorLote(loteId: string): Promise<Empaquetado[]> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .eq('lote_id', loteId)
+    .order('fecha_empaquetado', { ascending: false })
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return data as Empaquetado[]
+}
+
+export async function getResumenPalletsEmpaquetado(): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('numero_pallet, num_cajas')
+
+  if (error) throw new Error(error.message)
+
+  return (data ?? []).reduce<Record<string, number>>((acc, row) => {
+    const pallet = row.numero_pallet?.toUpperCase?.() ?? ''
+    if (!pallet) return acc
+    acc[pallet] = (acc[pallet] ?? 0) + (row.num_cajas ?? 0)
+    return acc
+  }, {})
+}
+
+export async function createEmpaquetado(input: EmpaquetadoInsert, userId: string): Promise<Empaquetado> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ ...input, created_by: userId })
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+  return data as Empaquetado
+}
+
+export async function deleteEmpaquetado(id: string): Promise<void> {
+  const { error } = await supabase.from(TABLE).delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}

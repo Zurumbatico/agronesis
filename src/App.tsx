@@ -16,6 +16,7 @@ import LotesPage from '@/features/lotes/LotesPage'
 import LoteDetallePage from '@/features/lotes/LoteDetallePage'
 import ClasificarLotePage from '@/features/lotes/ClasificarLotePage'
 import HidroculizarPage from '@/features/lotes/HidroculizarPage'
+import EmpaquetarLotePage from '@/features/lotes/EmpaquetarLotePage'
 import DespacharLotePage from '@/features/lotes/DespacharLotePage'
 import LiquidacionesAgriPage from '@/features/liquidaciones-agri/LiquidacionesAgriPage'
 import NuevaLiquidacionAgriPage from '@/features/liquidaciones-agri/NuevaLiquidacionAgriPage'
@@ -52,6 +53,7 @@ export default function App() {
             <Route path={ROUTES.LOTES_DETALLE} element={<LoteDetallePage />} />
             <Route path={ROUTES.CLASIFICACIONES} element={<ClasificarLotePage />} />
             <Route path={ROUTES.HIDROCULIZAR} element={<HidroculizarPage />} />
+            <Route path={ROUTES.EMPAQUETAR} element={<EmpaquetarLotePage />} />
             <Route path={ROUTES.DESPACHOS} element={<DespacharLotePage />} />
             <Route
               path={ROUTES.CUBETAS}

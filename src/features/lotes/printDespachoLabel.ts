@@ -1,5 +1,5 @@
 import { VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
-import type { Lote, Despacho } from '@/types/models'
+import type { Lote, Despacho, Empaquetado } from '@/types/models'
 
 function escapeHtml(value: string): string {
   return value
@@ -45,10 +45,10 @@ function getFieldLotCode(lote: Lote): string {
  *   H1  = tipo de producto (fijo por ahora)
  *   A   = inicial del nombre del exportador
  */
-export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
-  const despachoDate = new Date(despacho.fecha_despacho + 'T00:00:00')
-  const year = String(despachoDate.getFullYear()).slice(-2)
-  const packDay = String(despachoDate.getDate()).padStart(2, '0')
+export function getTraceabilityCodeForDate(lote: Lote, packDate: string): string {
+  const empaqueDate = new Date(packDate + 'T00:00:00')
+  const year = String(empaqueDate.getFullYear()).slice(-2)
+  const packDay = String(empaqueDate.getDate()).padStart(2, '0')
   const julian = julianDay(lote.fecha_cosecha)
   const initials = (
     (lote.agricultor?.nombre?.[0] ?? 'X') +
@@ -60,17 +60,17 @@ export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
   return `G${year}${julian}${packDay}${initials}${fieldLot}${productCode}${exporterInitial}`
 }
 
-export function printDespachoLabel(lote: Lote, despacho: Despacho): void {
+export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
+  return getTraceabilityCodeForDate(lote, despacho.fecha_despacho)
+}
+
+function buildTraceabilityLabelHtml(lote: Lote, code: string): string {
   const variedad = lote.producto
     ? VARIEDAD_PRODUCTO_CONFIG[lote.producto.variedad].label.toUpperCase()
     : 'N/A'
-  const code = getTraceabilityCode(lote, despacho)
   const exporterName = EXPORTADOR_NOMBRE
 
-  const printWindow = window.open('', '_blank', 'width=640,height=500')
-  if (!printWindow) return
-
-  printWindow.document.write(`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -189,6 +189,22 @@ export function printDespachoLabel(lote: Lote, despacho: Despacho): void {
     };
   </script>
 </body>
-</html>`)
+</html>`
+}
+
+export function printTraceabilityLabel(lote: Lote, code: string): void {
+  const printWindow = window.open('', '_blank', 'width=640,height=500')
+  if (!printWindow) return
+  printWindow.document.write(buildTraceabilityLabelHtml(lote, code))
   printWindow.document.close()
+}
+
+export function printEmpaquetadoLabel(lote: Lote, empaquetado: Pick<Empaquetado, 'fecha_empaquetado' | 'codigo_trazabilidad'>): void {
+  const code = empaquetado.codigo_trazabilidad || getTraceabilityCodeForDate(lote, empaquetado.fecha_empaquetado)
+  printTraceabilityLabel(lote, code)
+}
+
+export function printDespachoLabel(lote: Lote, despacho: Despacho): void {
+  const code = getTraceabilityCode(lote, despacho)
+  printTraceabilityLabel(lote, code)
 }

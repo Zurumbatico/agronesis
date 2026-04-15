@@ -33,8 +33,11 @@ export async function guardarClasificacion(
     colaborador_id: string
     kg_bueno: number
     kg_bruto: number
+    num_jabas: number
+    peso_tara_kg: number
     jabas_descartadas: number
     kg_bruto_descartable: number
+    peso_tara_descartable_kg: number
     kg_neto_descartable: number
   }>,
   calidad: 'cat1' | 'cat2',
@@ -95,8 +98,11 @@ export async function guardarClasificacion(
       kg_cat1: calidad === 'cat1' ? a.kg_bueno : 0,
       kg_cat2: calidad === 'cat2' ? a.kg_bueno : 0,
       kg_bruto: a.kg_bruto,
+      num_jabas: a.num_jabas,
+      peso_tara_kg: a.peso_tara_kg,
       jabas_descartadas: a.jabas_descartadas,
       kg_bruto_descartable: a.kg_bruto_descartable,
+      peso_tara_descartable_kg: a.peso_tara_descartable_kg,
       kg_neto_descartable: a.kg_neto_descartable,
       created_by: userId,
     }))

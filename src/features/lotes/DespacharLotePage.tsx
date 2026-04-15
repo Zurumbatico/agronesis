@@ -4,7 +4,7 @@ import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { despachoSchema, type DespachoFormData } from '@/utils/validators'
 import { getLote, actualizarEstadoLote } from '@/services/lotes.service'
-import { getClasificacionesPorLote } from '@/services/clasificaciones.service'
+import { getEmpaquetadosPorLote } from '@/services/empaquetados.service'
 import { getDespachosPorLote, createDespacho } from '@/services/despachos.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
@@ -19,32 +19,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/store/auth.store'
 import { formatFecha, formatPeso, formatMoneda } from '@/utils/formatters'
 import {
-  calcularTotalesClasificacion,
-  calcularPesoTotalClasificado,
-  calcularCajasExportables,
   calcularPallets,
   validarCajasDespacho,
   calcularValorDespacho,
   PESO_CAJA_EXPORTACION_KG,
 } from '@/utils/business-rules'
 import { format } from 'date-fns'
-import { Printer } from 'lucide-react'
-import { printDespachoLabel, getTraceabilityCode } from './printDespachoLabel'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { Lote, Clasificacion, Despacho } from '@/types/models'
+import type { Lote, Despacho, Empaquetado } from '@/types/models'
 
 export default function DespacharLotePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const [lote, setLote] = useState<Lote | null>(null)
-  const [clasificaciones, setClasificaciones] = useState<Clasificacion[]>([])
+  const [empaquetados, setEmpaquetados] = useState<Empaquetado[]>([])
   const [despachos, setDespachos] = useState<Despacho[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [errorCajas, setErrorCajas] = useState<string | null>(null)
   const [confirmarFinalizar, setConfirmarFinalizar] = useState(false)
-  const [labelDespacho, setLabelDespacho] = useState<Despacho | null>(null)
 
   const { register, handleSubmit, control, reset, watch, formState: { errors, isSubmitting } } = useForm<DespachoFormData>({
     resolver: zodResolver(despachoSchema) as any,
@@ -67,33 +60,32 @@ export default function DespacharLotePage() {
     if (!id) return
     setLoading(true)
     try {
-      const [l, cls, desp] = await Promise.all([getLote(id), getClasificacionesPorLote(id), getDespachosPorLote(id)])
-      setLote(l); setClasificaciones(cls); setDespachos(desp)
+      const [l, emp, desp] = await Promise.all([getLote(id), getEmpaquetadosPorLote(id), getDespachosPorLote(id)])
+      setLote(l); setEmpaquetados(emp); setDespachos(desp)
     } catch (e) { setError((e as Error).message) }
     finally { setLoading(false) }
   }
 
   useEffect(() => { cargar() }, [id])
 
+  const totalCajasEmpaquetadas = empaquetados.reduce((acc, item) => acc + item.num_cajas, 0)
+  const totalCajasDespachadas = despachos.reduce((acc, d) => acc + d.num_cajas_despachadas, 0)
+  const cajasDisponibles = totalCajasEmpaquetadas - totalCajasDespachadas
+  const palletsEmpaquetados = new Set(empaquetados.map((item) => item.numero_pallet)).size
+
   const onSubmit = async (data: DespachoFormData) => {
     if (!lote || !user) return
-    const totales = calcularTotalesClasificacion(clasificaciones)
-    const totalCajasClasificadas = Object.values(totales).reduce((acc, t) => acc + t.num_cajas, 0)
-    const totalCajasYaDespachadas = despachos.reduce((acc, d) => acc + d.num_cajas_despachadas, 0)
-
-    const cajasDisponibles = totalCajasClasificadas - totalCajasYaDespachadas
     const errCajas = validarCajasDespacho(cajasDisponibles, data.num_cajas_despachadas)
     if (errCajas) { setErrorCajas(errCajas); return }
 
     setErrorCajas(null)
     const nuevo = await createDespacho(data, user.id)
 
-    if (lote.estado === 'hidroculizado') {
+    if (lote.estado === 'empaquetado') {
       await actualizarEstadoLote(lote.id, 'en_despacho')
     }
 
     setDespachos((prev) => [...prev, nuevo])
-    setLabelDespacho(nuevo)
     reset({ lote_id: id ?? '', fecha_despacho: format(new Date(), 'yyyy-MM-dd'), destino: 'exportacion', tipo_despacho: 'terrestre', precio_venta_kg: undefined })
   }
 
@@ -103,10 +95,6 @@ export default function DespacharLotePage() {
     navigate(`/lotes/${id}`)
   }
 
-  const pesoKgBuenos = calcularPesoTotalClasificado(clasificaciones)
-  const totalCajasExportables = calcularCajasExportables(pesoKgBuenos)
-  const totalCajasDespachadas = despachos.reduce((acc, d) => acc + d.num_cajas_despachadas, 0)
-  const cajasDisponibles = totalCajasExportables - totalCajasDespachadas
   const pesoKgDespachado = despachos.reduce((acc, d) => acc + d.peso_neto_kg, 0)
 
   if (loading) return <LoadingPage />
@@ -131,9 +119,9 @@ export default function DespacharLotePage() {
         <CardContent className="pt-4 space-y-3">
           <div className="grid grid-cols-3 gap-2 text-sm">
             <div>
-              <p className="text-muted-foreground text-xs">Cajas exportables</p>
-              <p className="font-bold text-lg">{totalCajasExportables}</p>
-              <p className="text-muted-foreground text-[11px]">{formatPeso(pesoKgBuenos)} buenos</p>
+              <p className="text-muted-foreground text-xs">Cajas empaquetadas</p>
+              <p className="font-bold text-lg">{totalCajasEmpaquetadas}</p>
+              <p className="text-muted-foreground text-[11px]">{palletsEmpaquetados} pallet(s)</p>
             </div>
             <div>
               <p className="text-muted-foreground text-xs">Despachadas</p>
@@ -153,6 +141,9 @@ export default function DespacharLotePage() {
       <Card className="mb-4">
         <CardHeader><CardTitle className="text-base">Registrar despacho</CardTitle></CardHeader>
         <CardContent>
+          {empaquetados.length === 0 && (
+            <p className="text-sm text-destructive mb-4">Debe registrar al menos un empaquetado antes de despachar.</p>
+          )}
           <form onSubmit={handleSubmit(onSubmit as any)} className="flex flex-col gap-4">
             <Input type="hidden" {...register('lote_id')} value={id} />
 
@@ -227,7 +218,7 @@ export default function DespacharLotePage() {
 
             {errorCajas && <p className="text-sm text-destructive">{errorCajas}</p>}
 
-            <Button type="submit" loading={isSubmitting} className="w-full sm:w-auto sm:self-end">
+            <Button type="submit" loading={isSubmitting} className="w-full sm:w-auto sm:self-end" disabled={empaquetados.length === 0}>
               Registrar despacho
             </Button>
           </form>
@@ -244,20 +235,10 @@ export default function DespacharLotePage() {
                 <div>
                   <span className="font-medium uppercase">{d.destino.replace('_', ' ')}</span>
                   <span className="text-muted-foreground ml-2">{formatFecha(d.fecha_despacho)}</span>
-                  {lote && (
-                    <p className="font-mono text-xs text-muted-foreground mt-0.5">Traz.: {getTraceabilityCode(lote, d)}</p>
-                  )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-right">
-                    <p className="font-medium">{d.num_cajas_despachadas} cjs · {formatPeso(d.peso_neto_kg)}</p>
-                    <p className="text-muted-foreground text-xs">{formatMoneda(d.precio_venta_kg ?? 0)}/kg · Total: {formatMoneda(calcularValorDespacho({ peso_neto_kg: d.peso_neto_kg ?? 0, precio_venta_kg: d.precio_venta_kg ?? 0 }))}</p>
-                  </div>
-                  {lote && (
-                    <Button variant="ghost" size="icon" title="Imprimir etiqueta" onClick={() => printDespachoLabel(lote, d)}>
-                      <Printer className="h-4 w-4" />
-                    </Button>
-                  )}
+                <div className="text-right">
+                  <p className="font-medium">{d.num_cajas_despachadas} cjs · {formatPeso(d.peso_neto_kg)}</p>
+                  <p className="text-muted-foreground text-xs">{formatMoneda(d.precio_venta_kg ?? 0)}/kg · Total: {formatMoneda(calcularValorDespacho({ peso_neto_kg: d.peso_neto_kg ?? 0, precio_venta_kg: d.precio_venta_kg ?? 0 }))}</p>
                 </div>
               </div>
             ))}
@@ -265,32 +246,6 @@ export default function DespacharLotePage() {
         </Card>
       )}
     </div>
-
-      {/* Diálogo: imprimir etiqueta de caja */}
-      <Dialog open={Boolean(labelDespacho)} onOpenChange={(open) => { if (!open) setLabelDespacho(null) }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Despacho registrado</DialogTitle>
-          </DialogHeader>
-          {labelDespacho && lote && (
-            <div className="space-y-4">
-              <div className="text-sm space-y-1">
-                <p><span className="text-muted-foreground">Cajas:</span> <strong>{labelDespacho.num_cajas_despachadas}</strong></p>
-                <p><span className="text-muted-foreground">Peso neto:</span> <strong>{formatPeso(labelDespacho.peso_neto_kg)}</strong></p>
-                <p><span className="text-muted-foreground">Fecha:</span> <strong>{formatFecha(labelDespacho.fecha_despacho)}</strong></p>
-              </div>
-              <div className="flex gap-2">
-                <Button className="flex-1" onClick={() => { printDespachoLabel(lote, labelDespacho) }}>
-                  <Printer className="h-4 w-4 mr-1" /> Imprimir etiqueta
-                </Button>
-                <Button variant="outline" className="flex-1" onClick={() => setLabelDespacho(null)}>
-                  Continuar
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <ConfirmDialog
         open={confirmarFinalizar}

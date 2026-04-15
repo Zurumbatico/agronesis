@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Printer } from 'lucide-react'
 import { getLote } from '@/services/lotes.service'
 import { getClasificacionesPorLote } from '@/services/clasificaciones.service'
+import { getEmpaquetadosPorLote } from '@/services/empaquetados.service'
 import { getDespachosPorLote } from '@/services/despachos.service'
 import { getTareoHidroculizadoPorLote } from '@/services/tareo-hidroculizado.service'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -13,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoteTimeline } from './LoteTimeline'
 import { printLoteTicket } from './printLoteTicket'
-import { printDespachoLabel, getTraceabilityCode } from './printDespachoLabel'
+import { printEmpaquetadoLabel } from './printDespachoLabel'
 import {
   ROUTES,
   DESTINO_DESPACHO_CONFIG,
@@ -24,7 +25,7 @@ import {
 } from '@/constants'
 import { formatFecha, formatPeso, formatMoneda } from '@/utils/formatters'
 import { calcularPagoSeleccionador, calcularPesoPorJaba } from '@/utils/business-rules'
-import type { Lote, Clasificacion, Despacho, TareoHidroculizado } from '@/types/models'
+import type { Lote, Clasificacion, Despacho, Empaquetado, TareoHidroculizado } from '@/types/models'
 
 type CuadroLocal = {
   filas: Array<{
@@ -33,9 +34,12 @@ type CuadroLocal = {
     kg_cat2?: string
     peso_bueno_kg?: string
     kg_bruto?: string
+    num_jabas?: string
+    peso_tara_kg?: string
     kg_exportable?: string
     jabas_descartadas?: string
     kg_bruto_descartable?: string
+    peso_tara_descartable_kg?: string
     kg_neto_descartable?: string
   }>
 }
@@ -48,6 +52,7 @@ export default function LoteDetallePage() {
   const [lote, setLote] = useState<Lote | null>(null)
   const [clasificaciones, setClasificaciones] = useState<Clasificacion[]>([])
   const [tareos, setTareos] = useState<TareoHidroculizado[]>([])
+  const [empaquetados, setEmpaquetados] = useState<Empaquetado[]>([])
   const [despachos, setDespachos] = useState<Despacho[]>([])
   const [cuadrosLocales, setCuadrosLocales] = useState<CuadroLocal[] | null>(null)
   const [loading, setLoading] = useState(true)
@@ -57,13 +62,14 @@ export default function LoteDetallePage() {
     if (!id) return
     setLoading(true); setError(null)
     try {
-      const [l, cls, des, tar] = await Promise.all([
+      const [l, cls, emp, des, tar] = await Promise.all([
         getLote(id),
         getClasificacionesPorLote(id),
+        getEmpaquetadosPorLote(id),
         getDespachosPorLote(id),
         getTareoHidroculizadoPorLote(id),
       ])
-      setLote(l); setClasificaciones(cls); setDespachos(des); setTareos(tar)
+      setLote(l); setClasificaciones(cls); setEmpaquetados(emp); setDespachos(des); setTareos(tar)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -127,7 +133,15 @@ export default function LoteDetallePage() {
                 Hidroculizar
               </Button>
             )}
-            {(lote.estado === 'hidroculizado' || lote.estado === 'en_despacho') && (
+            {(lote.estado === 'hidroculizado' || lote.estado === 'empaquetado') && (
+              <Button
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
+                onClick={() => navigate(`/lotes/${id}/empaquetar`)}
+              >
+                Empaquetar
+              </Button>
+            )}
+            {lote.estado === 'en_despacho' && (
               <Button
                 className="bg-agro-green hover:bg-agro-green/90 text-white font-semibold shadow-sm"
                 onClick={() => navigate(`/lotes/${id}/despachar`)}
@@ -280,8 +294,11 @@ export default function LoteDetallePage() {
             const aportesPorColaborador = new Map(aportes.map((a) => [a.colaborador_id, a]))
             const calidad = lote.producto?.calidad ?? 'cat1'
             const totalBrutoClasif = aportes.reduce((s, a) => s + (a.kg_bruto ?? 0), 0)
+            const totalNumJabas = aportes.reduce((s, a) => s + (a.num_jabas ?? 0), 0)
+            const totalPesoTara = aportes.reduce((s, a) => s + ((a.num_jabas ?? 0) * (a.peso_tara_kg ?? 0)), 0)
             const totalJabasDesc = aportes.reduce((s, a) => s + (a.jabas_descartadas ?? 0), 0)
             const totalBrutoDesc = aportes.reduce((s, a) => s + (a.kg_bruto_descartable ?? 0), 0)
+            const totalPesoTaraDesc = aportes.reduce((s, a) => s + ((a.jabas_descartadas ?? 0) * (a.peso_tara_descartable_kg ?? a.peso_tara_kg ?? 0)), 0)
             const totalNetoDesc = aportes.reduce((s, a) => s + (a.kg_neto_descartable ?? 0), 0)
             const aportesAgrupadosPorMesa = (cuadrosLocales ?? [])
               .map((cuadro, index) => ({
@@ -302,12 +319,15 @@ export default function LoteDetallePage() {
                   </span>
                   <span className="text-xs text-primary font-medium">{formatMoneda(calcularPagoSeleccionador(a.peso_bueno_kg, calidad))}</span>
                 </div>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                  <div><span className="block text-[10px]">Kg bruto</span><span className="font-medium text-foreground">{formatPeso(a.kg_bruto ?? 0)}</span></div>
-                  <div><span className="block text-[10px]">Exportables</span><span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span></div>
-                  <div><span className="block text-[10px]">Jabas desc.</span><span className="font-medium text-foreground">{a.jabas_descartadas ?? 0}</span></div>
-                  <div><span className="block text-[10px]">Kg bruto desc.</span><span className="font-medium text-foreground">{formatPeso(a.kg_bruto_descartable ?? 0)}</span></div>
-                  <div><span className="block text-[10px]">Kg neto desc.</span><span className="font-medium text-foreground">{formatPeso(a.kg_neto_descartable ?? 0)}</span></div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2 text-xs text-muted-foreground">
+                  <div><span className="block text-[10px]">Kg brutos</span><span className="font-medium text-foreground">{formatPeso(a.kg_bruto ?? 0)}</span></div>
+                  <div><span className="block text-[10px]">Cantidad de jabas</span><span className="font-medium text-foreground">{a.num_jabas ?? 0}</span></div>
+                  <div><span className="block text-[10px]">Peso tara</span><span className="font-medium text-foreground">{formatPeso(a.peso_tara_kg ?? 0)}</span></div>
+                  <div><span className="block text-[10px]">Kg exportables</span><span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span></div>
+                  <div><span className="block text-[10px]">Kg bruto descarte</span><span className="font-medium text-foreground">{formatPeso(a.kg_bruto_descartable ?? 0)}</span></div>
+                  <div><span className="block text-[10px]">Jabas descarte</span><span className="font-medium text-foreground">{a.jabas_descartadas ?? 0}</span></div>
+                  <div><span className="block text-[10px]">Peso tara descarte</span><span className="font-medium text-foreground">{formatPeso(a.peso_tara_descartable_kg ?? a.peso_tara_kg ?? 0)}</span></div>
+                  <div><span className="block text-[10px]">Kg neto descarte</span><span className="font-medium text-foreground">{formatPeso(a.kg_neto_descartable ?? 0)}</span></div>
                 </div>
               </div>
             )
@@ -318,30 +338,48 @@ export default function LoteDetallePage() {
                   <CardTitle className="text-base">Clasificación</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3 text-sm">
                     <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
-                      <p className="text-xs text-green-700 mb-0.5">Exportables</p>
+                      <p className="text-xs text-green-700 mb-0.5">Kg brutos</p>
+                      <p className="font-bold text-lg text-green-700">{formatPeso(totalBrutoClasif)}</p>
+                    </div>
+                    <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
+                      <p className="text-xs text-green-700 mb-0.5">Cantidad de jabas</p>
+                      <p className="font-bold text-lg text-green-700">{totalNumJabas}</p>
+                    </div>
+                    <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
+                      <p className="text-xs text-green-700 mb-0.5">Peso tara total</p>
+                      <p className="font-bold text-lg text-green-700">{formatPeso(totalPesoTara)}</p>
+                    </div>
+                    <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
+                      <p className="text-xs text-green-700 mb-0.5">Kg exportables</p>
                       <p className="font-bold text-lg text-green-700">{formatPeso(sesion.peso_bueno_kg)}</p>
                     </div>
                     <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
-                      <p className="text-xs text-red-700 mb-0.5">Malos / descarte</p>
-                      <p className="font-bold text-lg text-red-700">{formatPeso(totalesMalos)}</p>
+                      <p className="text-xs text-red-700 mb-0.5">Kg bruto descarte</p>
+                      <p className="font-bold text-lg text-red-700">{formatPeso(totalBrutoDesc)}</p>
+                    </div>
+                    <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
+                      <p className="text-xs text-red-700 mb-0.5">Jabas descarte</p>
+                      <p className="font-bold text-lg text-red-700">{totalJabasDesc}</p>
+                    </div>
+                    <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
+                      <p className="text-xs text-red-700 mb-0.5">Peso tara descarte</p>
+                      <p className="font-bold text-lg text-red-700">{formatPeso(totalPesoTaraDesc)}</p>
+                    </div>
+                    <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
+                      <p className="text-xs text-red-700 mb-0.5">Kg neto descarte</p>
+                      <p className="font-bold text-lg text-red-700">{formatPeso(totalNetoDesc)}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 text-sm">
+                    <div className="rounded-lg bg-muted/30 border p-3 text-center">
+                      <p className="text-xs text-muted-foreground mb-0.5">Neto ingresado</p>
+                      <p className="font-bold text-lg">{formatPeso(lote.peso_neto_kg)}</p>
                     </div>
                     <div className="rounded-lg bg-muted/30 border p-3 text-center">
-                      <p className="text-xs text-muted-foreground mb-0.5">Kg bruto total</p>
-                      <p className="font-bold text-lg">{formatPeso(totalBrutoClasif)}</p>
-                    </div>
-                    <div className="rounded-lg bg-muted/30 border p-3 text-center">
-                      <p className="text-xs text-muted-foreground mb-0.5">Jabas descartadas</p>
-                      <p className="font-bold text-lg">{totalJabasDesc}</p>
-                    </div>
-                    <div className="rounded-lg bg-muted/30 border p-3 text-center">
-                      <p className="text-xs text-muted-foreground mb-0.5">Kg bruto descartable</p>
-                      <p className="font-bold text-lg">{formatPeso(totalBrutoDesc)}</p>
-                    </div>
-                    <div className="rounded-lg bg-muted/30 border p-3 text-center">
-                      <p className="text-xs text-muted-foreground mb-0.5">Kg neto descartable</p>
-                      <p className="font-bold text-lg">{formatPeso(totalNetoDesc)}</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">Malos / pendiente</p>
+                      <p className="font-bold text-lg">{formatPeso(totalesMalos)}</p>
                     </div>
                   </div>
                   {aportes.length > 0 && aportesAgrupadosPorMesa.length === 0 && (
@@ -404,6 +442,52 @@ export default function LoteDetallePage() {
             )
           })()}
 
+          {/* Empaquetado */}
+          {empaquetados.length > 0 && (() => {
+            const totalCajas = empaquetados.reduce((acc, item) => acc + item.num_cajas, 0)
+            const pallets = new Map<string, number>()
+            for (const item of empaquetados) {
+              pallets.set(item.numero_pallet, (pallets.get(item.numero_pallet) ?? 0) + item.num_cajas)
+            }
+            return (
+              <Card>
+                <CardHeader className="pb-2"><CardTitle className="text-base">Empaquetado</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-3 mb-3 text-sm">
+                    <div className="rounded-lg bg-indigo-50 border border-indigo-200 p-3 text-center">
+                      <p className="text-xs text-indigo-700 mb-0.5">Cajas empaquetadas</p>
+                      <p className="font-bold text-lg text-indigo-700">{totalCajas}</p>
+                    </div>
+                    <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-center">
+                      <p className="text-xs text-sky-700 mb-0.5">Pallets usados</p>
+                      <p className="font-bold text-lg text-sky-700">{pallets.size}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {empaquetados.map((item) => (
+                      <div key={item.id} className="border rounded-lg p-3 text-sm">
+                        <div className="flex justify-between items-start gap-3">
+                          <div>
+                            <span className="font-medium">Pallet {item.numero_pallet}</span>
+                            <span className="text-muted-foreground ml-2">{formatFecha(item.fecha_empaquetado)}</span>
+                            <div className="flex gap-4 mt-1 text-muted-foreground">
+                              <span>{item.num_cajas} cajas</span>
+                              <span className="text-foreground font-medium uppercase">{item.destino}</span>
+                            </div>
+                            <p className="font-mono text-xs text-muted-foreground mt-0.5">Traz.: {item.codigo_trazabilidad}</p>
+                          </div>
+                          <Button variant="ghost" size="icon" title="Imprimir etiqueta" onClick={() => printEmpaquetadoLabel(lote, item)}>
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })()}
+
           {/* Despachos */}
           {despachos.length > 0 && (
             <Card>
@@ -420,11 +504,7 @@ export default function LoteDetallePage() {
                           <span className="text-foreground font-medium">{formatMoneda(d.peso_neto_kg * d.precio_venta_kg)}</span>
                         </div>
                         <p className="text-muted-foreground text-xs mt-0.5">Vía: {TIPO_DESPACHO_CONFIG[d.tipo_despacho]?.label ?? d.tipo_despacho}{d.transportista ? ` · Transportista: ${d.transportista}` : ''}{d.placa_vehiculo ? ` · ${d.placa_vehiculo}` : ''}</p>
-                        <p className="font-mono text-xs text-muted-foreground mt-0.5">Traz.: {getTraceabilityCode(lote, d)}</p>
                       </div>
-                      <Button variant="ghost" size="icon" title="Imprimir etiqueta de caja" onClick={() => printDespachoLabel(lote, d)}>
-                        <Printer className="h-4 w-4" />
-                      </Button>
                     </div>
                   </div>
                 ))}

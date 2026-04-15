@@ -92,6 +92,7 @@ export type EstadoLote =
   | 'en_clasificacion'
   | 'clasificado'
   | 'hidroculizado'
+  | 'empaquetado'
   | 'en_despacho'
   | 'despachado'
   | 'liquidado'
@@ -153,8 +154,11 @@ export interface ClasificacionAporte extends BaseEntity {
   kg_cat1: number
   kg_cat2: number
   kg_bruto: number
+  num_jabas: number
+  peso_tara_kg: number
   jabas_descartadas: number
   kg_bruto_descartable: number
+  peso_tara_descartable_kg: number
   kg_neto_descartable: number
   // relaciones
   colaborador?: Colaborador
@@ -172,6 +176,25 @@ export interface ClasificacionMesa extends BaseEntity {
 
 export type ClasificacionMesaInsert = Omit<ClasificacionMesa, keyof BaseEntity>
 export type ClasificacionMesaUpdate = Partial<ClasificacionMesaInsert>
+
+// ─────────────────────────────────────────────
+// EMPAQUETADO
+// ─────────────────────────────────────────────
+export type DestinoEmpaquetado = 'europa'
+
+export interface Empaquetado extends BaseEntity {
+  lote_id: UUID
+  fecha_empaquetado: string
+  destino: DestinoEmpaquetado
+  codigo_trazabilidad: string
+  numero_pallet: string
+  num_cajas: number
+  observaciones: string | null
+  lote?: Lote
+}
+
+export type EmpaquetadoInsert = Omit<Empaquetado, keyof BaseEntity | 'lote'>
+export type EmpaquetadoUpdate = Partial<EmpaquetadoInsert>
 
 // ─────────────────────────────────────────────
 // DESPACHO

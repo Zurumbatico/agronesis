@@ -19,14 +19,28 @@ import { Plus, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { Lote, Colaborador } from '@/types/models'
 
+const roundTo2 = (value: number) => Math.round(value * 100) / 100
+const toNumber = (value: string | number | null | undefined) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+const calcularNetoPorTara = (kgBruto: number, cantidadJabas: number, pesoTara: number) => roundTo2(Math.max(0, kgBruto - (cantidadJabas * pesoTara)))
+const inferirJabas = (kgBruto: number, kgNeto: number, pesoTara: number) => {
+  if (pesoTara <= 0) return 0
+  const diferencia = roundTo2(kgBruto - kgNeto)
+  if (diferencia <= 0) return 0
+  return Math.max(0, Math.round(diferencia / pesoTara))
+}
+
 type Fila = {
   key: string
   colaborador_id: string
   kg_bruto: string
-  kg_exportable: string
+  num_jabas: string
+  peso_tara_kg: string
   jabas_descartadas: string
   kg_bruto_descartable: string
-  kg_neto_descartable: string
+  peso_tara_descartable_kg: string
 }
 type MesaBloque = { key: string; filas: Fila[] }
 
@@ -42,10 +56,11 @@ export default function ClasificarLotePage() {
     key: `${uid}-f-${suffix}`,
     colaborador_id: '',
     kg_bruto: '',
-    kg_exportable: '',
+    num_jabas: '',
+    peso_tara_kg: '',
     jabas_descartadas: '',
     kg_bruto_descartable: '',
-    kg_neto_descartable: '',
+    peso_tara_descartable_kg: '',
   })
 
   const crearMesa = (suffix: string, conFilaInicial = true): MesaBloque => ({
@@ -68,15 +83,31 @@ export default function ClasificarLotePage() {
 
   const todasFilas = mesas.flatMap((m) => m.filas)
   const calidad = lote?.producto?.calidad ?? 'cat1'
-  const totalExportables = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_exportable) || 0), 0)
-  const totalBruto = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_bruto) || 0), 0)
-  const totalJabasDescartadas = todasFilas.reduce((acc, f) => acc + (parseInt(f.jabas_descartadas) || 0), 0)
-  const totalBrutoDescartable = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_bruto_descartable) || 0), 0)
-  const totalNetoDescartable = todasFilas.reduce((acc, f) => acc + (parseFloat(f.kg_neto_descartable) || 0), 0)
-  const totalPagoSeleccionadores = todasFilas.reduce((acc, f) =>
-    acc + calcularPagoSeleccionador(parseFloat(f.kg_exportable) || 0, calidad), 0)
-  const totalMalos = Math.max(0, (lote?.peso_neto_kg ?? 0) - totalExportables)
-  const porcentajeBuenos = lote ? Math.min(100, (totalExportables / lote.peso_neto_kg) * 100) : 0
+  const metricasFilas = todasFilas.map((fila) => {
+    const kgBruto = toNumber(fila.kg_bruto)
+    const numJabas = Math.max(0, Math.trunc(toNumber(fila.num_jabas)))
+    const pesoTaraKg = toNumber(fila.peso_tara_kg || lote?.peso_tara_kg)
+    const kgExportable = calcularNetoPorTara(kgBruto, numJabas, pesoTaraKg)
+    const kgBrutoDescarte = toNumber(fila.kg_bruto_descartable)
+    const jabasDescartadas = Math.max(0, Math.trunc(toNumber(fila.jabas_descartadas)))
+    const pesoTaraDescarteKg = toNumber(fila.peso_tara_descartable_kg || fila.peso_tara_kg || lote?.peso_tara_kg)
+    const kgNetoDescartable = calcularNetoPorTara(kgBrutoDescarte, jabasDescartadas, pesoTaraDescarteKg)
+    return {
+      fila,
+      kgBruto,
+      numJabas,
+      pesoTaraKg,
+      kgExportable,
+      kgBrutoDescarte,
+      jabasDescartadas,
+      pesoTaraDescarteKg,
+      kgNetoDescartable,
+    }
+  })
+  const totalExportables = metricasFilas.reduce((acc, item) => acc + item.kgExportable, 0)
+  const totalNetoDescartable = metricasFilas.reduce((acc, item) => acc + item.kgNetoDescartable, 0)
+  const totalPagoSeleccionadores = metricasFilas.reduce((acc, item) =>
+    acc + calcularPagoSeleccionador(item.kgExportable, calidad), 0)
 
   const cargar = async () => {
     if (!id) return
@@ -99,10 +130,11 @@ export default function ClasificarLotePage() {
           key: `${uid}-loaded-${i}`,
           colaborador_id: a.colaborador_id,
           kg_bruto: String(a.kg_bruto ?? 0),
-          kg_exportable: String(a.peso_bueno_kg),
+          num_jabas: String(a.num_jabas ?? inferirJabas(a.kg_bruto ?? 0, a.peso_bueno_kg, a.peso_tara_kg ?? l.peso_tara_kg ?? 0)),
+          peso_tara_kg: String(a.peso_tara_kg ?? l.peso_tara_kg ?? 0),
           jabas_descartadas: String(a.jabas_descartadas ?? 0),
           kg_bruto_descartable: String(a.kg_bruto_descartable ?? 0),
-          kg_neto_descartable: String(a.kg_neto_descartable ?? 0),
+          peso_tara_descartable_kg: String(a.peso_tara_descartable_kg ?? a.peso_tara_kg ?? l.peso_tara_kg ?? 0),
         }))
 
         if (aportesCargados.length > 0) {
@@ -116,11 +148,15 @@ export default function ClasificarLotePage() {
             const parsed = JSON.parse(raw) as Array<{ filas: Array<{
               colaborador_id: string
               kg_bruto?: string
+              num_jabas?: string
+              peso_tara_kg?: string
               kg_exportable?: string
               kg_bueno?: string
               peso_bueno_kg?: string
               jabas_descartadas?: string
               kg_bruto_descartable?: string
+              peso_tara_descartable_kg?: string
+              peso_tara_kg_descarte?: string
               kg_neto_descartable?: string
             }> }>
             if (Array.isArray(parsed) && parsed.length > 0) {
@@ -132,14 +168,16 @@ export default function ClasificarLotePage() {
                         key: `${uid}-fila-local-${i}-${j}`,
                         colaborador_id: f.colaborador_id ?? '',
                         kg_bruto: String(f.kg_bruto ?? ''),
-                        kg_exportable: String(f.kg_exportable ?? f.kg_bueno ?? f.peso_bueno_kg ?? ''),
+                        num_jabas: String(f.num_jabas ?? inferirJabas(toNumber(f.kg_bruto), toNumber(f.kg_exportable ?? f.kg_bueno ?? f.peso_bueno_kg), toNumber(f.peso_tara_kg ?? l.peso_tara_kg ?? 0))),
+                        peso_tara_kg: String(f.peso_tara_kg ?? l.peso_tara_kg ?? ''),
                         jabas_descartadas: String(f.jabas_descartadas ?? ''),
                         kg_bruto_descartable: String(f.kg_bruto_descartable ?? ''),
-                        kg_neto_descartable: String(f.kg_neto_descartable ?? ''),
+                        peso_tara_descartable_kg: String(f.peso_tara_descartable_kg ?? f.peso_tara_kg_descarte ?? f.peso_tara_kg ?? l.peso_tara_kg ?? ''),
                       }))
                     : [],
                 }))
                 .filter((m) => m.filas.length > 0)
+
               if (mesasDesdeLocal.length > 0) {
                 setMesas(mesasDesdeLocal)
                 setLoading(false)
@@ -231,20 +269,23 @@ export default function ClasificarLotePage() {
     const filasActuales = mesas.flatMap((m) => m.filas)
 
     const hayFilaIncompleta = filasActuales.some((f) => {
-      const exportable = parseFloat(f.kg_exportable)
       const bruto = parseFloat(f.kg_bruto)
+      const numJabas = parseFloat(f.num_jabas)
+      const pesoTara = parseFloat(f.peso_tara_kg || String(lote.peso_tara_kg))
       return !f.colaborador_id
-        || f.kg_exportable.trim() === '' || Number.isNaN(exportable) || exportable < 0
         || f.kg_bruto.trim() === '' || Number.isNaN(bruto) || bruto < 0
+        || f.num_jabas.trim() === '' || Number.isNaN(numJabas) || numJabas < 0
+        || (f.peso_tara_kg.trim() === '' && lote.peso_tara_kg <= 0) || Number.isNaN(pesoTara) || pesoTara < 0
     })
 
     const neto = lote.peso_neto_kg
+    const brutoLote = lote.peso_bruto_kg
 
-    const hayExportableMayorQueBruto = filasActuales.some((f) => {
-      const exportable = parseFloat(f.kg_exportable) || 0
-      const bruto = parseFloat(f.kg_bruto) || 0
-      return exportable > bruto
-    })
+    const hayTaraPrincipalMayorQueBruto = metricasFilas.some((item) => (item.numJabas * item.pesoTaraKg) > item.kgBruto)
+    const hayTaraDescarteMayorQueBruto = metricasFilas.some((item) => (item.jabasDescartadas * item.pesoTaraDescarteKg) > item.kgBrutoDescarte)
+    const hayBrutoPrincipalMayorQueBrutoLote = metricasFilas.some((item) => item.kgBruto > brutoLote)
+    const hayBrutoDescarteMayorQueBrutoLote = metricasFilas.some((item) => item.kgBrutoDescarte > brutoLote)
+    const totalBrutoRegistrado = metricasFilas.reduce((acc, item) => acc + item.kgBruto + item.kgBrutoDescarte, 0)
 
     const hayBrutoMayorQueNeto = filasActuales.some((f) => {
       const bruto = parseFloat(f.kg_bruto) || 0
@@ -262,7 +303,7 @@ export default function ClasificarLotePage() {
     }
 
     if (hayFilaIncompleta) {
-      notifyFormError('Complete todos los trabajadores: seleccionador, kg bruto y kg exportables (0 o mayor).')
+      notifyFormError('Complete todos los trabajadores: seleccionador, kg brutos, cantidad de jabas y peso tara.')
       return
     }
 
@@ -271,18 +312,41 @@ export default function ClasificarLotePage() {
       return
     }
 
-    if (hayExportableMayorQueBruto) {
-      notifyFormError('Los kg exportables no pueden ser mayores que los kg bruto del mismo trabajador.')
+    if (hayBrutoPrincipalMayorQueBrutoLote) {
+      notifyFormError(`El kg bruto principal no puede ser mayor al kg bruto del lote (${formatPeso(brutoLote)}).`)
       return
     }
 
-    const filasValidas = filasActuales.map((f) => ({
-      colaborador_id: f.colaborador_id,
-      kg_bueno: parseFloat(f.kg_exportable) || 0,
-      kg_bruto: parseFloat(f.kg_bruto) || 0,
-      jabas_descartadas: parseInt(f.jabas_descartadas) || 0,
-      kg_bruto_descartable: parseFloat(f.kg_bruto_descartable) || 0,
-      kg_neto_descartable: parseFloat(f.kg_neto_descartable) || 0,
+    if (hayBrutoDescarteMayorQueBrutoLote) {
+      notifyFormError(`El kg bruto descarte no puede ser mayor al kg bruto del lote (${formatPeso(brutoLote)}).`)
+      return
+    }
+
+    if (totalBrutoRegistrado > brutoLote) {
+      notifyFormError(`La suma de kg bruto principal y kg bruto descarte (${formatPeso(totalBrutoRegistrado)}) no puede superar el kg bruto del lote (${formatPeso(brutoLote)}).`)
+      return
+    }
+
+    if (hayTaraPrincipalMayorQueBruto) {
+      notifyFormError('La tara total de la fila principal no puede ser mayor que los kg brutos del trabajador.')
+      return
+    }
+
+    if (hayTaraDescarteMayorQueBruto) {
+      notifyFormError('La tara total del descarte no puede ser mayor que el kg bruto descarte del trabajador.')
+      return
+    }
+
+    const filasValidas = metricasFilas.map((item) => ({
+      colaborador_id: item.fila.colaborador_id,
+      kg_bueno: item.kgExportable,
+      kg_bruto: item.kgBruto,
+      num_jabas: item.numJabas,
+      peso_tara_kg: item.pesoTaraKg,
+      jabas_descartadas: item.jabasDescartadas,
+      kg_bruto_descartable: item.kgBrutoDescarte,
+      peso_tara_descartable_kg: item.pesoTaraDescarteKg,
+      kg_neto_descartable: item.kgNetoDescartable,
     }))
 
     const totalBuenosCalculado = filasValidas.reduce((acc, f) => acc + f.kg_bueno, 0)
@@ -311,10 +375,13 @@ export default function ClasificarLotePage() {
                 filas: m.filas.map((f) => ({
                   colaborador_id: f.colaborador_id,
                   kg_bruto: f.kg_bruto,
-                  kg_exportable: f.kg_exportable,
+                  num_jabas: f.num_jabas,
+                  peso_tara_kg: f.peso_tara_kg || String(lote.peso_tara_kg),
+                  kg_exportable: String(calcularNetoPorTara(toNumber(f.kg_bruto), Math.max(0, Math.trunc(toNumber(f.num_jabas))), toNumber(f.peso_tara_kg || lote.peso_tara_kg))),
                   jabas_descartadas: f.jabas_descartadas,
                   kg_bruto_descartable: f.kg_bruto_descartable,
-                  kg_neto_descartable: f.kg_neto_descartable,
+                  peso_tara_descartable_kg: f.peso_tara_descartable_kg || f.peso_tara_kg || String(lote.peso_tara_kg),
+                  kg_neto_descartable: String(calcularNetoPorTara(toNumber(f.kg_bruto_descartable), Math.max(0, Math.trunc(toNumber(f.jabas_descartadas))), toNumber(f.peso_tara_descartable_kg || f.peso_tara_kg || lote.peso_tara_kg))),
                 })),
               }))
             )
@@ -368,47 +435,18 @@ export default function ClasificarLotePage() {
       {/* Resumen de pesos – se actualiza en tiempo real */}
       <Card className="mb-4">
         <CardContent className="pt-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm mb-3">
-            <div className="rounded-lg bg-muted/30 border p-3 text-center">
-              <p className="text-xs text-muted-foreground mb-0.5">Neto ingresado</p>
-              <p className="font-bold text-base">{formatPeso(lote.peso_neto_kg)}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+            <div className="rounded-lg border bg-muted/20 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Kg netos ingresado</p>
+              <p className="mt-1 font-bold text-lg">{formatPeso(lote.peso_neto_kg)}</p>
             </div>
-            <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
-              <p className="text-xs text-green-700 mb-0.5">Exportables</p>
-              <p className="font-bold text-base text-green-700">{formatPeso(totalExportables)}</p>
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-green-700">Kg exportables</p>
+              <p className="mt-1 font-bold text-lg text-green-700">{formatPeso(totalExportables)}</p>
             </div>
-            <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
-              <p className="text-xs text-red-700 mb-0.5">Pendiente / malos</p>
-              <p className="font-bold text-base text-red-700">{formatPeso(totalMalos)}</p>
-            </div>
-            <div className="rounded-lg bg-muted/30 border p-3 text-center">
-              <p className="text-xs text-muted-foreground mb-0.5">Kg bruto total</p>
-              <p className="font-bold text-base">{formatPeso(totalBruto)}</p>
-            </div>
-            <div className="rounded-lg bg-muted/30 border p-3 text-center">
-              <p className="text-xs text-muted-foreground mb-0.5">Jabas descartadas</p>
-              <p className="font-bold text-base">{totalJabasDescartadas}</p>
-            </div>
-            <div className="rounded-lg bg-muted/30 border p-3 text-center">
-              <p className="text-xs text-muted-foreground mb-0.5">Kg bruto descartable</p>
-              <p className="font-bold text-base">{formatPeso(totalBrutoDescartable)}</p>
-            </div>
-            <div className="rounded-lg bg-muted/30 border p-3 text-center">
-              <p className="text-xs text-muted-foreground mb-0.5">Kg neto descartable</p>
-              <p className="font-bold text-base">{formatPeso(totalNetoDescartable)}</p>
-            </div>
-          </div>
-          {/* Barra de progreso de lo clasificado como bueno */}
-          <div className="space-y-1">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Clasificado como bueno</span>
-              <span>{porcentajeBuenos.toFixed(1)}%</span>
-            </div>
-            <div className="h-2 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-green-500 transition-all duration-300"
-                style={{ width: `${porcentajeBuenos}%` }}
-              />
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Kg de descarte</p>
+              <p className="mt-1 font-bold text-lg text-red-700">{formatPeso(totalNetoDescartable)}</p>
             </div>
           </div>
         </CardContent>
@@ -454,7 +492,17 @@ export default function ClasificarLotePage() {
               )}
 
               {mesa.filas.map((fila, idx) => {
-                const pagoFila = calcularPagoSeleccionador(parseFloat(fila.kg_exportable) || 0, lote.producto?.calidad ?? 'cat1')
+                const kgExportableFila = calcularNetoPorTara(
+                  toNumber(fila.kg_bruto),
+                  Math.max(0, Math.trunc(toNumber(fila.num_jabas))),
+                  toNumber(fila.peso_tara_kg || lote.peso_tara_kg)
+                )
+                const kgNetoDescarteFila = calcularNetoPorTara(
+                  toNumber(fila.kg_bruto_descartable),
+                  Math.max(0, Math.trunc(toNumber(fila.jabas_descartadas))),
+                  toNumber(fila.peso_tara_descartable_kg || fila.peso_tara_kg || lote.peso_tara_kg)
+                )
+                const pagoFila = calcularPagoSeleccionador(kgExportableFila, lote.producto?.calidad ?? 'cat1')
                 return (
                 <div key={fila.key} className="space-y-2 border rounded-lg p-3">
                   <div className="flex items-end gap-2">
@@ -481,9 +529,9 @@ export default function ClasificarLotePage() {
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pl-7">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-7">
                     <div>
-                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg bruto</p>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg brutos</p>
                       <Input
                         type="number"
                         min="0"
@@ -494,29 +542,43 @@ export default function ClasificarLotePage() {
                       />
                     </div>
                     <div>
-                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg exportables</p>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={fila.kg_exportable}
-                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_exportable', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-muted-foreground mb-0.5">Jabas descart.</p>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Cantidad de jabas</p>
                       <Input
                         type="number"
                         min="0"
                         step="1"
                         placeholder="0"
-                        value={fila.jabas_descartadas}
-                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'jabas_descartadas', e.target.value)}
+                        value={fila.num_jabas}
+                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'num_jabas', e.target.value)}
                       />
                     </div>
                     <div>
-                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg bruto desc.</p>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Peso tara</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={String(lote.peso_tara_kg.toFixed(2))}
+                        value={fila.peso_tara_kg}
+                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'peso_tara_kg', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg exportables</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={kgExportableFila.toFixed(2)}
+                        disabled
+                        className="bg-muted/40 text-foreground disabled:opacity-100 disabled:text-foreground"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pl-7">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg bruto descarte</p>
                       <Input
                         type="number"
                         min="0"
@@ -527,14 +589,36 @@ export default function ClasificarLotePage() {
                       />
                     </div>
                     <div>
-                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg neto desc.</p>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Cantidad de jabas descarte</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                        value={fila.jabas_descartadas}
+                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'jabas_descartadas', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Peso tara</p>
                       <Input
                         type="number"
                         min="0"
                         step="0.01"
-                        placeholder="0.00"
-                        value={fila.kg_neto_descartable}
-                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'kg_neto_descartable', e.target.value)}
+                        placeholder={String(lote.peso_tara_kg.toFixed(2))}
+                        value={fila.peso_tara_descartable_kg}
+                        onChange={(e) => actualizarFilaEnMesa(mesa.key, fila.key, 'peso_tara_descartable_kg', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Kg neto descarte</p>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={kgNetoDescarteFila.toFixed(2)}
+                        disabled
+                        className="bg-muted/40 text-foreground disabled:opacity-100 disabled:text-foreground"
                       />
                     </div>
                   </div>

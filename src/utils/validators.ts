@@ -54,6 +54,14 @@ export const cantidadEnteraSchema = z
 export const observacionesSchema = z
   .preprocess(nullableUpperTrim, z.string().max(500).nullable())
 
+const codigoPalletSchema = z
+  .string()
+  .trim()
+  .min(1, 'Ingrese el número de pallet')
+  .max(30, 'Máximo 30 caracteres')
+  .regex(/^[A-Z0-9_-]+$/i, 'Solo letras, números, guión o guión bajo')
+  .transform((value) => value.toUpperCase())
+
 // ─────────────────────────────────────────────
 // SCHEMAS DE ENTIDADES
 // ─────────────────────────────────────────────
@@ -189,6 +197,18 @@ export const despachoSchema = z.object({
   observaciones:        observacionesSchema,
 })
 
+export const empaquetadoSchema = z.object({
+  lote_id: z.string().uuid(),
+  fecha_empaquetado: z.string().min(1, 'Ingrese la fecha'),
+  destino: z.enum(['europa']),
+  codigo_trazabilidad: z.string().trim().min(1, 'Código de trazabilidad inválido'),
+  numero_pallet: codigoPalletSchema,
+  num_cajas: cantidadEnteraSchema
+    .refine((value) => value > 0, 'Ingrese al menos 1 caja')
+    .refine((value) => value <= 172, 'No puede exceder 172 cajas por registro'),
+  observaciones: observacionesSchema,
+})
+
 export const movimientoCubetaSchema = z.object({
   agricultor_id: z.string().uuid('Seleccione un agricultor'),
   lote_id:       z.string().uuid().optional().or(z.literal('')).transform((v) => v || null),
@@ -208,5 +228,6 @@ export type ProductoFormData         = z.infer<typeof productoSchema>
 export type CentroAcopioFormData     = z.infer<typeof centroAcopioSchema>
 export type LoteFormData             = z.infer<typeof loteSchema>
 export type ClasificacionFormData    = z.infer<typeof clasificacionSchema>
+export type EmpaquetadoFormData      = z.infer<typeof empaquetadoSchema>
 export type DespachoFormData         = z.infer<typeof despachoSchema>
 export type MovimientoCubetaFormData = z.infer<typeof movimientoCubetaSchema>
