@@ -488,7 +488,7 @@ create table if not exists public.empaquetados (
   created_by uuid not null references auth.users(id) on delete restrict,
   lote_id uuid not null references public.lotes(id) on delete cascade,
   fecha_empaquetado date not null,
-  destino text not null default 'europa' check (destino in ('europa')),
+  destino text not null default 'europa' check (destino in ('europa', 'usa')),
   codigo_trazabilidad text not null,
   numero_pallet text not null,
   num_cajas integer not null check (num_cajas > 0),
@@ -875,6 +875,30 @@ drop policy if exists config_precios_authenticated_all on public.config_precios;
 create policy config_precios_authenticated_all on public.config_precios for all to authenticated using (true) with check (auth.uid() is not null);
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- CONFIG_SISTEMA — parámetros globales de operación
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.config_sistema (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  created_by uuid not null references auth.users(id) on delete restrict,
+  clave text not null unique,
+  nombre text not null,
+  descripcion text null,
+  valor_texto text null,
+  valor_numerico numeric(12,4) null
+);
+
+create index if not exists idx_config_sistema_clave on public.config_sistema(clave);
+
+drop trigger if exists trg_config_sistema_updated_at on public.config_sistema;
+create trigger trg_config_sistema_updated_at before update on public.config_sistema for each row execute function public.set_updated_at();
+
+alter table public.config_sistema enable row level security;
+drop policy if exists config_sistema_authenticated_all on public.config_sistema;
+create policy config_sistema_authenticated_all on public.config_sistema for all to authenticated using (true) with check (auth.uid() is not null);
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- CLASIFICACION_APORTES — desglose kg por categoría para pago al seleccionador
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.clasificacion_aportes add column if not exists kg_cat1 numeric(12,2) not null default 0 check (kg_cat1 >= 0);
@@ -892,44 +916,35 @@ alter table public.clasificacion_aportes add column if not exists kg_neto_descar
 -- ─────────────────────────────────────────────────────────────────────────────
 -- PLANILLA_DETALLES — desglose de pago por selección (Tareo A)
 -- ─────────────────────────────────────────────────────────────────────────────
-alter table public.planilla_detalles add column if not exists kg_cat1_seleccion numeric(12,2) not null default 0 check (kg_cat1_seleccion >= 0);
-alter table public.planilla_detalles add column if not exists kg_cat2_seleccion numeric(12,2) not null default 0 check (kg_cat2_seleccion >= 0);
-alter table public.planilla_detalles add column if not exists pago_seleccion numeric(10,2) not null default 0 check (pago_seleccion >= 0);
+do $$
+begin
+  if to_regclass('public.planilla_detalles') is not null then
+    alter table public.planilla_detalles add column if not exists kg_cat1_seleccion numeric(12,2) not null default 0 check (kg_cat1_seleccion >= 0);
+    alter table public.planilla_detalles add column if not exists kg_cat2_seleccion numeric(12,2) not null default 0 check (kg_cat2_seleccion >= 0);
+    alter table public.planilla_detalles add column if not exists pago_seleccion numeric(10,2) not null default 0 check (pago_seleccion >= 0);
+  end if;
+end;
+$$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- LOTES — ampliar constraint de estado para incluir 'hidroculizado'
+-- LOTES — constraint de estado sin etapa de hidroculizado
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.lotes drop constraint if exists lotes_estado_check;
 alter table public.lotes add constraint lotes_estado_check
-  check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'hidroculizado', 'empaquetado', 'en_despacho', 'despachado', 'liquidado'));
+  check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'empaquetado', 'en_despacho', 'despachado', 'liquidado'));
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- TAREO_HIDROCULIZADO — Módulo 4 / Tareo B
--- Registro diario de operarios que trabajaron en el proceso de hidroculizado.
+-- LIMPIEZA — retirar hidroculizado del flujo
 -- ─────────────────────────────────────────────────────────────────────────────
-create table if not exists public.tareo_hidroculizado (
-  id uuid primary key default gen_random_uuid(),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  created_by uuid not null references auth.users(id) on delete restrict,
-  lote_id uuid not null references public.lotes(id) on delete cascade,
-  colaborador_id uuid not null references public.colaboradores(id) on delete restrict,
-  fecha date not null,
-  n_jabas integer not null check (n_jabas > 0),
-  observaciones text null,
-  constraint uq_tareo_hidro_lote_colaborador_fecha unique (lote_id, colaborador_id, fecha)
-);
-
-create index if not exists idx_tareo_hidro_lote_id on public.tareo_hidroculizado(lote_id);
-create index if not exists idx_tareo_hidro_colaborador_id on public.tareo_hidroculizado(colaborador_id);
-create index if not exists idx_tareo_hidro_fecha on public.tareo_hidroculizado(fecha);
-
-drop trigger if exists trg_tareo_hidroculizado_updated_at on public.tareo_hidroculizado;
-create trigger trg_tareo_hidroculizado_updated_at before update on public.tareo_hidroculizado for each row execute function public.set_updated_at();
-
-alter table public.tareo_hidroculizado enable row level security;
-drop policy if exists tareo_hidroculizado_authenticated_all on public.tareo_hidroculizado;
-create policy tareo_hidroculizado_authenticated_all on public.tareo_hidroculizado for all to authenticated using (true) with check (auth.uid() is not null);
+do $$
+begin
+  if to_regclass('public.tareo_hidroculizado') is not null then
+    execute 'drop trigger if exists trg_tareo_hidroculizado_updated_at on public.tareo_hidroculizado';
+    execute 'drop policy if exists tareo_hidroculizado_authenticated_all on public.tareo_hidroculizado';
+    execute 'drop table if exists public.tareo_hidroculizado';
+  end if;
+end;
+$$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- PLANILLAS_QUINCENALES — Módulo 9
@@ -958,6 +973,14 @@ create policy planillas_quincenales_authenticated_all on public.planillas_quince
 -- ─────────────────────────────────────────────────────────────────────────────
 -- PLANILLA_DETALLES — línea por trabajador dentro de la planilla
 -- ─────────────────────────────────────────────────────────────────────────────
+do $$
+begin
+  if to_regclass('public.planilla_detalles') is not null then
+    alter table public.planilla_detalles drop column if exists n_jabas_hidroculizado;
+  end if;
+end;
+$$;
+
 create table if not exists public.planilla_detalles (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -965,7 +988,9 @@ create table if not exists public.planilla_detalles (
   created_by uuid not null references auth.users(id) on delete restrict,
   planilla_id uuid not null references public.planillas_quincenales(id) on delete cascade,
   colaborador_id uuid not null references public.colaboradores(id) on delete restrict,
-  n_jabas_hidroculizado integer not null default 0 check (n_jabas_hidroculizado >= 0),
+  kg_cat1_seleccion numeric(12,2) not null default 0 check (kg_cat1_seleccion >= 0),
+  kg_cat2_seleccion numeric(12,2) not null default 0 check (kg_cat2_seleccion >= 0),
+  pago_seleccion numeric(10,2) not null default 0 check (pago_seleccion >= 0),
   n_cajas_empaquetado integer not null default 0 check (n_cajas_empaquetado >= 0),
   monto_empaquetado numeric(10,2) not null default 0 check (monto_empaquetado >= 0),
   otros_montos numeric(10,2) not null default 0,

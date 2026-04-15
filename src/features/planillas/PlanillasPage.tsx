@@ -5,7 +5,7 @@ import {
   createPlanillaQuincenal,
   pagarPlanilla,
   getPlanillaConDetalles,
-  getResumenHidroculizadoPeriodo,
+  getResumenColaboradoresPeriodo,
   type ResumenColaboradorPeriodo,
 } from '@/services/planillas.service'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -37,7 +37,6 @@ type DetalleForm = {
   kg_cat1_seleccion: number
   kg_cat2_seleccion: number
   pago_seleccion: number
-  n_jabas_hidroculizado: number
   n_cajas_empaquetado: number
   otros_montos: number
 }
@@ -87,14 +86,13 @@ export default function PlanillasPage() {
     if (!watchInicio || !watchFin) return
     setCargandoResumen(true)
     try {
-      const resumen: ResumenColaboradorPeriodo[] = await getResumenHidroculizadoPeriodo(watchInicio, watchFin)
+      const resumen: ResumenColaboradorPeriodo[] = await getResumenColaboradoresPeriodo(watchInicio, watchFin)
       replace(resumen.map((r) => ({
         colaborador_id: r.colaborador_id,
         nombre_display: `${r.apellido}, ${r.nombre}`,
         kg_cat1_seleccion: r.kg_cat1_seleccion,
         kg_cat2_seleccion: r.kg_cat2_seleccion,
         pago_seleccion: r.pago_seleccion,
-        n_jabas_hidroculizado: r.n_jabas_hidroculizado,
         n_cajas_empaquetado: 0,
         otros_montos: 0,
       })))
@@ -116,7 +114,6 @@ export default function PlanillasPage() {
         kg_cat1_seleccion: d.kg_cat1_seleccion,
         kg_cat2_seleccion: d.kg_cat2_seleccion,
         pago_seleccion: d.pago_seleccion,
-        n_jabas_hidroculizado: d.n_jabas_hidroculizado,
         n_cajas_empaquetado: d.n_cajas_empaquetado,
         monto_empaquetado,
         otros_montos: d.otros_montos ?? 0,
@@ -174,7 +171,7 @@ export default function PlanillasPage() {
     <div className="max-w-4xl mx-auto">
       <PageHeader
         title="Planilla Quincenal"
-        description="Liquidación de trabajadores — Tareo B (Hidroculizado) + Tareo D (Empaquetado)"
+        description="Liquidación de trabajadores por selección y empaquetado"
         actions={
           !creando ? (
             <Button onClick={() => setCreando(true)}>Nueva planilla</Button>
@@ -204,7 +201,7 @@ export default function PlanillasPage() {
                 </FormField>
               </div>
 
-              {/* Pre-cargar desde tareos */}
+              {/* Pre-cargar desde clasificación */}
               <div className="flex items-center gap-3">
                 <Button
                   type="button"
@@ -213,7 +210,7 @@ export default function PlanillasPage() {
                   disabled={cargandoResumen}
                   onClick={cargarResumen}
                 >
-                  {cargandoResumen ? 'Cargando...' : 'Cargar operarios desde tareos del período'}
+                  {cargandoResumen ? 'Cargando...' : 'Cargar colaboradores del período'}
                 </Button>
                 {fields.length > 0 && (
                   <p className="text-xs text-muted-foreground">{fields.length} operario(s) cargados</p>
@@ -253,10 +250,6 @@ export default function PlanillasPage() {
                               <div className="flex justify-between gap-4">
                                 <span>Cat2: {field.kg_cat2_seleccion.toFixed(2)} kg × S/0.28</span>
                                 <span className="text-foreground">{formatMoneda(field.kg_cat2_seleccion * 0.28)}</span>
-                              </div>
-                              <div className="flex justify-between gap-4 border-t pt-0.5 mt-1">
-                                <span className="text-muted-foreground">Jabas hidroc.</span>
-                                <span>{watch(`detalles.${i}.n_jabas_hidroculizado`) || 0}</span>
                               </div>
                             </div>
                           </div>
@@ -386,8 +379,7 @@ export default function PlanillasPage() {
                               <p className="font-bold text-green-700">{formatMoneda(d.pago_seleccion)}</p>
                               <p className="text-xs text-muted-foreground mt-1">
                                 Cat1: {d.kg_cat1_seleccion.toFixed(2)} kg<br />
-                                Cat2: {d.kg_cat2_seleccion.toFixed(2)} kg<br />
-                                Jabas hidroc.: {d.n_jabas_hidroculizado}
+                                Cat2: {d.kg_cat2_seleccion.toFixed(2)} kg
                               </p>
                             </div>
                             <div className="px-3 py-2">

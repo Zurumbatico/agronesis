@@ -71,10 +71,9 @@ export interface ResumenColaboradorPeriodo {
   kg_cat1_seleccion: number
   kg_cat2_seleccion: number
   pago_seleccion: number
-  n_jabas_hidroculizado: number
 }
 
-export async function getResumenHidroculizadoPeriodo(
+export async function getResumenColaboradoresPeriodo(
   fechaInicio: string,
   fechaFin: string
 ): Promise<ResumenColaboradorPeriodo[]> {
@@ -106,7 +105,6 @@ export async function getResumenHidroculizadoPeriodo(
           kg_cat1_seleccion: 0,
           kg_cat2_seleccion: 0,
           pago_seleccion: 0,
-          n_jabas_hidroculizado: 0,
         })
       }
       const entry = mapa.get(cid)!
@@ -118,30 +116,6 @@ export async function getResumenHidroculizadoPeriodo(
         (entry.kg_cat1_seleccion * 0.20 + entry.kg_cat2_seleccion * 0.28) * 100
       ) / 100
     })
-  }
-
-  // 2. Jabas de hidroculizado del período
-  const { data: hidro, error: errHidro } = await supabase
-    .from('tareo_hidroculizado')
-    .select('colaborador_id, n_jabas, colaborador:colaboradores(nombre, apellido)')
-    .gte('fecha', fechaInicio)
-    .lte('fecha', fechaFin)
-  if (errHidro) throw new Error(errHidro.message)
-
-  for (const row of hidro as any[]) {
-    const cid = row.colaborador_id
-    if (!mapa.has(cid)) {
-      mapa.set(cid, {
-        colaborador_id: cid,
-        nombre: row.colaborador?.nombre ?? '',
-        apellido: row.colaborador?.apellido ?? '',
-        kg_cat1_seleccion: 0,
-        kg_cat2_seleccion: 0,
-        pago_seleccion: 0,
-        n_jabas_hidroculizado: 0,
-      })
-    }
-    mapa.get(cid)!.n_jabas_hidroculizado += row.n_jabas
   }
 
   return Array.from(mapa.values())

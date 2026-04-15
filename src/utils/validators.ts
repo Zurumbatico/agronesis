@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { normalizarNumeroPallet } from './business-rules'
 
 // ─────────────────────────────────────────────
 // SCHEMAS DE VALIDACIÓN REUTILIZABLES
@@ -58,9 +59,12 @@ const codigoPalletSchema = z
   .string()
   .trim()
   .min(1, 'Ingrese el número de pallet')
-  .max(30, 'Máximo 30 caracteres')
-  .regex(/^[A-Z0-9_-]+$/i, 'Solo letras, números, guión o guión bajo')
-  .transform((value) => value.toUpperCase())
+  .regex(/^\d{1,3}$/, 'El pallet debe tener entre 1 y 3 dígitos')
+  .refine((value) => {
+    const numero = Number.parseInt(value, 10)
+    return numero >= 1 && numero <= 999
+  }, 'El pallet debe estar entre 001 y 999')
+  .transform((value) => normalizarNumeroPallet(value))
 
 // ─────────────────────────────────────────────
 // SCHEMAS DE ENTIDADES
@@ -200,7 +204,7 @@ export const despachoSchema = z.object({
 export const empaquetadoSchema = z.object({
   lote_id: z.string().uuid(),
   fecha_empaquetado: z.string().min(1, 'Ingrese la fecha'),
-  destino: z.enum(['europa']),
+  destino: z.enum(['europa', 'usa']),
   codigo_trazabilidad: z.string().trim().min(1, 'Código de trazabilidad inválido'),
   numero_pallet: codigoPalletSchema,
   num_cajas: cantidadEnteraSchema

@@ -1,17 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import {
-  BarChart,
-  Bar,
-  CartesianGrid,
-  ComposedChart,
   Legend,
-  Line,
+  Pie,
+  PieChart,
   ResponsiveContainer,
   Tooltip,
-  XAxis,
-  YAxis,
+  Cell,
 } from 'recharts'
-import { endOfMonth, format, parseISO, startOfMonth, subDays } from 'date-fns'
+import { endOfMonth, format, startOfMonth, subDays } from 'date-fns'
 import { Boxes, CalendarRange, Package, Trash2, TrendingDown } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingPage } from '@/components/shared/Spinner'
@@ -55,6 +51,15 @@ interface StatCardProps {
   icon: React.ReactNode
 }
 
+type PieMetricKey = 'ingresado' | 'exportable' | 'descarte'
+
+type PieMetricDatum = {
+  name: string
+  value: number
+  percentage: number
+  color: string
+}
+
 function StatCard({ title, value, sub, icon }: StatCardProps) {
   return (
     <Card>
@@ -67,6 +72,93 @@ function StatCard({ title, value, sub, icon }: StatCardProps) {
           <p className="font-bold text-xl">{value}</p>
           {sub && <p className="text-muted-foreground text-xs">{sub}</p>}
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+const VARIEDAD_COLORS: Record<VariedadProducto, string> = {
+  snow_peas: '#1d4ed8',
+  sugar: '#16a34a',
+}
+
+function PorcentajePieCard({
+  title,
+  description,
+  totalLabel,
+  data,
+}: {
+  title: string
+  description: string
+  totalLabel: string
+  data: PieMetricDatum[]
+}) {
+  const total = roundTo2(data.reduce((acc, item) => acc + item.value, 0))
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {total > 0 ? (
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_220px] gap-4 items-center">
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={68}
+                    outerRadius={104}
+                    paddingAngle={2}
+                    stroke="#ffffff"
+                    strokeWidth={3}
+                    labelLine={false}
+                    label={({ percent }) => ((percent ?? 0) >= 0.08 ? `${((percent ?? 0) * 100).toFixed(1)}%` : '')}
+                  >
+                    {data.map((item) => (
+                      <Cell key={item.name} fill={item.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={((value: unknown, _name: unknown, item: { payload?: PieMetricDatum }) => {
+                    const metricValue = Number(value ?? 0)
+                    const percentage = item?.payload?.percentage ?? 0
+                    return [`${metricValue.toFixed(2)} kg · ${percentage.toFixed(1)}%`, item?.payload?.name ?? '']
+                  }) as never} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="space-y-3">
+              <div className="rounded-xl border bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">{totalLabel}</p>
+                <p className="mt-1 text-2xl font-bold">{total.toFixed(2)} kg</p>
+              </div>
+              <div className="space-y-2">
+                {data.map((item) => (
+                  <div key={item.name} className="flex items-center justify-between rounded-lg border px-3 py-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                      <span>{item.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">{item.percentage.toFixed(1)}%</p>
+                      <p className="text-xs text-muted-foreground">{item.value.toFixed(2)} kg</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="h-[280px] rounded-xl border border-dashed bg-muted/10 flex items-center justify-center text-sm text-muted-foreground">
+            No hay datos suficientes en el filtro actual para este gráfico.
+          </div>
+        )}
       </CardContent>
     </Card>
   )
@@ -99,10 +191,6 @@ function buildMetricRow(lote: Lote, clasificaciones: DashboardClasificacionRow[]
     descarte,
     merma,
   }
-}
-
-function formatShortDate(isoDate: string) {
-  return format(parseISO(isoDate), 'dd/MM')
 }
 
 export default function DashboardPage() {
@@ -199,38 +287,22 @@ export default function DashboardPage() {
     merma: 0,
   })
 
-  const serieDiaria = Array.from(filteredRows.reduce((acc, row) => {
-    const current = acc.get(row.fecha) ?? {
-      fecha: row.fecha,
-      label: formatShortDate(row.fecha),
-      ingresado: 0,
-      exportable: 0,
-      descarte: 0,
-      merma: 0,
-    }
+  const buildPieMetricData = (metric: PieMetricKey): PieMetricDatum[] => {
+    const total = resumenPorVariedad.reduce((acc, item) => acc + item[metric], 0)
 
-    current.ingresado = roundTo2(current.ingresado + row.ingresado)
-    current.exportable = roundTo2(current.exportable + row.exportable)
-    current.descarte = roundTo2(current.descarte + row.descarte)
-    current.merma = roundTo2(current.merma + row.merma)
-    acc.set(row.fecha, current)
-    return acc
-  }, new Map<string, {
-    fecha: string
-    label: string
-    ingresado: number
-    exportable: number
-    descarte: number
-    merma: number
-  }>()).values()).sort((a, b) => a.fecha.localeCompare(b.fecha))
+    return resumenPorVariedad
+      .filter((item) => item[metric] > 0)
+      .map((item) => ({
+        name: item.label,
+        value: roundTo2(item[metric]),
+        percentage: total > 0 ? roundTo2((item[metric] / total) * 100) : 0,
+        color: VARIEDAD_COLORS[item.variedad],
+      }))
+  }
 
-  const comparativoVariedad = resumenPorVariedad.map((item) => ({
-    variedad: item.label,
-    ingresado: item.ingresado,
-    exportable: item.exportable,
-    descarte: item.descarte,
-    merma: item.merma,
-  }))
+  const pieIngresado = buildPieMetricData('ingresado')
+  const pieExportable = buildPieMetricData('exportable')
+  const pieDescarte = buildPieMetricData('descarte')
 
   const aplicarHoy = () => {
     setFilterMode('dia')
@@ -363,53 +435,26 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {serieDiaria.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Comportamiento diario</CardTitle>
-            <CardDescription>Serie diaria del rango filtrado. La línea representa kg netos ingresados.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={serieDiaria} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={((value: unknown) => `${Number(value ?? 0).toFixed(2)} kg`) as never} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="exportable" name="Exportables" fill="#16a34a" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="descarte" name="Descarte" fill="#dc2626" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="merma" name="Merma" fill="#d97706" radius={[4, 4, 0, 0]} />
-                <Line type="monotone" dataKey="ingresado" name="Netos ingresados" stroke="#1d4ed8" strokeWidth={2.5} dot={{ r: 3 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {comparativoVariedad.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Comparativo por variedad</CardTitle>
-            <CardDescription>Comparación consolidada de ingreso, exportable, descarte y merma.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={comparativoVariedad} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="variedad" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={((value: unknown) => `${Number(value ?? 0).toFixed(2)} kg`) as never} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="ingresado" name="Netos ingresados" fill="#1d4ed8" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="exportable" name="Exportables" fill="#16a34a" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="descarte" name="Descarte" fill="#dc2626" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="merma" name="Merma" fill="#d97706" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <PorcentajePieCard
+          title="Ingresado por variedad"
+          description="Porcentaje de kg netos ingresados por variedad en el día o rango seleccionado."
+          totalLabel="Total ingresado"
+          data={pieIngresado}
+        />
+        <PorcentajePieCard
+          title="Exportable por variedad"
+          description="Distribución porcentual de kg exportables según el filtro aplicado."
+          totalLabel="Total exportable"
+          data={pieExportable}
+        />
+        <PorcentajePieCard
+          title="Descarte por variedad"
+          description="Participación porcentual del descarte por variedad dentro del filtro actual."
+          totalLabel="Total descarte"
+          data={pieDescarte}
+        />
+      </div>
 
       {filteredRows.length === 0 && (
         <Card>

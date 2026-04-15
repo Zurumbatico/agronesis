@@ -90,7 +90,7 @@ export default function ClasificarLotePage() {
     const kgExportable = calcularNetoPorTara(kgBruto, numJabas, pesoTaraKg)
     const kgBrutoDescarte = toNumber(fila.kg_bruto_descartable)
     const jabasDescartadas = Math.max(0, Math.trunc(toNumber(fila.jabas_descartadas)))
-    const pesoTaraDescarteKg = toNumber(fila.peso_tara_descartable_kg || fila.peso_tara_kg || lote?.peso_tara_kg)
+    const pesoTaraDescarteKg = toNumber(fila.peso_tara_descartable_kg || lote?.peso_tara_kg)
     const kgNetoDescartable = calcularNetoPorTara(kgBrutoDescarte, jabasDescartadas, pesoTaraDescarteKg)
     return {
       fila,
@@ -106,6 +106,7 @@ export default function ClasificarLotePage() {
   })
   const totalExportables = metricasFilas.reduce((acc, item) => acc + item.kgExportable, 0)
   const totalNetoDescartable = metricasFilas.reduce((acc, item) => acc + item.kgNetoDescartable, 0)
+  const totalMerma = Math.max(0, (lote?.peso_neto_kg ?? 0) - (totalExportables + totalNetoDescartable))
   const totalPagoSeleccionadores = metricasFilas.reduce((acc, item) =>
     acc + calcularPagoSeleccionador(item.kgExportable, calidad), 0)
 
@@ -134,7 +135,7 @@ export default function ClasificarLotePage() {
           peso_tara_kg: String(a.peso_tara_kg ?? l.peso_tara_kg ?? 0),
           jabas_descartadas: String(a.jabas_descartadas ?? 0),
           kg_bruto_descartable: String(a.kg_bruto_descartable ?? 0),
-          peso_tara_descartable_kg: String(a.peso_tara_descartable_kg ?? a.peso_tara_kg ?? l.peso_tara_kg ?? 0),
+          peso_tara_descartable_kg: String(a.peso_tara_descartable_kg ?? l.peso_tara_kg ?? 0),
         }))
 
         if (aportesCargados.length > 0) {
@@ -172,7 +173,7 @@ export default function ClasificarLotePage() {
                         peso_tara_kg: String(f.peso_tara_kg ?? l.peso_tara_kg ?? ''),
                         jabas_descartadas: String(f.jabas_descartadas ?? ''),
                         kg_bruto_descartable: String(f.kg_bruto_descartable ?? ''),
-                        peso_tara_descartable_kg: String(f.peso_tara_descartable_kg ?? f.peso_tara_kg_descarte ?? f.peso_tara_kg ?? l.peso_tara_kg ?? ''),
+                        peso_tara_descartable_kg: String(f.peso_tara_descartable_kg ?? f.peso_tara_kg_descarte ?? l.peso_tara_kg ?? ''),
                       }))
                     : [],
                 }))
@@ -350,8 +351,10 @@ export default function ClasificarLotePage() {
     }))
 
     const totalBuenosCalculado = filasValidas.reduce((acc, f) => acc + f.kg_bueno, 0)
-    if (totalBuenosCalculado > neto) {
-      notifyFormError(`La suma de kg exportables (${formatPeso(totalBuenosCalculado)}) no puede ser mayor al neto (${formatPeso(neto)}).`)
+    const totalDescarteCalculado = filasValidas.reduce((acc, f) => acc + f.kg_neto_descartable, 0)
+    const totalClasificadoCalculado = totalBuenosCalculado + totalDescarteCalculado
+    if (totalClasificadoCalculado > neto) {
+      notifyFormError(`La suma de kg exportables y descarte (${formatPeso(totalClasificadoCalculado)}) no puede ser mayor al neto (${formatPeso(neto)}).`)
       return
     }
 
@@ -380,8 +383,8 @@ export default function ClasificarLotePage() {
                   kg_exportable: String(calcularNetoPorTara(toNumber(f.kg_bruto), Math.max(0, Math.trunc(toNumber(f.num_jabas))), toNumber(f.peso_tara_kg || lote.peso_tara_kg))),
                   jabas_descartadas: f.jabas_descartadas,
                   kg_bruto_descartable: f.kg_bruto_descartable,
-                  peso_tara_descartable_kg: f.peso_tara_descartable_kg || f.peso_tara_kg || String(lote.peso_tara_kg),
-                  kg_neto_descartable: String(calcularNetoPorTara(toNumber(f.kg_bruto_descartable), Math.max(0, Math.trunc(toNumber(f.jabas_descartadas))), toNumber(f.peso_tara_descartable_kg || f.peso_tara_kg || lote.peso_tara_kg))),
+                  peso_tara_descartable_kg: f.peso_tara_descartable_kg || String(lote.peso_tara_kg),
+                  kg_neto_descartable: String(calcularNetoPorTara(toNumber(f.kg_bruto_descartable), Math.max(0, Math.trunc(toNumber(f.jabas_descartadas))), toNumber(f.peso_tara_descartable_kg || lote.peso_tara_kg))),
                 })),
               }))
             )
@@ -435,7 +438,7 @@ export default function ClasificarLotePage() {
       {/* Resumen de pesos – se actualiza en tiempo real */}
       <Card className="mb-4">
         <CardContent className="pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 text-sm">
             <div className="rounded-lg border bg-muted/20 p-4 text-center">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Kg netos ingresado</p>
               <p className="mt-1 font-bold text-lg">{formatPeso(lote.peso_neto_kg)}</p>
@@ -447,6 +450,10 @@ export default function ClasificarLotePage() {
             <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Kg de descarte</p>
               <p className="mt-1 font-bold text-lg text-red-700">{formatPeso(totalNetoDescartable)}</p>
+            </div>
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Merma</p>
+              <p className="mt-1 font-bold text-lg text-amber-700">{formatPeso(totalMerma)}</p>
             </div>
           </div>
         </CardContent>
@@ -500,7 +507,7 @@ export default function ClasificarLotePage() {
                 const kgNetoDescarteFila = calcularNetoPorTara(
                   toNumber(fila.kg_bruto_descartable),
                   Math.max(0, Math.trunc(toNumber(fila.jabas_descartadas))),
-                  toNumber(fila.peso_tara_descartable_kg || fila.peso_tara_kg || lote.peso_tara_kg)
+                  toNumber(fila.peso_tara_descartable_kg || lote.peso_tara_kg)
                 )
                 const pagoFila = calcularPagoSeleccionador(kgExportableFila, lote.producto?.calidad ?? 'cat1')
                 return (
@@ -643,6 +650,7 @@ export default function ClasificarLotePage() {
 
         <div className="flex justify-between pt-2 border-t text-sm">
           <span className="font-semibold text-green-700">Total exportables: {formatPeso(totalExportables)}</span>
+          <span className="text-muted-foreground">Merma actual: <strong className="text-amber-700">{formatPeso(totalMerma)}</strong></span>
           <span className="text-muted-foreground">Pago est. seleccionadores: <strong className="text-green-700">S/ {totalPagoSeleccionadores.toFixed(2)}</strong></span>
         </div>
       </div>

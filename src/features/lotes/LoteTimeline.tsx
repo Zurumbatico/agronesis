@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 const PASOS: EstadoLote[] = [
   'ingresado', 'en_clasificacion', 'clasificado',
-  'hidroculizado', 'empaquetado', 'en_despacho', 'despachado', 'liquidado',
+  'empaquetado', 'en_despacho', 'despachado', 'liquidado',
 ]
 
 interface LoteTimelineProps {

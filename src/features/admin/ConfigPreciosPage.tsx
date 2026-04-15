@@ -2,7 +2,15 @@ import { useState, useEffect } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { getConfigPrecios, createConfigPrecio, updateConfigPrecio, deleteConfigPrecio } from '@/services/config-precios.service'
+import {
+  getConfigPrecios,
+  createConfigPrecio,
+  updateConfigPrecio,
+  deleteConfigPrecio,
+  getConfigSistemaPorClave,
+  upsertConfigSistemaNumerico,
+  CLAVE_PESO_CAJA_EXPORTACION,
+} from '@/services/config-precios.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -17,6 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuthStore } from '@/store/auth.store'
 import { VARIEDAD_PRODUCTO_CONFIG, CALIDAD_PRODUCTO_CONFIG } from '@/constants'
+import { DEFAULT_PESO_CAJA_EXPORTACION_KG } from '@/utils/business-rules'
 import { Plus, Settings, Pencil, Trash2 } from 'lucide-react'
 import { getISOWeek, getYear } from 'date-fns'
 import type { ConfigPrecio } from '@/types/models'
@@ -31,6 +40,12 @@ const configPrecioSchema = z.object({
 
 type FormData = z.infer<typeof configPrecioSchema>
 
+const parametroCajaSchema = z.object({
+  peso_caja_exportacion_kg: z.number({ message: 'Ingrese un número' }).positive().max(100),
+})
+
+type ParametroCajaFormData = z.infer<typeof parametroCajaSchema>
+
 export default function ConfigPreciosPage() {
   const { user } = useAuthStore()
   const [precios, setPrecios] = useState<ConfigPrecio[]>([])
@@ -40,6 +55,7 @@ export default function ConfigPreciosPage() {
   const [editando, setEditando] = useState<ConfigPrecio | null>(null)
   const [precioAEliminar, setPrecioAEliminar] = useState<ConfigPrecio | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [parametroError, setParametroError] = useState<string | null>(null)
 
   const semanaActual = getISOWeek(new Date())
   const anioActual = getYear(new Date())
@@ -49,9 +65,26 @@ export default function ConfigPreciosPage() {
     defaultValues: { semana: semanaActual, anio: anioActual, variedad: 'snow_peas', categoria: 'cat1', precio_kg_sol: undefined },
   })
 
+  const {
+    register: registerParametro,
+    handleSubmit: handleSubmitParametro,
+    reset: resetParametro,
+    formState: { errors: parametroErrors, isSubmitting: guardandoParametro },
+  } = useForm<ParametroCajaFormData>({
+    resolver: zodResolver(parametroCajaSchema),
+    defaultValues: { peso_caja_exportacion_kg: DEFAULT_PESO_CAJA_EXPORTACION_KG },
+  })
+
   const cargar = async () => {
     setLoading(true); setError(null)
-    try { setPrecios(await getConfigPrecios()) }
+    try {
+      const [preciosDb, pesoCajaConfig] = await Promise.all([
+        getConfigPrecios(),
+        getConfigSistemaPorClave(CLAVE_PESO_CAJA_EXPORTACION),
+      ])
+      setPrecios(preciosDb)
+      resetParametro({ peso_caja_exportacion_kg: Number(pesoCajaConfig?.valor_numerico ?? DEFAULT_PESO_CAJA_EXPORTACION_KG) })
+    }
     catch (e) { setError((e as Error).message) }
     finally { setLoading(false) }
   }
@@ -73,6 +106,7 @@ export default function ConfigPreciosPage() {
   const onSubmit = async (data: FormData) => {
     if (!user) return
     try {
+      setFormError(null)
       if (editando) {
         const updated = await updateConfigPrecio(editando.id, data)
         setPrecios((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
@@ -83,6 +117,22 @@ export default function ConfigPreciosPage() {
       setDialogOpen(false)
     } catch (e) {
       setFormError((e as Error).message)
+    }
+  }
+
+  const onSubmitParametro = async (data: ParametroCajaFormData) => {
+    if (!user) return
+    try {
+      setParametroError(null)
+      const updated = await upsertConfigSistemaNumerico({
+        clave: CLAVE_PESO_CAJA_EXPORTACION,
+        nombre: 'Peso por caja de exportación',
+        descripcion: 'Peso objetivo en kg usado para convertir kg buenos clasificados a cajas exportables.',
+        valor_numerico: data.peso_caja_exportacion_kg,
+      }, user.id)
+      resetParametro({ peso_caja_exportacion_kg: Number(updated.valor_numerico ?? DEFAULT_PESO_CAJA_EXPORTACION_KG) })
+    } catch (e) {
+      setParametroError((e as Error).message)
     }
   }
 
@@ -109,13 +159,31 @@ export default function ConfigPreciosPage() {
     <div>
       <PageHeader
         title="Configuración de Precios"
-        description="Precio S/./kg por semana, variedad y categoría. Se usa como referencia para liquidaciones."
+        description="Precio S/./kg por semana, variedad y categoría, además de parámetros globales de empaque."
         actions={
           <Button onClick={abrirNuevo}>
             <Plus className="h-4 w-4 mr-2" /> Nuevo precio
           </Button>
         }
       />
+
+      <Card className="mb-6">
+        <CardContent className="pt-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold">Parámetros de empaquetado</p>
+              <p className="text-sm text-muted-foreground">Estos valores se usan para calcular cajas exportables en empaquetado y despacho.</p>
+            </div>
+            <form onSubmit={handleSubmitParametro(onSubmitParametro)} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <FormField label="Peso por caja (kg)" error={parametroErrors.peso_caja_exportacion_kg?.message} required>
+                <Input type="number" step="0.01" min="0.01" placeholder="4.65" {...registerParametro('peso_caja_exportacion_kg', { valueAsNumber: true })} />
+              </FormField>
+              <Button type="submit" loading={guardandoParametro}>Guardar parámetro</Button>
+            </form>
+          </div>
+          {parametroError && <p className="mt-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{parametroError}</p>}
+        </CardContent>
+      </Card>
 
       {precios.length === 0 ? (
         <EmptyState

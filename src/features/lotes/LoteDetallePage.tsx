@@ -5,7 +5,6 @@ import { getLote } from '@/services/lotes.service'
 import { getClasificacionesPorLote } from '@/services/clasificaciones.service'
 import { getEmpaquetadosPorLote } from '@/services/empaquetados.service'
 import { getDespachosPorLote } from '@/services/despachos.service'
-import { getTareoHidroculizadoPorLote } from '@/services/tareo-hidroculizado.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -24,8 +23,19 @@ import {
   TIPO_PRODUCCION_CONFIG,
 } from '@/constants'
 import { formatFecha, formatPeso, formatMoneda } from '@/utils/formatters'
-import { calcularPagoSeleccionador, calcularPesoPorJaba } from '@/utils/business-rules'
-import type { Lote, Clasificacion, Despacho, Empaquetado, TareoHidroculizado } from '@/types/models'
+import { calcularPagoSeleccionador, calcularPesoPorJaba, normalizarNumeroPallet } from '@/utils/business-rules'
+import type { Lote, Clasificacion, Despacho, Empaquetado } from '@/types/models'
+
+const toNumber = (value: string | number | null | undefined) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const roundTo2 = (value: number) => Math.round(value * 100) / 100
+
+const calcularNetoPorTara = (kgBruto: number, cantidadJabas: number, pesoTara: number) => {
+  return roundTo2(Math.max(0, kgBruto - (cantidadJabas * pesoTara)))
+}
 
 type CuadroLocal = {
   filas: Array<{
@@ -51,7 +61,6 @@ export default function LoteDetallePage() {
   const navigate = useNavigate()
   const [lote, setLote] = useState<Lote | null>(null)
   const [clasificaciones, setClasificaciones] = useState<Clasificacion[]>([])
-  const [tareos, setTareos] = useState<TareoHidroculizado[]>([])
   const [empaquetados, setEmpaquetados] = useState<Empaquetado[]>([])
   const [despachos, setDespachos] = useState<Despacho[]>([])
   const [cuadrosLocales, setCuadrosLocales] = useState<CuadroLocal[] | null>(null)
@@ -62,14 +71,13 @@ export default function LoteDetallePage() {
     if (!id) return
     setLoading(true); setError(null)
     try {
-      const [l, cls, emp, des, tar] = await Promise.all([
+      const [l, cls, emp, des] = await Promise.all([
         getLote(id),
         getClasificacionesPorLote(id),
         getEmpaquetadosPorLote(id),
         getDespachosPorLote(id),
-        getTareoHidroculizadoPorLote(id),
       ])
-      setLote(l); setClasificaciones(cls); setEmpaquetados(emp); setDespachos(des); setTareos(tar)
+      setLote(l); setClasificaciones(cls); setEmpaquetados(emp); setDespachos(des)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -94,8 +102,6 @@ export default function LoteDetallePage() {
   if (error) return <ErrorMessage message={error} onRetry={cargar} />
   if (!lote) return null
 
-  const totalesBuenos = clasificaciones.reduce((acc, c) => acc + c.peso_bueno_kg, 0)
-  const totalesMalos = Math.max(0, lote.peso_neto_kg - totalesBuenos)
   const acopiadorNombre = lote.acopiador
     ? `${lote.acopiador.apellido}, ${lote.acopiador.nombre}`
     : lote.acopiador_agricultor
@@ -127,13 +133,13 @@ export default function LoteDetallePage() {
             )}
             {lote.estado === 'clasificado' && (
               <Button
-                className="bg-teal-600 hover:bg-teal-700 text-white font-semibold shadow-sm"
-                onClick={() => navigate(`/lotes/${id}/hidroculizar`)}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
+                onClick={() => navigate(`/lotes/${id}/empaquetar`)}
               >
-                Hidroculizar
+                Empaquetar
               </Button>
             )}
-            {(lote.estado === 'hidroculizado' || lote.estado === 'empaquetado') && (
+            {lote.estado === 'empaquetado' && (
               <Button
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
                 onClick={() => navigate(`/lotes/${id}/empaquetar`)}
@@ -290,16 +296,45 @@ export default function LoteDetallePage() {
           {/* Clasificación */}
           {clasificaciones.length > 0 && (() => {
             const sesion = clasificaciones[0]
-            const aportes = sesion.aportes ?? []
+            const aportesOriginales = sesion.aportes ?? []
+            const filasLocalesPorColaborador = new Map(
+              (cuadrosLocales ?? [])
+                .flatMap((cuadro) => cuadro.filas ?? [])
+                .filter((fila) => Boolean(fila.colaborador_id))
+                .map((fila) => [fila.colaborador_id, fila])
+            )
+            const aportes = aportesOriginales.map((aporte) => {
+              const filaLocal = filasLocalesPorColaborador.get(aporte.colaborador_id)
+              const kgBruto = aporte.kg_bruto ?? toNumber(filaLocal?.kg_bruto)
+              const numJabas = aporte.num_jabas ?? Math.max(0, Math.trunc(toNumber(filaLocal?.num_jabas)))
+              const pesoTaraKg = aporte.peso_tara_kg > 0
+                ? aporte.peso_tara_kg
+                : toNumber(filaLocal?.peso_tara_kg) || lote.peso_tara_kg
+              const kgBrutoDescartable = aporte.kg_bruto_descartable ?? toNumber(filaLocal?.kg_bruto_descartable)
+              const jabasDescartadas = aporte.jabas_descartadas ?? Math.max(0, Math.trunc(toNumber(filaLocal?.jabas_descartadas)))
+              const pesoTaraDescartableKg = aporte.peso_tara_descartable_kg > 0
+                ? aporte.peso_tara_descartable_kg
+                : toNumber(filaLocal?.peso_tara_descartable_kg) || lote.peso_tara_kg
+              return {
+                ...aporte,
+                kg_bruto: kgBruto,
+                num_jabas: numJabas,
+                peso_tara_kg: pesoTaraKg,
+                peso_bueno_kg: calcularNetoPorTara(kgBruto, numJabas, pesoTaraKg),
+                kg_bruto_descartable: kgBrutoDescartable,
+                jabas_descartadas: jabasDescartadas,
+                peso_tara_descartable_kg: pesoTaraDescartableKg,
+                kg_neto_descartable: calcularNetoPorTara(kgBrutoDescartable, jabasDescartadas, pesoTaraDescartableKg),
+              }
+            })
             const aportesPorColaborador = new Map(aportes.map((a) => [a.colaborador_id, a]))
             const calidad = lote.producto?.calidad ?? 'cat1'
             const totalBrutoClasif = aportes.reduce((s, a) => s + (a.kg_bruto ?? 0), 0)
             const totalNumJabas = aportes.reduce((s, a) => s + (a.num_jabas ?? 0), 0)
-            const totalPesoTara = aportes.reduce((s, a) => s + ((a.num_jabas ?? 0) * (a.peso_tara_kg ?? 0)), 0)
             const totalJabasDesc = aportes.reduce((s, a) => s + (a.jabas_descartadas ?? 0), 0)
             const totalBrutoDesc = aportes.reduce((s, a) => s + (a.kg_bruto_descartable ?? 0), 0)
-            const totalPesoTaraDesc = aportes.reduce((s, a) => s + ((a.jabas_descartadas ?? 0) * (a.peso_tara_descartable_kg ?? a.peso_tara_kg ?? 0)), 0)
             const totalNetoDesc = aportes.reduce((s, a) => s + (a.kg_neto_descartable ?? 0), 0)
+            const totalMerma = Math.max(0, lote.peso_neto_kg - (sesion.peso_bueno_kg + totalNetoDesc))
             const aportesAgrupadosPorMesa = (cuadrosLocales ?? [])
               .map((cuadro, index) => ({
                 index,
@@ -326,7 +361,7 @@ export default function LoteDetallePage() {
                   <div><span className="block text-[10px]">Kg exportables</span><span className="font-medium text-green-700">{formatPeso(a.peso_bueno_kg)}</span></div>
                   <div><span className="block text-[10px]">Kg bruto descarte</span><span className="font-medium text-foreground">{formatPeso(a.kg_bruto_descartable ?? 0)}</span></div>
                   <div><span className="block text-[10px]">Jabas descarte</span><span className="font-medium text-foreground">{a.jabas_descartadas ?? 0}</span></div>
-                  <div><span className="block text-[10px]">Peso tara descarte</span><span className="font-medium text-foreground">{formatPeso(a.peso_tara_descartable_kg ?? a.peso_tara_kg ?? 0)}</span></div>
+                  <div><span className="block text-[10px]">Peso tara descarte</span><span className="font-medium text-foreground">{formatPeso(a.peso_tara_descartable_kg ?? lote.peso_tara_kg ?? 0)}</span></div>
                   <div><span className="block text-[10px]">Kg neto descarte</span><span className="font-medium text-foreground">{formatPeso(a.kg_neto_descartable ?? 0)}</span></div>
                 </div>
               </div>
@@ -338,7 +373,7 @@ export default function LoteDetallePage() {
                   <CardTitle className="text-base">Clasificación</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3 text-sm">
                     <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
                       <p className="text-xs text-green-700 mb-0.5">Kg brutos</p>
                       <p className="font-bold text-lg text-green-700">{formatPeso(totalBrutoClasif)}</p>
@@ -346,10 +381,6 @@ export default function LoteDetallePage() {
                     <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
                       <p className="text-xs text-green-700 mb-0.5">Cantidad de jabas</p>
                       <p className="font-bold text-lg text-green-700">{totalNumJabas}</p>
-                    </div>
-                    <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
-                      <p className="text-xs text-green-700 mb-0.5">Peso tara total</p>
-                      <p className="font-bold text-lg text-green-700">{formatPeso(totalPesoTara)}</p>
                     </div>
                     <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-center">
                       <p className="text-xs text-green-700 mb-0.5">Kg exportables</p>
@@ -364,22 +395,22 @@ export default function LoteDetallePage() {
                       <p className="font-bold text-lg text-red-700">{totalJabasDesc}</p>
                     </div>
                     <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
-                      <p className="text-xs text-red-700 mb-0.5">Peso tara descarte</p>
-                      <p className="font-bold text-lg text-red-700">{formatPeso(totalPesoTaraDesc)}</p>
-                    </div>
-                    <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-center">
                       <p className="text-xs text-red-700 mb-0.5">Kg neto descarte</p>
                       <p className="font-bold text-lg text-red-700">{formatPeso(totalNetoDesc)}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 text-sm">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3 text-sm">
                     <div className="rounded-lg bg-muted/30 border p-3 text-center">
                       <p className="text-xs text-muted-foreground mb-0.5">Neto ingresado</p>
                       <p className="font-bold text-lg">{formatPeso(lote.peso_neto_kg)}</p>
                     </div>
                     <div className="rounded-lg bg-muted/30 border p-3 text-center">
-                      <p className="text-xs text-muted-foreground mb-0.5">Malos / pendiente</p>
-                      <p className="font-bold text-lg">{formatPeso(totalesMalos)}</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">Descarte</p>
+                      <p className="font-bold text-lg">{formatPeso(totalNetoDesc)}</p>
+                    </div>
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-center">
+                      <p className="text-xs text-amber-700 mb-0.5">Merma</p>
+                      <p className="font-bold text-lg text-amber-700">{formatPeso(totalMerma)}</p>
                     </div>
                   </div>
                   {aportes.length > 0 && aportesAgrupadosPorMesa.length === 0 && (
@@ -404,50 +435,13 @@ export default function LoteDetallePage() {
             )
           })()}
 
-          {/* Hidroculizado */}
-          {tareos.length > 0 && (() => {
-            const totalJabas = tareos.reduce((s, t) => s + t.n_jabas, 0)
-            // Agrupar por colaborador (puede haber varios días)
-            const porColaborador = new Map<string, { tareo: TareoHidroculizado; totalJabas: number }>()
-            for (const t of tareos) {
-              const prev = porColaborador.get(t.colaborador_id)
-              if (prev) prev.totalJabas += t.n_jabas
-              else porColaborador.set(t.colaborador_id, { tareo: t, totalJabas: t.n_jabas })
-            }
-            return (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Hidroculizado</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-center mb-3">
-                    <p className="text-xs text-blue-700 mb-0.5">Total jabas procesadas</p>
-                    <p className="font-bold text-lg text-blue-700">{totalJabas} jabas</p>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Por operario</p>
-                    {[...porColaborador.values()].map(({ tareo, totalJabas: jabs }) => (
-                      <div key={tareo.colaborador_id} className="flex items-center justify-between text-sm border rounded-lg px-3 py-2">
-                        <span className="text-muted-foreground">
-                          {tareo.colaborador
-                            ? `${tareo.colaborador.apellido}, ${tareo.colaborador.nombre}`
-                            : tareo.colaborador_id}
-                        </span>
-                        <span className="font-medium text-blue-700">{jabs} jabas</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })()}
-
           {/* Empaquetado */}
           {empaquetados.length > 0 && (() => {
             const totalCajas = empaquetados.reduce((acc, item) => acc + item.num_cajas, 0)
             const pallets = new Map<string, number>()
             for (const item of empaquetados) {
-              pallets.set(item.numero_pallet, (pallets.get(item.numero_pallet) ?? 0) + item.num_cajas)
+              const palletNormalizado = normalizarNumeroPallet(item.numero_pallet)
+              pallets.set(palletNormalizado, (pallets.get(palletNormalizado) ?? 0) + item.num_cajas)
             }
             return (
               <Card>
@@ -468,7 +462,7 @@ export default function LoteDetallePage() {
                       <div key={item.id} className="border rounded-lg p-3 text-sm">
                         <div className="flex justify-between items-start gap-3">
                           <div>
-                            <span className="font-medium">Pallet {item.numero_pallet}</span>
+                            <span className="font-medium">Pallet {normalizarNumeroPallet(item.numero_pallet)}</span>
                             <span className="text-muted-foreground ml-2">{formatFecha(item.fecha_empaquetado)}</span>
                             <div className="flex gap-4 mt-1 text-muted-foreground">
                               <span>{item.num_cajas} cajas</span>

@@ -12,6 +12,7 @@ import {
   getEmpaquetadosPorLote,
   getResumenPalletsEmpaquetado,
 } from '@/services/empaquetados.service'
+import { CLAVE_PESO_CAJA_EXPORTACION, getValorNumericoSistema } from '@/services/config-precios.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -25,9 +26,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/store/auth.store'
 import { empaquetadoSchema, type EmpaquetadoFormData } from '@/utils/validators'
 import { formatFecha } from '@/utils/formatters'
-import { CAJAS_POR_PALLET, calcularCajasExportables, calcularPesoTotalClasificado } from '@/utils/business-rules'
+import { CAJAS_POR_PALLET, calcularCajasExportables, calcularPesoTotalClasificado, DEFAULT_PESO_CAJA_EXPORTACION_KG, normalizarNumeroPallet } from '@/utils/business-rules'
 import { getTraceabilityCodeForDate, printEmpaquetadoLabel } from './printDespachoLabel'
 import type { Clasificacion, Empaquetado, Lote } from '@/types/models'
+
+const DESTINO_LABELS = {
+  europa: 'Europa',
+  usa: 'USA',
+} as const
 
 export default function EmpaquetarLotePage() {
   const { id } = useParams<{ id: string }>()
@@ -37,6 +43,7 @@ export default function EmpaquetarLotePage() {
   const [clasificaciones, setClasificaciones] = useState<Clasificacion[]>([])
   const [empaquetados, setEmpaquetados] = useState<Empaquetado[]>([])
   const [resumenPallets, setResumenPallets] = useState<Record<string, number>>({})
+  const [pesoCajaExportacionKg, setPesoCajaExportacionKg] = useState(DEFAULT_PESO_CAJA_EXPORTACION_KG)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
@@ -58,23 +65,25 @@ export default function EmpaquetarLotePage() {
   })
 
   const fechaEmpaquetado = watch('fecha_empaquetado')
-  const numeroPallet = watch('numero_pallet')?.toUpperCase?.() ?? ''
+  const numeroPallet = normalizarNumeroPallet(watch('numero_pallet') ?? '')
   const numCajas = watch('num_cajas') ?? 0
 
   const cargar = async () => {
     if (!id) return
     setLoading(true)
     try {
-      const [l, cls, emp, pallets] = await Promise.all([
+      const [l, cls, emp, pallets, pesoCajaConfigurado] = await Promise.all([
         getLote(id),
         getClasificacionesPorLote(id),
         getEmpaquetadosPorLote(id),
-        getResumenPalletsEmpaquetado(),
+        getResumenPalletsEmpaquetado(id),
+        getValorNumericoSistema(CLAVE_PESO_CAJA_EXPORTACION, DEFAULT_PESO_CAJA_EXPORTACION_KG),
       ])
       setLote(l)
       setClasificaciones(cls)
       setEmpaquetados(emp)
       setResumenPallets(pallets)
+      setPesoCajaExportacionKg(pesoCajaConfigurado)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -89,19 +98,22 @@ export default function EmpaquetarLotePage() {
     setValue('codigo_trazabilidad', getTraceabilityCodeForDate(lote, fechaEmpaquetado), { shouldValidate: true })
   }, [fechaEmpaquetado, lote, setValue])
 
-  const totalCajasExportables = useMemo(() => calcularCajasExportables(calcularPesoTotalClasificado(clasificaciones)), [clasificaciones])
+  const totalCajasExportables = useMemo(
+    () => calcularCajasExportables(calcularPesoTotalClasificado(clasificaciones), pesoCajaExportacionKg),
+    [clasificaciones, pesoCajaExportacionKg]
+  )
   const totalCajasEmpaquetadas = empaquetados.reduce((acc, item) => acc + item.num_cajas, 0)
   const cajasPendientes = Math.max(0, totalCajasExportables - totalCajasEmpaquetadas)
   const palletActualAcumulado = resumenPallets[numeroPallet] ?? 0
   const palletActualDisponible = Math.max(0, CAJAS_POR_PALLET - palletActualAcumulado)
   const palletsUsados = Object.keys(resumenPallets).length
-  const puedeEditar = lote?.estado === 'hidroculizado' || lote?.estado === 'empaquetado'
+  const puedeEditar = lote?.estado === 'clasificado' || lote?.estado === 'empaquetado'
 
   const onSubmit = async (data: EmpaquetadoFormData) => {
     if (!id || !user || !lote) return
 
     setFormError(null)
-    const numeroPalletNormalizado = data.numero_pallet.toUpperCase()
+    const numeroPalletNormalizado = data.numero_pallet
     const acumuladoActual = resumenPallets[numeroPalletNormalizado] ?? 0
     const totalConNuevoRegistro = totalCajasEmpaquetadas + data.num_cajas
 
@@ -131,7 +143,7 @@ export default function EmpaquetarLotePage() {
     setResumenPallets(nuevoResumenPallets)
     setLabelEmpaquetado(nuevo)
 
-    if (lote.estado === 'hidroculizado') {
+    if (lote.estado === 'clasificado') {
       const actualizado = await actualizarEstadoLote(lote.id, 'empaquetado')
       setLote(actualizado)
     }
@@ -225,6 +237,7 @@ export default function EmpaquetarLotePage() {
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="europa">Europa</SelectItem>
+                            <SelectItem value="usa">USA</SelectItem>
                         </SelectContent>
                       </Select>
                     )} />
@@ -235,7 +248,7 @@ export default function EmpaquetarLotePage() {
                   </FormField>
 
                   <FormField label="N° de pallet" error={errors.numero_pallet?.message} required>
-                    <Input placeholder="PALLET-01" {...register('numero_pallet')} />
+                    <Input inputMode="numeric" maxLength={3} placeholder="001" {...register('numero_pallet')} />
                     {numeroPallet && (
                       <p className="text-xs text-muted-foreground">Acumuladas en {numeroPallet}: {palletActualAcumulado} cajas · Disponible: {palletActualDisponible}</p>
                     )}
@@ -268,17 +281,18 @@ export default function EmpaquetarLotePage() {
             <CardHeader><CardTitle className="text-base">Registros de empaquetado</CardTitle></CardHeader>
             <CardContent className="flex flex-col gap-2">
               {empaquetados.map((item) => {
-                const acumuladoPallet = resumenPallets[item.numero_pallet] ?? item.num_cajas
+                const palletNormalizado = normalizarNumeroPallet(item.numero_pallet)
+                const acumuladoPallet = resumenPallets[palletNormalizado] ?? item.num_cajas
                 return (
                   <div key={item.id} className="border rounded-lg px-3 py-3 text-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium">Pallet {item.numero_pallet}</span>
+                          <span className="font-medium">Pallet {palletNormalizado}</span>
                           <span className="text-muted-foreground">{formatFecha(item.fecha_empaquetado)}</span>
                           <span className="text-indigo-700 font-medium">{item.num_cajas} cajas</span>
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">Destino: EUROPA · Acumulado del pallet: {acumuladoPallet} / {CAJAS_POR_PALLET}</p>
+                        <p className="text-xs text-muted-foreground mt-1">Destino: {DESTINO_LABELS[item.destino]} · Acumulado del pallet: {acumuladoPallet} / {CAJAS_POR_PALLET}</p>
                         <p className="font-mono text-xs text-muted-foreground mt-1">Traz.: {item.codigo_trazabilidad}</p>
                         {item.observaciones && <p className="text-xs text-muted-foreground mt-1">{item.observaciones}</p>}
                       </div>
@@ -324,7 +338,7 @@ export default function EmpaquetarLotePage() {
       <ConfirmDialog
         open={Boolean(labelEmpaquetado)}
         title="Empaquetado registrado"
-        description={labelEmpaquetado ? `Pallet ${labelEmpaquetado.numero_pallet} · ${labelEmpaquetado.num_cajas} cajas` : ''}
+        description={labelEmpaquetado ? `Pallet ${normalizarNumeroPallet(labelEmpaquetado.numero_pallet)} · ${labelEmpaquetado.num_cajas} cajas` : ''}
         confirmLabel="Imprimir etiqueta"
         cancelLabel="Continuar"
         variant="default"

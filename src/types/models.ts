@@ -91,7 +91,6 @@ export type EstadoLote =
   | 'ingresado'
   | 'en_clasificacion'
   | 'clasificado'
-  | 'hidroculizado'
   | 'empaquetado'
   | 'en_despacho'
   | 'despachado'
@@ -180,7 +179,7 @@ export type ClasificacionMesaUpdate = Partial<ClasificacionMesaInsert>
 // ─────────────────────────────────────────────
 // EMPAQUETADO
 // ─────────────────────────────────────────────
-export type DestinoEmpaquetado = 'europa'
+export type DestinoEmpaquetado = 'europa' | 'usa'
 
 export interface Empaquetado extends BaseEntity {
   lote_id: UUID
@@ -256,23 +255,6 @@ export type LiquidacionAgriUpdate = Partial<LiquidacionAgriInsert>
 export type LiquidacionAgriDetalleInsert = Omit<LiquidacionAgriDetalle, keyof BaseEntity | 'lote'>
 
 // ─────────────────────────────────────────────
-// TAREO HIDROCULIZADO (Módulo 4 PDF — Tareo B)
-// ─────────────────────────────────────────────
-export interface TareoHidroculizado extends BaseEntity {
-  lote_id: UUID
-  colaborador_id: UUID
-  fecha: string
-  n_jabas: number
-  observaciones: string | null
-  // relaciones
-  colaborador?: Colaborador
-  lote?: Lote
-}
-
-export type TareoHidroculizadoInsert = Omit<TareoHidroculizado, keyof BaseEntity | 'colaborador' | 'lote'>
-export type TareoHidroculizadoUpdate = Partial<TareoHidroculizadoInsert>
-
-// ─────────────────────────────────────────────
 // PLANILLA QUINCENAL (Módulo 9 PDF)
 // ─────────────────────────────────────────────
 export type EstadoPlanilla = 'pendiente' | 'pagada'
@@ -296,7 +278,6 @@ export interface PlanillaDetalle extends BaseEntity {
   kg_cat1_seleccion: number       // Tareo A — kg seleccionados Cat 1
   kg_cat2_seleccion: number       // Tareo A — kg seleccionados Cat 2
   pago_seleccion: number          // kg_cat1 × 0.20 + kg_cat2 × 0.28
-  n_jabas_hidroculizado: number   // Módulo 4 / Tareo B — jornal base (sin destajo)
   n_cajas_empaquetado: number     // Módulo 6 / Tareo D — S/ 0.32 / caja
   monto_empaquetado: number       // n_cajas * 0.32
   otros_montos: number            // jornal, adelantos, descuentos, etc.
@@ -321,6 +302,17 @@ export interface ConfigPrecio extends BaseEntity {
 
 export type ConfigPrecioInsert = Omit<ConfigPrecio, keyof BaseEntity>
 export type ConfigPrecioUpdate = Partial<ConfigPrecioInsert>
+
+export interface ConfigSistema extends BaseEntity {
+  clave: string
+  nombre: string
+  descripcion: string | null
+  valor_texto: string | null
+  valor_numerico: number | null
+}
+
+export type ConfigSistemaInsert = Omit<ConfigSistema, keyof BaseEntity>
+export type ConfigSistemaUpdate = Partial<ConfigSistemaInsert>
 
 // ─────────────────────────────────────────────
 // MOVIMIENTO DE CUBETAS

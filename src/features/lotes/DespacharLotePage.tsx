@@ -6,6 +6,7 @@ import { despachoSchema, type DespachoFormData } from '@/utils/validators'
 import { getLote, actualizarEstadoLote } from '@/services/lotes.service'
 import { getEmpaquetadosPorLote } from '@/services/empaquetados.service'
 import { getDespachosPorLote, createDespacho } from '@/services/despachos.service'
+import { CLAVE_PESO_CAJA_EXPORTACION, getValorNumericoSistema } from '@/services/config-precios.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -22,7 +23,7 @@ import {
   calcularPallets,
   validarCajasDespacho,
   calcularValorDespacho,
-  PESO_CAJA_EXPORTACION_KG,
+  DEFAULT_PESO_CAJA_EXPORTACION_KG,
 } from '@/utils/business-rules'
 import { format } from 'date-fns'
 import type { Lote, Despacho, Empaquetado } from '@/types/models'
@@ -34,6 +35,7 @@ export default function DespacharLotePage() {
   const [lote, setLote] = useState<Lote | null>(null)
   const [empaquetados, setEmpaquetados] = useState<Empaquetado[]>([])
   const [despachos, setDespachos] = useState<Despacho[]>([])
+  const [pesoCajaExportacionKg, setPesoCajaExportacionKg] = useState(DEFAULT_PESO_CAJA_EXPORTACION_KG)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [errorCajas, setErrorCajas] = useState<string | null>(null)
@@ -60,8 +62,14 @@ export default function DespacharLotePage() {
     if (!id) return
     setLoading(true)
     try {
-      const [l, emp, desp] = await Promise.all([getLote(id), getEmpaquetadosPorLote(id), getDespachosPorLote(id)])
+      const [l, emp, desp, pesoCajaConfigurado] = await Promise.all([
+        getLote(id),
+        getEmpaquetadosPorLote(id),
+        getDespachosPorLote(id),
+        getValorNumericoSistema(CLAVE_PESO_CAJA_EXPORTACION, DEFAULT_PESO_CAJA_EXPORTACION_KG),
+      ])
       setLote(l); setEmpaquetados(emp); setDespachos(desp)
+      setPesoCajaExportacionKg(pesoCajaConfigurado)
     } catch (e) { setError((e as Error).message) }
     finally { setLoading(false) }
   }
@@ -131,7 +139,7 @@ export default function DespacharLotePage() {
             <div>
               <p className="text-muted-foreground text-xs">Disponibles</p>
               <p className={`font-bold text-lg ${cajasDisponibles <= 0 ? 'text-destructive' : ''}`}>{cajasDisponibles}</p>
-              <p className="text-muted-foreground text-[11px]">{cajasDisponibles <= 0 ? 'Sin stock' : `${formatPeso(cajasDisponibles * PESO_CAJA_EXPORTACION_KG)} est.`}</p>
+              <p className="text-muted-foreground text-[11px]">{cajasDisponibles <= 0 ? 'Sin stock' : `${formatPeso(cajasDisponibles * pesoCajaExportacionKg)} est.`}</p>
             </div>
           </div>
         </CardContent>

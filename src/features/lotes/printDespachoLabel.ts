@@ -19,6 +19,7 @@ function julianDay(dateStr: string): string {
 }
 
 const EXPORTADOR_NOMBRE = 'AGRONESIS DEL PERU S.A.C'
+const CERTIFICACION_SENASA = 'N°000299-MIDAGRI-SENASA-ANCASH'
 
 function getExporterInitial(name: string): string {
   const match = name.trim().match(/[A-Za-z]/)
@@ -110,6 +111,13 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string): string {
     .middle { vertical-align: middle; }
     .small { font-size: 11px; }
     .tiny { font-size: 10px; }
+    .cert-line {
+      font-size: 18px;
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: 0.3px;
+      padding: 6px 0;
+    }
     .exporter {
       font-family: 'Arial Black', Arial, sans-serif;
       font-size: 20px;
@@ -164,7 +172,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string): string {
             <tr>
               <td>PRODUCT: HOLANTAO</td>
               <td>VARIETY: ${escapeHtml(variedad)}</td>
-              <td>NET WEIGHT: 4.5 JGV (10LB)</td>
+              <td>NET WEIGHT: 4.5 KG (10LB)</td>
             </tr>
           </table>
         </td>
@@ -175,6 +183,9 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string): string {
           <div>TRACEABILITY CODE:</div>
           <div class="trace">${escapeHtml(code)}</div>
         </td>
+      </tr>
+      <tr>
+        <td colspan="2" class="cert-line">${escapeHtml(CERTIFICACION_SENASA)}</td>
       </tr>
       <tr>
         <td class="center">PRODUCE OF PERU</td>

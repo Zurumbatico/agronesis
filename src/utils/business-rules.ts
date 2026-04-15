@@ -4,9 +4,9 @@ import type { CategoriaClasificacion, Clasificacion, Despacho } from '@/types/mo
 
 // ─────────────────────────────────────────────
 // CONSTANTES DE PROCESO (Módulos 6 y 7 del PDF)
-// Hardcodeadas por ahora; en el futuro vendrán de tabla config_sistema en DB
+// Fallbacks por defecto cuando aún no existe configuración en DB
 // ─────────────────────────────────────────────
-export const PESO_CAJA_EXPORTACION_KG = 4.65
+export const DEFAULT_PESO_CAJA_EXPORTACION_KG = 4.65
 export const PCT_DESHIDRATACION = 0.05
 export const CAJAS_POR_PALLET = 172
 /** 3% del peso neto que corresponde al socio Alan Melendrez (Módulo 1 PDF) */
@@ -17,6 +17,14 @@ export const PRECIO_SELECCION_CAT1 = 0.20
 export const PRECIO_SELECCION_CAT2 = 0.28
 /** Tarifa de pago al empacador por caja completada (S/ 0.32/caja) */
 export const PRECIO_EMPAQUE_CAJA = 0.32
+
+export function normalizarNumeroPallet(value: string): string {
+  const trimmed = value.trim()
+  if (!/^\d{1,3}$/.test(trimmed)) return trimmed
+  const numero = Number.parseInt(trimmed, 10)
+  if (!Number.isFinite(numero) || numero <= 0 || numero > 999) return trimmed
+  return String(numero).padStart(3, '0')
+}
 
 /**
  * Calcula el peso neto promedio por jaba de un lote.
@@ -77,9 +85,12 @@ export function siguienteEstadoLote(estadoActual: EstadoLote): EstadoLote | null
  * Aplica ajuste por deshidratación (5%) y divide por el peso objetivo por caja (4.65 kg).
  * Siempre redondeado hacia abajo — no se puede empacar media caja.
  */
-export function calcularCajasExportables(pesoKgBuenos: number): number {
+export function calcularCajasExportables(
+  pesoKgBuenos: number,
+  pesoCajaKg: number = DEFAULT_PESO_CAJA_EXPORTACION_KG
+): number {
   const exportableFinal = pesoKgBuenos * (1 - PCT_DESHIDRATACION)
-  return Math.floor(exportableFinal / PESO_CAJA_EXPORTACION_KG)
+  return Math.floor(exportableFinal / pesoCajaKg)
 }
 
 /**
@@ -98,11 +109,12 @@ export function calcularPallets(nCajas: number): { completos: number; restantes:
  * num_cajas se calcula aplicando ajuste por deshidratación y dividiendo por peso/caja.
  */
 export function calcularTotalesClasificacion(
-  clasificaciones: Clasificacion[]
+  clasificaciones: Clasificacion[],
+  pesoCajaKg: number = DEFAULT_PESO_CAJA_EXPORTACION_KG
 ): Record<CategoriaClasificacion, { peso_kg: number; num_cajas: number }> {
   const totalBuenos = clasificaciones.reduce((acc, c) => acc + c.peso_bueno_kg, 0)
   return {
-    primera:  { peso_kg: totalBuenos, num_cajas: calcularCajasExportables(totalBuenos) },
+    primera:  { peso_kg: totalBuenos, num_cajas: calcularCajasExportables(totalBuenos, pesoCajaKg) },
     segunda:  { peso_kg: 0,           num_cajas: 0 },
     descarte: { peso_kg: 0,           num_cajas: 0 },
   }
