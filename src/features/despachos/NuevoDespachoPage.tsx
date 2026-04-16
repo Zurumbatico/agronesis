@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
 import { useAuthStore } from '@/store/auth.store'
 import { despachoSchema, type DespachoFormData } from '@/utils/validators'
 import { CLAVE_PESO_CAJA_DESPACHO, getValorNumericoSistema } from '@/services/config-precios.service'
-import { createDespacho, getPalletsDisponiblesParaDespacho, type PalletDisponibleDespacho } from '@/services/despachos.service'
+import { createDespacho, getDespacho, getPalletsDisponiblesParaDespacho, updateDespachoCompleto, type PalletDisponibleDespacho } from '@/services/despachos.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -21,14 +21,16 @@ import { calcularPesoNetoDespacho, DEFAULT_PESO_CAJA_DESPACHO_KG, validarLimiteC
 import { PalletMultiSelect } from './PalletMultiSelect'
 
 export default function NuevoDespachoPage() {
+  const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuthStore()
+  const isEditMode = Boolean(id)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pallets, setPallets] = useState<PalletDisponibleDespacho[]>([])
   const [pesoCajaDespachoKg, setPesoCajaDespachoKg] = useState(DEFAULT_PESO_CAJA_DESPACHO_KG)
 
-  const { register, handleSubmit, control, watch, setValue, formState: { errors, isSubmitting } } = useForm<DespachoFormData>({
+  const { register, handleSubmit, control, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<DespachoFormData>({
     resolver: zodResolver(despachoSchema) as never,
     defaultValues: {
       fecha_despacho: format(new Date(), 'yyyy-MM-dd'),
@@ -52,12 +54,29 @@ export default function NuevoDespachoPage() {
     const cargar = async () => {
       setLoading(true)
       try {
-        const [disponibles, pesoConfigurado] = await Promise.all([
-          getPalletsDisponiblesParaDespacho(),
+        const [disponibles, pesoConfigurado, despacho] = await Promise.all([
+          getPalletsDisponiblesParaDespacho(id),
           getValorNumericoSistema(CLAVE_PESO_CAJA_DESPACHO, DEFAULT_PESO_CAJA_DESPACHO_KG),
+          isEditMode && id ? getDespacho(id) : Promise.resolve(null),
         ])
         setPallets(disponibles)
         setPesoCajaDespachoKg(pesoConfigurado)
+        if (despacho) {
+          reset({
+            fecha_despacho: despacho.fecha_despacho,
+            destino: despacho.destino,
+            tipo_despacho: despacho.tipo_despacho,
+            exportador: despacho.exportador ?? '',
+            marca_caja: despacho.marca_caja ?? '',
+            transportista: despacho.transportista ?? '',
+            placa_vehiculo: despacho.placa_vehiculo ?? '',
+            pallet_keys: (despacho.pallets ?? []).map((item) => `${item.lote_id}::${item.numero_pallet}`),
+            num_cajas_despachadas: despacho.num_cajas_despachadas,
+            peso_neto_kg: despacho.peso_neto_kg,
+            observaciones: despacho.observaciones ?? '',
+          })
+        }
+        setError(null)
       } catch (e) {
         setError((e as Error).message)
       } finally {
@@ -66,7 +85,7 @@ export default function NuevoDespachoPage() {
     }
 
     cargar()
-  }, [])
+  }, [id, isEditMode, reset])
 
   const palletsSeleccionados = useMemo(
     () => pallets.filter((item) => palletKeys.includes(item.key)),
@@ -96,7 +115,7 @@ export default function NuevoDespachoPage() {
 
     try {
       setError(null)
-      const nuevo = await createDespacho({
+      const payload = {
         lote_id: null,
         fecha_despacho: data.fecha_despacho,
         destino: data.destino,
@@ -108,12 +127,18 @@ export default function NuevoDespachoPage() {
         num_cajas_despachadas: totalCajas,
         peso_neto_kg: pesoNeto,
         observaciones: data.observaciones,
-      }, palletsSeleccionados.map((item) => ({
+      }
+      const palletsPayload = palletsSeleccionados.map((item) => ({
         lote_id: item.lote_id,
         numero_pallet: item.numero_pallet,
         num_cajas: item.num_cajas,
-      })), user.id)
-      navigate(`/despachos/${nuevo.id}`)
+      }))
+
+      const despacho = isEditMode && id
+        ? await updateDespachoCompleto(id, payload, palletsPayload, user.id)
+        : await createDespacho(payload, palletsPayload, user.id)
+
+      navigate(`/despachos/${despacho.id}`)
     } catch (e) {
       setError((e as Error).message)
     }
@@ -124,7 +149,11 @@ export default function NuevoDespachoPage() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <PageHeader title="Nuevo despacho" description="Selecciona pallets empaquetados y registra la salida operativa." backHref={ROUTES.DESPACHOS} />
+      <PageHeader
+        title={isEditMode ? 'Editar despacho' : 'Nuevo despacho'}
+        description={isEditMode ? 'Actualiza la salida operativa y la selección de pallets.' : 'Selecciona pallets empaquetados y registra la salida operativa.'}
+        backHref={isEditMode && id ? `/despachos/${id}` : ROUTES.DESPACHOS}
+      />
 
       <Card className="mb-4">
         <CardContent className="pt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 text-sm">
@@ -141,14 +170,14 @@ export default function NuevoDespachoPage() {
             <p className="font-bold text-lg">{resumenVariedad.snow_peas}</p>
           </div>
           <div className="rounded-lg border bg-muted/20 p-3 text-center">
-            <p className="text-xs text-muted-foreground">Sugar</p>
+            <p className="text-xs text-muted-foreground">Sugar Snap</p>
             <p className="font-bold text-lg">{resumenVariedad.sugar}</p>
           </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Registrar despacho</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{isEditMode ? 'Editar despacho' : 'Registrar despacho'}</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit as never)} className="flex flex-col gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -190,8 +219,8 @@ export default function NuevoDespachoPage() {
                 <Input placeholder="Marca comercial" {...register('marca_caja')} />
               </FormField>
 
-              <FormField label="Transportista" error={errors.transportista?.message}>
-                <Input placeholder="Nombre del transportista" {...register('transportista')} />
+              <FormField label="Proveedor de transporte" error={errors.transportista?.message}>
+                <Input placeholder="Nombre del proveedor de transporte" {...register('transportista')} />
               </FormField>
 
               <FormField label="Placa" error={errors.placa_vehiculo?.message}>
@@ -238,8 +267,8 @@ export default function NuevoDespachoPage() {
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => navigate(ROUTES.DESPACHOS)}>Cancelar</Button>
-              <Button type="submit" loading={isSubmitting}>Registrar despacho</Button>
+              <Button type="button" variant="outline" onClick={() => navigate(isEditMode && id ? `/despachos/${id}` : ROUTES.DESPACHOS)}>Cancelar</Button>
+              <Button type="submit" loading={isSubmitting}>{isEditMode ? 'Guardar cambios' : 'Registrar despacho'}</Button>
             </div>
           </form>
         </CardContent>

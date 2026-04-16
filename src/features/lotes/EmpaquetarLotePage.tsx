@@ -178,8 +178,8 @@ export default function EmpaquetarLotePage() {
     if (!id || !lote) return
     setFinalizando(true)
     try {
-      if (lote.estado !== 'empaquetado') {
-        await actualizarEstadoLote(id, 'empaquetado')
+      if (lote.estado !== 'en_despacho') {
+        await actualizarEstadoLote(id, 'en_despacho')
       }
       navigate(`/lotes/${id}`)
     } catch (e) {

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
+import { Pencil } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -11,6 +13,7 @@ import type { Despacho } from '@/types/models'
 
 export default function DetalleDespachoPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const [despacho, setDespacho] = useState<Despacho | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -44,9 +47,16 @@ export default function DetalleDespachoPage() {
   return (
     <div className="max-w-5xl mx-auto flex flex-col gap-4">
       <PageHeader
-        title={`Despacho ${formatFecha(despacho.fecha_despacho)}`}
-        description={`${DESTINO_DESPACHO_CONFIG[despacho.destino].label} · ${TIPO_DESPACHO_CONFIG[despacho.tipo_despacho].label}`}
+        title={despacho.codigo}
+        description={`${formatFecha(despacho.fecha_despacho)} · ${DESTINO_DESPACHO_CONFIG[despacho.destino].label} · ${TIPO_DESPACHO_CONFIG[despacho.tipo_despacho].label}`}
         backHref={ROUTES.DESPACHOS}
+        actions={
+          id ? (
+            <Button onClick={() => navigate(`/despachos/${id}/editar`)}>
+              <Pencil className="h-4 w-4 mr-2" /> Editar despacho
+            </Button>
+          ) : null
+        }
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
@@ -54,15 +64,17 @@ export default function DetalleDespachoPage() {
         <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Cajas</p><p className="font-bold text-lg">{despacho.num_cajas_despachadas}</p></CardContent></Card>
         <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Peso neto</p><p className="font-bold text-lg">{formatPeso(despacho.peso_neto_kg)}</p></CardContent></Card>
         <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Snow Peas</p><p className="font-bold text-lg">{resumenVariedad.snow_peas}</p></CardContent></Card>
-        <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Sugar</p><p className="font-bold text-lg">{resumenVariedad.sugar}</p></CardContent></Card>
+        <Card><CardContent className="pt-4 text-center"><p className="text-xs text-muted-foreground">Sugar Snap</p><p className="font-bold text-lg">{resumenVariedad.sugar}</p></CardContent></Card>
       </div>
 
       <Card>
         <CardHeader><CardTitle className="text-base">Datos generales</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+          <div><p className="text-xs text-muted-foreground">Codigo</p><p className="font-medium">{despacho.codigo}</p></div>
+          <div><p className="text-xs text-muted-foreground">Fecha despacho</p><p className="font-medium">{formatFecha(despacho.fecha_despacho)}</p></div>
           <div><p className="text-xs text-muted-foreground">Exportador</p><p className="font-medium">{despacho.exportador || '-'}</p></div>
           <div><p className="text-xs text-muted-foreground">Marca de caja</p><p className="font-medium">{despacho.marca_caja || '-'}</p></div>
-          <div><p className="text-xs text-muted-foreground">Transportista</p><p className="font-medium">{despacho.transportista || '-'}</p></div>
+          <div><p className="text-xs text-muted-foreground">Proveedor de transporte</p><p className="font-medium">{despacho.transportista || '-'}</p></div>
           <div><p className="text-xs text-muted-foreground">Placa</p><p className="font-medium">{despacho.placa_vehiculo || '-'}</p></div>
           <div className="md:col-span-2"><p className="text-xs text-muted-foreground">Observaciones</p><p className="font-medium">{despacho.observaciones || '-'}</p></div>
         </CardContent>

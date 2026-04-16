@@ -24,7 +24,7 @@ export const ESTADO_LIQUIDACION_CONFIG = {
 
 export const VARIEDAD_PRODUCTO_CONFIG = {
   snow_peas:   { label: 'Snow Peas' },
-  sugar:       { label: 'Sugar' },
+  sugar:       { label: 'Sugar Snap' },
 } as const
 
 export const CALIDAD_PRODUCTO_CONFIG = {
@@ -105,6 +105,7 @@ export const ROUTES = {
   DESPACHOS:                '/despachos',
   DESPACHOS_NUEVO:          '/despachos/nuevo',
   DESPACHOS_DETALLE:        '/despachos/:id',
+  DESPACHOS_EDITAR:         '/despachos/:id/editar',
   CONFIG_PRECIOS:           '/admin/config-precios',
 } as const
 

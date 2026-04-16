@@ -146,7 +146,7 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
               <SelectTrigger><SelectValue placeholder="Seleccionar producto..." /></SelectTrigger>
               <SelectContent>
                 {productosActivos.map((p) => {
-                  const variedadLabel = p.variedad === 'snow_peas' ? 'Snow Peas' : 'Sugar'
+                  const variedadLabel = p.variedad === 'snow_peas' ? 'Snow Peas' : 'Sugar Snap'
                   const produccionLabel = p.tipo_produccion === 'organico' ? 'Orgánico' : 'Convencional'
                   return (
                     <SelectItem key={p.id} value={p.id}>

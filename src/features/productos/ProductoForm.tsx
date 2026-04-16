@@ -57,7 +57,7 @@ export function ProductoForm({ defaultValues, onSubmit, onCancel, isEditing }: P
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="snow_peas">Snow Peas</SelectItem>
-                <SelectItem value="sugar">Sugar</SelectItem>
+                <SelectItem value="sugar">Sugar Snap</SelectItem>
               </SelectContent>
             </Select>
           )} />

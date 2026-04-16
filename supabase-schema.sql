@@ -6,6 +6,7 @@ create sequence if not exists public.colaboradores_codigo_seq;
 create sequence if not exists public.productos_codigo_seq;
 create sequence if not exists public.lotes_codigo_seq;
 create sequence if not exists public.centros_acopio_codigo_seq;
+create sequence if not exists public.despachos_codigo_seq;
 
 create or replace function public.generate_agricultor_codigo()
 returns text
@@ -184,6 +185,35 @@ end;
 $$;
 
 create or replace function public.protect_centro_acopio_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := old.codigo;
+  return new;
+end;
+$$;
+
+create or replace function public.generate_despacho_codigo()
+returns text
+language plpgsql
+as $$
+begin
+  return 'DESP-' || lpad(nextval('public.despachos_codigo_seq')::text, 6, '0');
+end;
+$$;
+
+create or replace function public.set_despacho_codigo()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.codigo := public.generate_despacho_codigo();
+  return new;
+end;
+$$;
+
+create or replace function public.protect_despacho_codigo()
 returns trigger
 language plpgsql
 as $$
@@ -501,11 +531,28 @@ create table if not exists public.empaquetados (
   observaciones text null
 );
 
+alter table public.empaquetados drop constraint if exists empaquetados_destino_check;
+
+update public.empaquetados
+set destino = case
+  when lower(trim(destino)) = 'usa' then 'usa'
+  when lower(trim(destino)) = 'europa' then 'europa'
+  else destino
+end
+where destino is not null;
+
+alter table public.empaquetados alter column destino set default 'europa';
+
+alter table public.empaquetados
+add constraint empaquetados_destino_check
+check (destino in ('europa', 'usa'));
+
 create table if not exists public.despachos (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
+  codigo text not null unique default public.generate_despacho_codigo(),
   lote_id uuid null references public.lotes(id) on delete cascade,
   fecha_despacho date not null,
   destino text not null check (destino in ('exportacion', 'mercado_local', 'planta_proceso')),
@@ -519,6 +566,27 @@ create table if not exists public.despachos (
   precio_venta_kg numeric(12,2) not null default 0,
   observaciones text null
 );
+
+alter table public.despachos add column if not exists codigo text;
+update public.despachos
+set codigo = public.generate_despacho_codigo()
+where codigo is null or trim(codigo) = '';
+alter table public.despachos alter column codigo set default public.generate_despacho_codigo();
+alter table public.despachos alter column codigo set not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints tc
+    where tc.table_schema = 'public'
+      and tc.table_name = 'despachos'
+      and tc.constraint_name = 'despachos_codigo_key'
+  ) then
+    alter table public.despachos add constraint despachos_codigo_key unique (codigo);
+  end if;
+end;
+$$;
 
 create table if not exists public.despacho_pallets (
   id uuid primary key default gen_random_uuid(),
@@ -592,6 +660,7 @@ create index if not exists idx_lotes_centro_acopio_id on public.lotes(centro_aco
 create index if not exists idx_clasificaciones_lote_id on public.clasificaciones(lote_id);
 create index if not exists idx_empaquetados_lote_id on public.empaquetados(lote_id);
 create index if not exists idx_empaquetados_numero_pallet on public.empaquetados(numero_pallet);
+create index if not exists idx_despachos_codigo on public.despachos(codigo);
 create index if not exists idx_despachos_lote_id on public.despachos(lote_id);
 create index if not exists idx_liquidaciones_agri_agricultor_id on public.liquidaciones_agri(agricultor_id);
 create index if not exists idx_liquidacion_agri_detalle_liquidacion_id on public.liquidacion_agri_detalle(liquidacion_id);
@@ -727,6 +796,22 @@ begin
 end;
 $$;
 
+do $$
+declare
+  v_max bigint;
+begin
+  select coalesce(max(substring(codigo from '^DESP-(\d+)$')::bigint), 0)
+  into v_max
+  from public.despachos;
+
+  if v_max = 0 then
+    perform setval('public.despachos_codigo_seq', 1, false);
+  else
+    perform setval('public.despachos_codigo_seq', v_max, true);
+  end if;
+end;
+$$;
+
 drop trigger if exists trg_productos_updated_at on public.productos;
 create trigger trg_productos_updated_at before update on public.productos for each row execute function public.set_updated_at();
 
@@ -750,6 +835,12 @@ create trigger trg_clasificaciones_updated_at before update on public.clasificac
 
 drop trigger if exists trg_empaquetados_updated_at on public.empaquetados;
 create trigger trg_empaquetados_updated_at before update on public.empaquetados for each row execute function public.set_updated_at();
+
+drop trigger if exists trg_despachos_protect_codigo on public.despachos;
+create trigger trg_despachos_protect_codigo before update on public.despachos for each row execute function public.protect_despacho_codigo();
+
+drop trigger if exists trg_despachos_codigo on public.despachos;
+create trigger trg_despachos_codigo before insert on public.despachos for each row execute function public.set_despacho_codigo();
 
 drop trigger if exists trg_despachos_updated_at on public.despachos;
 create trigger trg_despachos_updated_at before update on public.despachos for each row execute function public.set_updated_at();

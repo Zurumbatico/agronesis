@@ -202,6 +202,7 @@ export type DestinoDespacho = 'exportacion' | 'mercado_local' | 'planta_proceso'
 export type TipoDespacho = 'maritima' | 'aerea' | 'terrestre'
 
 export interface Despacho extends BaseEntity {
+  codigo: string
   lote_id: UUID | null
   fecha_despacho: string
   destino: DestinoDespacho
@@ -227,7 +228,7 @@ export interface DespachoPallet extends BaseEntity {
   despacho?: Despacho
 }
 
-export type DespachoInsert = Omit<Despacho, keyof BaseEntity | 'lote' | 'pallets'>
+export type DespachoInsert = Omit<Despacho, keyof BaseEntity | 'codigo' | 'lote' | 'pallets'>
 export type DespachoUpdate = Partial<DespachoInsert>
 export type DespachoPalletInsert = Omit<DespachoPallet, keyof BaseEntity | 'lote' | 'despacho'>
 

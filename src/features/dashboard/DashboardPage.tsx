@@ -373,7 +373,7 @@ export default function DashboardPage() {
                 <SelectContent>
                   <SelectItem value="all">Todas las variedades</SelectItem>
                   <SelectItem value="snow_peas">Snow Peas</SelectItem>
-                  <SelectItem value="sugar">Sugar</SelectItem>
+                  <SelectItem value="sugar">Sugar Snap</SelectItem>
                 </SelectContent>
               </Select>
             </FormField>
@@ -396,7 +396,7 @@ export default function DashboardPage() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Resumen por variedad</CardTitle>
-          <CardDescription>Totales acumulados en el filtro actual para Snow Peas y Sugar.</CardDescription>
+          <CardDescription>Totales acumulados en el filtro actual para Snow Peas y Sugar Snap.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

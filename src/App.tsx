@@ -57,6 +57,7 @@ export default function App() {
             <Route path={ROUTES.DESPACHOS} element={<DespachosPage />} />
             <Route path={ROUTES.DESPACHOS_NUEVO} element={<NuevoDespachoPage />} />
             <Route path={ROUTES.DESPACHOS_DETALLE} element={<DetalleDespachoPage />} />
+            <Route path={ROUTES.DESPACHOS_EDITAR} element={<NuevoDespachoPage />} />
             <Route
               path={ROUTES.CUBETAS}
               element={ENABLED_MODULES.CUBETAS ? <CubetasPage /> : <Navigate to={ROUTES.DASHBOARD} replace />}

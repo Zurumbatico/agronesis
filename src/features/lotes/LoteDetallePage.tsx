@@ -147,6 +147,14 @@ export default function LoteDetallePage() {
                 Empaquetar
               </Button>
             )}
+            {lote.estado === 'en_despacho' && (
+              <Button
+                className="bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-sm"
+                onClick={() => navigate(ROUTES.DESPACHOS_NUEVO)}
+              >
+                Registrar despacho
+              </Button>
+            )}
             {lote.estado === 'despachado' && (
               <Button
                 className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold shadow-sm"

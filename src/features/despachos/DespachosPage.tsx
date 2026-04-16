@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Truck } from 'lucide-react'
+import { Pencil, Plus, Search, Truck } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -48,7 +48,8 @@ export default function DespachosPage() {
   const filtrados = despachos.filter((despacho) => {
     if (!busqueda) return true
     const q = busqueda.toLowerCase()
-    return despacho.exportador?.toLowerCase().includes(q)
+    return despacho.codigo.toLowerCase().includes(q)
+      || despacho.exportador?.toLowerCase().includes(q)
       || despacho.marca_caja?.toLowerCase().includes(q)
       || despacho.transportista?.toLowerCase().includes(q)
       || despacho.placa_vehiculo?.toLowerCase().includes(q)
@@ -69,7 +70,7 @@ export default function DespachosPage() {
 
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Buscar por exportador, marca, placa o fecha..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+        <Input className="pl-9" placeholder="Buscar por codigo, exportador, marca, proveedor, placa o fecha..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
       </div>
 
       {filtrados.length === 0 ? (
@@ -83,7 +84,8 @@ export default function DespachosPage() {
                 <CardContent className="pt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium text-sm">{formatFecha(despacho.fecha_despacho)}</p>
+                      <p className="font-semibold text-sm">{despacho.codigo}</p>
+                      <span className="text-xs text-muted-foreground">{formatFecha(despacho.fecha_despacho)}</span>
                       <span className="text-xs rounded-full bg-muted px-2 py-0.5">{DESTINO_DESPACHO_CONFIG[despacho.destino].label}</span>
                       <span className="text-xs rounded-full bg-muted px-2 py-0.5">{TIPO_DESPACHO_CONFIG[despacho.tipo_despacho].label}</span>
                     </div>
@@ -101,6 +103,19 @@ export default function DespachosPage() {
                     {(despacho.transportista || despacho.placa_vehiculo) && (
                       <p className="text-xs text-muted-foreground mt-1">{despacho.transportista || '-'}{despacho.placa_vehiculo ? ` · ${despacho.placa_vehiculo}` : ''}</p>
                     )}
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          navigate(`/despachos/${despacho.id}/editar`)
+                        }}
+                      >
+                        <Pencil className="h-4 w-4 mr-2" /> Editar
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

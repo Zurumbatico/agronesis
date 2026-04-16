@@ -42,6 +42,7 @@ type EmpaquetadoPalletRow = {
 }
 
 type DespachoPalletUsageRow = {
+  despacho_id: string
   lote_id: string
   numero_pallet: string
 }
@@ -73,14 +74,14 @@ export async function getDespacho(id: string): Promise<Despacho> {
   return data as unknown as Despacho
 }
 
-export async function getPalletsDisponiblesParaDespacho(): Promise<PalletDisponibleDespacho[]> {
+export async function getPalletsDisponiblesParaDespacho(despachoId?: string): Promise<PalletDisponibleDespacho[]> {
   const [empaquetadosResult, usadosResult] = await Promise.all([
     supabase
       .from('empaquetados')
       .select('lote_id, numero_pallet, num_cajas, lote:lotes(id, codigo, producto:productos(nombre, variedad))'),
     supabase
       .from(TABLE_PALLETS)
-      .select('lote_id, numero_pallet'),
+      .select('despacho_id, lote_id, numero_pallet'),
   ])
 
   if (empaquetadosResult.error) throw new Error(empaquetadosResult.error.message)
@@ -88,6 +89,7 @@ export async function getPalletsDisponiblesParaDespacho(): Promise<PalletDisponi
 
   const usados = new Set(
     ((usadosResult.data ?? []) as DespachoPalletUsageRow[])
+      .filter((item) => !despachoId || item.despacho_id !== despachoId)
       .map((item) => `${item.lote_id}::${normalizarNumeroPallet(item.numero_pallet)}`)
   )
 
@@ -165,4 +167,42 @@ export async function updateDespacho(id: string, input: Partial<DespachoInsert>)
 
   if (error) throw new Error(error.message)
   return data as Despacho
+}
+
+export async function updateDespachoCompleto(
+  id: string,
+  input: DespachoInsert,
+  pallets: Array<Pick<DespachoPallet, 'lote_id' | 'numero_pallet' | 'num_cajas'>>,
+  userId: string
+): Promise<Despacho> {
+  const lotes = Array.from(new Set(pallets.map((item) => item.lote_id)))
+  const loteId = lotes.length === 1 ? lotes[0] : null
+
+  const { error: despachoError } = await supabase
+    .from(TABLE)
+    .update({ ...input, lote_id: loteId, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (despachoError) throw new Error(despachoError.message)
+
+  const { error: deleteError } = await supabase
+    .from(TABLE_PALLETS)
+    .delete()
+    .eq('despacho_id', id)
+
+  if (deleteError) throw new Error(deleteError.message)
+
+  const { error: palletsError } = await supabase
+    .from(TABLE_PALLETS)
+    .insert(pallets.map((item) => ({
+      despacho_id: id,
+      lote_id: item.lote_id,
+      numero_pallet: normalizarNumeroPallet(item.numero_pallet),
+      num_cajas: item.num_cajas,
+      created_by: userId,
+    })))
+
+  if (palletsError) throw new Error(palletsError.message)
+
+  return getDespacho(id)
 }

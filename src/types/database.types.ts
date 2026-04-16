@@ -253,6 +253,7 @@ export interface Database {
           created_at: string
           updated_at: string
           created_by: string
+          codigo: string
           lote_id: string | null
           fecha_despacho: string
           destino: 'exportacion' | 'mercado_local' | 'planta_proceso'
@@ -265,7 +266,7 @@ export interface Database {
           peso_neto_kg: number
           observaciones: string | null
         }
-        Insert: Omit<Database['public']['Tables']['despachos']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Insert: Omit<Database['public']['Tables']['despachos']['Row'], 'id' | 'created_at' | 'updated_at' | 'codigo'> & { codigo?: string }
         Update: Partial<Database['public']['Tables']['despachos']['Insert']>
         Relationships: []
       }

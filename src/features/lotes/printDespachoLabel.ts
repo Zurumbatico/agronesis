@@ -18,13 +18,16 @@ function julianDay(dateStr: string): string {
   return String(dayOfYear).padStart(3, '0')
 }
 
+/** Día ISO de la semana: lunes=1, ..., domingo=7 */
+function isoWeekday(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  const day = d.getDay()
+  return String(day === 0 ? 7 : day)
+}
+
 const EXPORTADOR_NOMBRE = 'AGRONESIS DEL PERU S.A.C'
 const CERTIFICACION_SENASA = 'N°000299-MIDAGRI-SENASA-ANCASH'
-
-function getExporterInitial(name: string): string {
-  const match = name.trim().match(/[A-Za-z]/)
-  return (match?.[0] ?? 'X').toUpperCase()
-}
+const EXPORTADOR_CODIGO_TRAZABILIDAD = 'AG'
 
 function getFieldLotCode(lote: Lote): string {
   const raw = lote.codigo_lote_agricultor ?? ''
@@ -34,22 +37,22 @@ function getFieldLotCode(lote: Lote): string {
 }
 
 /**
- * Código de trazabilidad: G · YY · JJJ · DD · II · LL · H1 · E
+ * Código de trazabilidad: G · YY · JJJ · D · II · LL · H1 · AG
  *
- * Ejemplo: G2508313CA01H1A
+ * Ejemplo: G251051RA001H1AG
  *   G   = prefijo fijo
  *   25  = año actual/proceso (2 dígitos)
  *   083 = juliano de cosecha (campo del lote)
- *   13  = día de empaque (día de despacho)
+ *   1   = día de semana de empaque/despacho (lunes=1 ... domingo=7)
  *   CA  = iniciales del agricultor (nombre[0] + apellido[0])
  *   ... = código de lote por agricultor completo (segmento lote de campo)
  *   H1  = tipo de producto (fijo por ahora)
- *   A   = inicial del nombre del exportador
+ *   AG  = código fijo del exportador
  */
 export function getTraceabilityCodeForDate(lote: Lote, packDate: string): string {
   const empaqueDate = new Date(packDate + 'T00:00:00')
   const year = String(empaqueDate.getFullYear()).slice(-2)
-  const packDay = String(empaqueDate.getDate()).padStart(2, '0')
+  const packWeekday = isoWeekday(packDate)
   const julian = julianDay(lote.fecha_cosecha)
   const initials = (
     (lote.agricultor?.nombre?.[0] ?? 'X') +
@@ -57,8 +60,7 @@ export function getTraceabilityCodeForDate(lote: Lote, packDate: string): string
   ).toUpperCase()
   const fieldLot = getFieldLotCode(lote)
   const productCode = 'H1'
-  const exporterInitial = getExporterInitial(EXPORTADOR_NOMBRE)
-  return `G${year}${julian}${packDay}${initials}${fieldLot}${productCode}${exporterInitial}`
+  return `G${year}${julian}${packWeekday}${initials}${fieldLot}${productCode}${EXPORTADOR_CODIGO_TRAZABILIDAD}`
 }
 
 export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
