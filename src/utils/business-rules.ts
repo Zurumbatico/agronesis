@@ -8,7 +8,6 @@ import type { CategoriaClasificacion, Clasificacion, Despacho } from '@/types/mo
 // ─────────────────────────────────────────────
 export const DEFAULT_PESO_CAJA_EXPORTACION_KG = 4.65
 export const DEFAULT_PESO_CAJA_DESPACHO_KG = 4.5
-export const PCT_DESHIDRATACION = 0.05
 export const CAJAS_POR_PALLET = 172
 export const MAX_PALLETS_POR_DESPACHO_MAR_AER = 20
 export const MAX_CAJAS_DESPACHO_MAR_AER = CAJAS_POR_PALLET * MAX_PALLETS_POR_DESPACHO_MAR_AER
@@ -85,15 +84,14 @@ export function siguienteEstadoLote(estadoActual: EstadoLote): EstadoLote | null
 
 /**
  * Calcula el número de cajas exportables a partir de los kg buenos clasificados.
- * Aplica ajuste por deshidratación (5%) y divide por el peso objetivo por caja (4.65 kg).
+ * Divide por el peso objetivo por caja (4.65 kg).
  * Siempre redondeado hacia abajo — no se puede empacar media caja.
  */
 export function calcularCajasExportables(
   pesoKgBuenos: number,
   pesoCajaKg: number = DEFAULT_PESO_CAJA_EXPORTACION_KG
 ): number {
-  const exportableFinal = pesoKgBuenos * (1 - PCT_DESHIDRATACION)
-  return Math.floor(exportableFinal / pesoCajaKg)
+  return Math.floor(pesoKgBuenos / pesoCajaKg)
 }
 
 /**
