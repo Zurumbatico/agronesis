@@ -368,27 +368,16 @@ export async function getAnexo41Data(despachoId: string): Promise<Anexo41Data> {
   const pallets = despacho.pallets ?? []
 
   if (pallets.length === 0) {
-    return { despacho: despacho as unknown as Despacho, rows: [], totalJabas: 0 }
+    return { despacho: despacho as unknown as Despacho, rows: [] }
   }
 
-  // Agrupar cajas por código de agricultor
+  // Agrupar cajas por código de lote
   const grouped: Record<string, number> = {}
-  const lotesCubetas: Record<string, number> = {}
 
   for (const p of pallets) {
-    const codigo = p.lote?.agricultor?.codigo
-      || p.lote?.codigo_lote_agricultor
-      || p.lote?.codigo
-      || 'SIN_CODIGO'
-
+    const codigo = p.lote?.codigo_lote_agricultor || p.lote?.codigo || 'SIN_CODIGO'
     grouped[codigo] = (grouped[codigo] ?? 0) + p.num_cajas
-
-    if (p.lote?.id && !(p.lote.id in lotesCubetas)) {
-      lotesCubetas[p.lote.id] = p.lote.num_cubetas ?? 0
-    }
   }
-
-  const totalJabas = Object.values(lotesCubetas).reduce((s, v) => s + v, 0)
 
   const rows: Anexo41Row[] = Object.entries(grouped)
     .map(([codigoLote, numCajas]) => ({ codigoLote, numCajas }))
@@ -401,5 +390,5 @@ export async function getAnexo41Data(despachoId: string): Promise<Anexo41Data> {
       return a.codigoLote.localeCompare(b.codigoLote)
     })
 
-  return { despacho: despacho as unknown as Despacho, rows, totalJabas }
+  return { despacho: despacho as unknown as Despacho, rows }
 }

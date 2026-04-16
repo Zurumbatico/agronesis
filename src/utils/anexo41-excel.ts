@@ -15,7 +15,6 @@ export type Anexo41Row = {
 export type Anexo41Data = {
   despacho: Despacho
   rows: Anexo41Row[]
-  totalJabas: number
 }
 
 // ─────────────────────────────────────────────
@@ -23,7 +22,7 @@ export type Anexo41Data = {
 // ─────────────────────────────────────────────
 
 const NOMBRE_EMPACADORA = 'AGRONESIS DEL PERU S.A.C'
-const MUESTREAR_DIVISOR = 230
+const MUESTRA_TOTAL = 10
 const C = 9 // Columnas A–I (0–8)
 
 // ─────────────────────────────────────────────
@@ -167,15 +166,20 @@ function styleRange(ws: XLSX.WorkSheet, r1: number, c1: number, r2: number, c2: 
 // Generador principal
 // ─────────────────────────────────────────────
 
+function calcJabas(cajas: number, pesoCaja: number): number {
+  return (cajas * pesoCaja * 1.1) / 14
+}
+
 export function generateAnexo41Excel(data: Anexo41Data): void {
-  const { despacho, rows, totalJabas } = data
+  const { despacho, rows } = data
   const pesoCaja = DEFAULT_PESO_CAJA_DESPACHO_KG
   const exportador = (despacho.exportador || NOMBRE_EMPACADORA).toUpperCase()
 
   // Totales
   const totalCajas = rows.reduce((sum, r) => sum + r.numCajas, 0)
+  const totalJabas = calcJabas(totalCajas, pesoCaja)
   const totalPeso = +(totalCajas * pesoCaja).toFixed(2)
-  const totalMuestrear = totalCajas > 0 ? totalCajas / MUESTREAR_DIVISOR : 0
+  const totalMuestrear = MUESTRA_TOTAL
 
   // ── Construir AOA ─────────────────────────
 
@@ -232,9 +236,9 @@ export function generateAnexo41Excel(data: Anexo41Data): void {
   const DATA_START = aoa.length
   for (let i = 0; i < rows.length; i++) {
     const item = rows[i]
-    const jabas = totalCajas > 0 ? (item.numCajas / totalCajas) * totalJabas : 0
+    const jabas = calcJabas(item.numCajas, pesoCaja)
     const peso = +(item.numCajas * pesoCaja).toFixed(2)
-    const muestrear = totalCajas > 0 ? (item.numCajas / totalCajas) * totalMuestrear : 0
+    const muestrear = totalCajas > 0 ? (item.numCajas / totalCajas) * MUESTRA_TOTAL : 0
 
     const r = emptyRow(C)
     r[0] = i + 1
