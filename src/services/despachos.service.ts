@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import { normalizarNumeroPallet } from '@/utils/business-rules'
 import type { Despacho, DespachoInsert, DespachoPallet, VariedadProducto, CalidadProducto } from '@/types/models'
 import type { PackingListData, PackingListRow } from '@/utils/packing-list-excel'
+import type { Anexo41Data, Anexo41Row } from '@/utils/anexo41-excel'
 
 const TABLE = 'despachos' as const
 const TABLE_PALLETS = 'despacho_pallets' as const
@@ -326,4 +327,79 @@ export async function getPackingListData(despachoId: string): Promise<PackingLis
   const destinoGeografico = DESTINO_GEO[destinoMayoritario] ?? destinoMayoritario.toUpperCase()
 
   return { despacho: despacho as unknown as Despacho, rows, destinoGeografico }
+}
+
+// ─────────────────────────────────────────────
+// Anexo 4.1B — datos para generar Excel
+// ─────────────────────────────────────────────
+
+type LoteAnexo41 = {
+  id: string
+  codigo: string
+  num_cubetas: number
+  codigo_lote_agricultor: string | null
+  agricultor: { id: string; codigo: string } | null
+  producto: { id: string; nombre: string; variedad: VariedadProducto } | null
+}
+
+export async function getAnexo41Data(despachoId: string): Promise<Anexo41Data> {
+  const { data: despachoData, error: despErr } = await supabase
+    .from(TABLE)
+    .select(`
+      *,
+      pallets:despacho_pallets(
+        *,
+        lote:lotes(
+          id, codigo, num_cubetas, codigo_lote_agricultor,
+          agricultor:agricultores!lotes_agricultor_id_fkey(id, codigo),
+          producto:productos(id, nombre, variedad)
+        )
+      )
+    `)
+    .eq('id', despachoId)
+    .single()
+
+  if (despErr) throw new Error(despErr.message)
+
+  const despacho = despachoData as unknown as Despacho & {
+    pallets: (DespachoPallet & { lote: LoteAnexo41 | null })[]
+  }
+
+  const pallets = despacho.pallets ?? []
+
+  if (pallets.length === 0) {
+    return { despacho: despacho as unknown as Despacho, rows: [], totalJabas: 0 }
+  }
+
+  // Agrupar cajas por código de agricultor
+  const grouped: Record<string, number> = {}
+  const lotesCubetas: Record<string, number> = {}
+
+  for (const p of pallets) {
+    const codigo = p.lote?.agricultor?.codigo
+      || p.lote?.codigo_lote_agricultor
+      || p.lote?.codigo
+      || 'SIN_CODIGO'
+
+    grouped[codigo] = (grouped[codigo] ?? 0) + p.num_cajas
+
+    if (p.lote?.id && !(p.lote.id in lotesCubetas)) {
+      lotesCubetas[p.lote.id] = p.lote.num_cubetas ?? 0
+    }
+  }
+
+  const totalJabas = Object.values(lotesCubetas).reduce((s, v) => s + v, 0)
+
+  const rows: Anexo41Row[] = Object.entries(grouped)
+    .map(([codigoLote, numCajas]) => ({ codigoLote, numCajas }))
+    .sort((a, b) => {
+      const numA = parseInt(a.codigoLote, 10)
+      const numB = parseInt(b.codigoLote, 10)
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB
+      if (!isNaN(numA)) return -1
+      if (!isNaN(numB)) return 1
+      return a.codigoLote.localeCompare(b.codigoLote)
+    })
+
+  return { despacho: despacho as unknown as Despacho, rows, totalJabas }
 }

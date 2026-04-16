@@ -7,8 +7,9 @@ import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { DESTINO_DESPACHO_CONFIG, ROUTES, TIPO_DESPACHO_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
-import { getDespacho, getPackingListData } from '@/services/despachos.service'
+import { getDespacho, getPackingListData, getAnexo41Data } from '@/services/despachos.service'
 import { generatePackingListExcel } from '@/utils/packing-list-excel'
+import { generateAnexo41Excel } from '@/utils/anexo41-excel'
 import { formatFecha, formatPeso } from '@/utils/formatters'
 import type { Despacho } from '@/types/models'
 
@@ -19,6 +20,7 @@ export default function DetalleDespachoPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [descargando, setDescargando] = useState(false)
+  const [descargandoAnexo, setDescargandoAnexo] = useState(false)
 
   const cargar = async () => {
     if (!id) return
@@ -48,6 +50,19 @@ export default function DetalleDespachoPage() {
     }
   }
 
+  const descargarAnexo41 = async () => {
+    if (!id) return
+    setDescargandoAnexo(true)
+    try {
+      const data = await getAnexo41Data(id)
+      generateAnexo41Excel(data)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setDescargandoAnexo(false)
+    }
+  }
+
   const resumenVariedad = useMemo(() => (despacho?.pallets ?? []).reduce((acc, pallet) => {
     const variedad = pallet.lote?.producto?.variedad
     if (!variedad) return acc
@@ -68,6 +83,9 @@ export default function DetalleDespachoPage() {
         actions={
           id ? (
             <div className="flex gap-2">
+              <Button variant="outline" onClick={descargarAnexo41} disabled={descargandoAnexo}>
+                <Download className="h-4 w-4 mr-2" /> {descargandoAnexo ? 'Generando…' : 'Anexo 4.1'}
+              </Button>
               <Button variant="outline" onClick={descargarPackingList} disabled={descargando}>
                 <Download className="h-4 w-4 mr-2" /> {descargando ? 'Generando…' : 'Packing List'}
               </Button>
