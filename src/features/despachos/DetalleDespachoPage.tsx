@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Pencil } from 'lucide-react'
+import { Download, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { DESTINO_DESPACHO_CONFIG, ROUTES, TIPO_DESPACHO_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
-import { getDespacho } from '@/services/despachos.service'
+import { getDespacho, getPackingListData } from '@/services/despachos.service'
+import { generatePackingListExcel } from '@/utils/packing-list-excel'
 import { formatFecha, formatPeso } from '@/utils/formatters'
 import type { Despacho } from '@/types/models'
 
@@ -17,6 +18,7 @@ export default function DetalleDespachoPage() {
   const [despacho, setDespacho] = useState<Despacho | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [descargando, setDescargando] = useState(false)
 
   const cargar = async () => {
     if (!id) return
@@ -32,6 +34,19 @@ export default function DetalleDespachoPage() {
   }
 
   useEffect(() => { cargar() }, [id])
+
+  const descargarPackingList = async () => {
+    if (!id) return
+    setDescargando(true)
+    try {
+      const data = await getPackingListData(id)
+      generatePackingListExcel(data)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setDescargando(false)
+    }
+  }
 
   const resumenVariedad = useMemo(() => (despacho?.pallets ?? []).reduce((acc, pallet) => {
     const variedad = pallet.lote?.producto?.variedad
@@ -52,9 +67,14 @@ export default function DetalleDespachoPage() {
         backHref={ROUTES.DESPACHOS}
         actions={
           id ? (
-            <Button onClick={() => navigate(`/despachos/${id}/editar`)}>
-              <Pencil className="h-4 w-4 mr-2" /> Editar despacho
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={descargarPackingList} disabled={descargando}>
+                <Download className="h-4 w-4 mr-2" /> {descargando ? 'Generando…' : 'Packing List'}
+              </Button>
+              <Button onClick={() => navigate(`/despachos/${id}/editar`)}>
+                <Pencil className="h-4 w-4 mr-2" /> Editar despacho
+              </Button>
+            </div>
           ) : null
         }
       />

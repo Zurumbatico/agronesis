@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { normalizarNumeroPallet } from '@/utils/business-rules'
-import type { Despacho, DespachoInsert, DespachoPallet, VariedadProducto } from '@/types/models'
+import type { Despacho, DespachoInsert, DespachoPallet, VariedadProducto, CalidadProducto } from '@/types/models'
+import type { PackingListData, PackingListRow } from '@/utils/packing-list-excel'
 
 const TABLE = 'despachos' as const
 const TABLE_PALLETS = 'despacho_pallets' as const
@@ -205,4 +206,124 @@ export async function updateDespachoCompleto(
   if (palletsError) throw new Error(palletsError.message)
 
   return getDespacho(id)
+}
+
+// ─────────────────────────────────────────────
+// Packing List — datos para generar Excel
+// ─────────────────────────────────────────────
+
+type EmpaquetadoRow = {
+  lote_id: string
+  numero_pallet: string
+  codigo_trazabilidad: string
+  num_cajas: number
+  destino: string
+}
+
+type LoteConRelaciones = {
+  id: string
+  codigo: string
+  agricultor_id: string
+  producto: { id: string; nombre: string; variedad: VariedadProducto; calidad: CalidadProducto } | null
+}
+
+type AgricultorGGN = {
+  id: string
+  ggn: string | null
+}
+
+const DESTINO_GEO: Record<string, string> = {
+  europa: 'EUROPA',
+  usa: 'USA',
+}
+
+export async function getPackingListData(despachoId: string): Promise<PackingListData> {
+  // 1. Despacho con pallets + lote + producto (sin agricultor para evitar FK ambigua)
+  const { data: despachoData, error: despErr } = await supabase
+    .from(TABLE)
+    .select(`
+      *,
+      pallets:despacho_pallets(
+        *,
+        lote:lotes(id, codigo, agricultor_id, producto:productos(id, nombre, variedad, calidad))
+      )
+    `)
+    .eq('id', despachoId)
+    .single()
+
+  if (despErr) throw new Error(despErr.message)
+
+  const despacho = despachoData as unknown as Despacho & {
+    pallets: (DespachoPallet & { lote: LoteConRelaciones | null })[]
+  }
+  const pallets = despacho.pallets ?? []
+
+  if (pallets.length === 0) {
+    return { despacho: despacho as unknown as Despacho, rows: [], destinoGeografico: '' }
+  }
+
+  const loteIds = [...new Set(pallets.map(p => p.lote_id))]
+
+  // 2. Obtener agricultores (con GGN) de los lotes involucrados
+  const agricultorIds = [...new Set(
+    pallets.map(p => p.lote?.agricultor_id).filter((id): id is string => !!id)
+  )]
+
+  const [empResult, agriResult] = await Promise.all([
+    supabase
+      .from('empaquetados')
+      .select('lote_id, numero_pallet, codigo_trazabilidad, num_cajas, destino')
+      .in('lote_id', loteIds),
+    agricultorIds.length > 0
+      ? supabase.from('agricultores').select('id, ggn').in('id', agricultorIds)
+      : Promise.resolve({ data: [] as AgricultorGGN[], error: null }),
+  ])
+
+  if (empResult.error) throw new Error(empResult.error.message)
+  if (agriResult.error) throw new Error(agriResult.error.message)
+
+  const ggnMap = new Map<string, string>(
+    ((agriResult.data ?? []) as AgricultorGGN[])
+      .filter(a => a.ggn)
+      .map(a => [a.id, a.ggn!])
+  )
+
+  const palletMap = new Map(
+    pallets.map(p => [
+      `${p.lote_id}::${normalizarNumeroPallet(p.numero_pallet)}`,
+      p,
+    ])
+  )
+
+  const rows: PackingListRow[] = ((empResult.data ?? []) as EmpaquetadoRow[])
+    .filter(e => palletMap.has(`${e.lote_id}::${normalizarNumeroPallet(e.numero_pallet)}`))
+    .map(e => {
+      const pallet = palletMap.get(`${e.lote_id}::${normalizarNumeroPallet(e.numero_pallet)}`)!
+      const agricultorId = pallet.lote?.agricultor_id ?? ''
+      return {
+        numero_pallet: normalizarNumeroPallet(e.numero_pallet),
+        codigo_trazabilidad: e.codigo_trazabilidad,
+        ggn: ggnMap.get(agricultorId) || '4069453556065',
+        variedad: (pallet.lote?.producto?.variedad ?? 'snow_peas') as VariedadProducto,
+        calidad: (pallet.lote?.producto?.calidad ?? 'cat1') as CalidadProducto,
+        num_cajas: e.num_cajas,
+      }
+    })
+    .sort((a, b) => {
+      const pa = parseInt(a.numero_pallet, 10) || 0
+      const pb = parseInt(b.numero_pallet, 10) || 0
+      if (pa !== pb) return pa - pb
+      return a.codigo_trazabilidad.localeCompare(b.codigo_trazabilidad)
+    })
+
+  // Destino geográfico desde los empaquetados (mayoría)
+  const destinos = ((empResult.data ?? []) as EmpaquetadoRow[])
+    .filter(e => palletMap.has(`${e.lote_id}::${normalizarNumeroPallet(e.numero_pallet)}`))
+    .map(e => e.destino)
+  const destinoFreq: Record<string, number> = {}
+  for (const d of destinos) destinoFreq[d] = (destinoFreq[d] ?? 0) + 1
+  const destinoMayoritario = Object.entries(destinoFreq).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'europa'
+  const destinoGeografico = DESTINO_GEO[destinoMayoritario] ?? destinoMayoritario.toUpperCase()
+
+  return { despacho: despacho as unknown as Despacho, rows, destinoGeografico }
 }
