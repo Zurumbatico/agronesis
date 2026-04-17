@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getLotes, createLote, updateLote, actualizarEstadoLote } from '@/services/lotes.service'
+import { getLotes, createLote, updateLote, actualizarEstadoLote, deleteLote } from '@/services/lotes.service'
 import { useAuthStore } from '@/store/auth.store'
 import type { Lote, EstadoLote } from '@/types/models'
 import type { LoteFormData } from '@/utils/validators'
@@ -42,5 +42,10 @@ export function useLotes() {
     return actualizado
   }
 
-  return { lotes, loading, error, reload, crear, actualizar, cambiarEstado }
+  const eliminar = async (id: string) => {
+    await deleteLote(id)
+    setLotes((prev) => prev.filter((l) => l.id !== id))
+  }
+
+  return { lotes, loading, error, reload, crear, actualizar, cambiarEstado, eliminar }
 }

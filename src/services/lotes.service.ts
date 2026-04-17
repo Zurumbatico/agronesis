@@ -58,3 +58,27 @@ export async function updateLote(id: string, input: LoteUpdate): Promise<Lote> {
 export async function actualizarEstadoLote(id: string, estado: Lote['estado']): Promise<Lote> {
   return updateLote(id, { estado })
 }
+
+export async function deleteLote(id: string): Promise<void> {
+  // Check if there are despachos associated with this lote
+  const { data: pallets, error: checkError } = await supabase
+    .from('despacho_pallets')
+    .select('despacho_id, despacho:despachos(codigo)')
+    .eq('lote_id', id)
+
+  if (checkError) throw new Error(checkError.message)
+
+  if (pallets && pallets.length > 0) {
+    const codigos = [...new Set(
+      pallets.map((p: any) => p.despacho?.codigo).filter(Boolean)
+    )]
+    throw new Error(`DESPACHO_ASOCIADO::${codigos.join(', ')}`)
+  }
+
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+}

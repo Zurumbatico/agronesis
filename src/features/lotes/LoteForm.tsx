@@ -184,8 +184,8 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
             >
               <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
               <SelectContent>
-                {[1.3, 1.8].map((v) => (
-                  <SelectItem key={v} value={String(v)}>{v.toFixed(1)} kg</SelectItem>
+                {[1.3, 1.8, 2].map((v) => (
+                  <SelectItem key={v} value={String(v)}>{v % 1 === 0 ? `${v}.0` : v.toFixed(1)} kg</SelectItem>
                 ))}
               </SelectContent>
             </Select>

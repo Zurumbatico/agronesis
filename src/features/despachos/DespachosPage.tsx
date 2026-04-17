@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Plus, Search, Truck } from 'lucide-react'
+import { Pencil, Plus, Search, Trash2, Truck } from 'lucide-react'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -8,8 +8,9 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { DESTINO_DESPACHO_CONFIG, ROUTES, TIPO_DESPACHO_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
-import { getDespachos } from '@/services/despachos.service'
+import { getDespachos, deleteDespacho } from '@/services/despachos.service'
 import { formatFecha, formatPeso } from '@/utils/formatters'
 import type { Despacho } from '@/types/models'
 
@@ -28,6 +29,8 @@ export default function DespachosPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  const [despachoAEliminar, setDespachoAEliminar] = useState<Despacho | null>(null)
+  const [eliminando, setEliminando] = useState(false)
 
   const cargar = async () => {
     setLoading(true)
@@ -41,6 +44,21 @@ export default function DespachosPage() {
   }
 
   useEffect(() => { cargar() }, [])
+
+  const handleEliminar = async () => {
+    if (!despachoAEliminar) return
+    setEliminando(true)
+    try {
+      await deleteDespacho(despachoAEliminar.id)
+      setDespachos((prev) => prev.filter((d) => d.id !== despachoAEliminar.id))
+      setDespachoAEliminar(null)
+    } catch (e) {
+      setDespachoAEliminar(null)
+      setError((e as Error).message)
+    } finally {
+      setEliminando(false)
+    }
+  }
 
   if (loading) return <LoadingPage />
   if (error) return <ErrorMessage message={error} onRetry={cargar} />
@@ -104,17 +122,30 @@ export default function DespachosPage() {
                       <p className="text-xs text-muted-foreground mt-1">{despacho.transportista || '-'}{despacho.placa_vehiculo ? ` · ${despacho.placa_vehiculo}` : ''}</p>
                     )}
                     <div className="mt-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          navigate(`/despachos/${despacho.id}/editar`)
-                        }}
-                      >
-                        <Pencil className="h-4 w-4 mr-2" /> Editar
-                      </Button>
+                      <div className="flex gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDespachoAEliminar(despacho)
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            navigate(`/despachos/${despacho.id}/editar`)
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 mr-2" /> Editar
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -123,6 +154,17 @@ export default function DespachosPage() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(despachoAEliminar)}
+        title="Eliminar despacho"
+        description={`¿Está seguro que desea eliminar el despacho ${despachoAEliminar?.codigo ?? ''}? Se eliminarán también los pallets asociados. Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        loading={eliminando}
+        onConfirm={handleEliminar}
+        onCancel={() => setDespachoAEliminar(null)}
+      />
     </div>
   )
 }

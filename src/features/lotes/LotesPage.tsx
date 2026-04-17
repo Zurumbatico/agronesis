@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Search, Eye, Filter, Printer } from 'lucide-react'
+import { Plus, Search, Eye, Filter, Printer, Trash2 } from 'lucide-react'
 import { useLotes } from './hooks/useLotes'
 import { LoteForm } from './LoteForm'
 import { printLoteTicket } from './printLoteTicket'
@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { EstadoLoteBadge } from '@/components/shared/StatusBadge'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -21,13 +22,16 @@ import type { LoteFormData } from '@/utils/validators'
 import type { EstadoLote, Lote } from '@/types/models'
 
 export default function LotesPage() {
-  const { lotes, loading, error, reload, crear } = useLotes()
+  const { lotes, loading, error, reload, crear, eliminar } = useLotes()
   const navigate = useNavigate()
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoLote | 'todos'>('todos')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [ticketLote, setTicketLote] = useState<Lote | null>(null)
+  const [loteAEliminar, setLoteAEliminar] = useState<Lote | null>(null)
+  const [eliminando, setEliminando] = useState(false)
+  const [errorEliminacion, setErrorEliminacion] = useState<string | null>(null)
 
   const getAcopiadorLabel = (lote: Lote) => {
     if (lote.acopiador) return `${lote.acopiador.apellido}, ${lote.acopiador.nombre}`
@@ -49,6 +53,27 @@ export default function LotesPage() {
       setTicketLote(nuevo)
     } catch (e) {
       setDialogError((e as Error).message)
+    }
+  }
+
+  const handleEliminar = async () => {
+    if (!loteAEliminar) return
+    setEliminando(true)
+    try {
+      await eliminar(loteAEliminar.id)
+      setLoteAEliminar(null)
+    } catch (e) {
+      const msg = (e as Error).message
+      if (msg.startsWith('DESPACHO_ASOCIADO::')) {
+        const codigos = msg.replace('DESPACHO_ASOCIADO::', '')
+        setLoteAEliminar(null)
+        setErrorEliminacion(`No se puede eliminar este lote porque tiene despacho(s) asociado(s): ${codigos}. Elimine primero el/los despacho(s) para poder eliminar el lote.`)
+      } else {
+        setLoteAEliminar(null)
+        setErrorEliminacion(msg)
+      }
+    } finally {
+      setEliminando(false)
     }
   }
 
@@ -112,6 +137,9 @@ export default function LotesPage() {
               <div className="flex gap-1.5 shrink-0">
                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); printLoteTicket(l) }}>
                   <Printer className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setLoteAEliminar(l) }}>
+                  <Trash2 className="h-4 w-4" />
                 </Button>
                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/lotes/${l.id}`) }}>
                   <Eye className="h-4 w-4 mr-1" /> Ver
@@ -228,6 +256,28 @@ export default function LotesPage() {
               </CardContent>
             </Card>
           )}
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={Boolean(loteAEliminar)}
+        title="Eliminar lote"
+        description={`¿Está seguro que desea eliminar el lote ${loteAEliminar?.codigo ?? ''}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        variant="destructive"
+        loading={eliminando}
+        onConfirm={handleEliminar}
+        onCancel={() => setLoteAEliminar(null)}
+      />
+
+      <Dialog open={Boolean(errorEliminacion)} onOpenChange={(open) => { if (!open) setErrorEliminacion(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>No se puede eliminar</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{errorEliminacion}</p>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setErrorEliminacion(null)}>Cerrar</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

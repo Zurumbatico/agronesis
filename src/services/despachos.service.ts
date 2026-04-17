@@ -209,6 +209,22 @@ export async function updateDespachoCompleto(
   return getDespacho(id)
 }
 
+export async function deleteDespacho(id: string): Promise<void> {
+  const { error: palletsError } = await supabase
+    .from(TABLE_PALLETS)
+    .delete()
+    .eq('despacho_id', id)
+
+  if (palletsError) throw new Error(palletsError.message)
+
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+}
+
 // ─────────────────────────────────────────────
 // Packing List — datos para generar Excel
 // ─────────────────────────────────────────────
