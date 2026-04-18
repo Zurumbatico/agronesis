@@ -69,7 +69,7 @@ export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
 
 interface LabelSize { width: string; height: string; page: string; compact?: boolean }
 const SIZE_A4_LANDSCAPE: LabelSize = { width: '297mm', height: '210mm', page: 'A4 landscape' }
-const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '100mm 60mm', compact: true }
+const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '60mm 100mm landscape', compact: true }
 
 function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = SIZE_A4_LANDSCAPE): string {
   const variedad = lote.producto
@@ -83,27 +83,37 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Etiqueta – ${escapeHtml(lote.codigo)}</title>
+  <title>${c ? '' : `Etiqueta – ${escapeHtml(lote.codigo)}`}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { size: ${size.page}; margin: 0; }
-    body {
+    @page {
+      size: ${size.page};
+      margin: 0;
+    }
+    html, body {
       font-family: 'Arial Narrow', Arial, sans-serif;
-      font-size: ${c ? '4.5px' : '12px'};
-      line-height: ${c ? '1.1' : '1.15'};
+      font-size: ${c ? '5.5px' : '12px'};
+      line-height: ${c ? '1.05' : '1.15'};
       color: #000;
       background: #fff;
       width: ${size.width};
       height: ${size.height};
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
     }
     .label {
       width: 100%;
       height: 100%;
       border: ${c ? '1px' : '2px'} solid #000;
       margin: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     table {
       width: 100%;
+      ${c ? 'height: 100%; flex: 1;' : ''}
       border-collapse: collapse;
       table-layout: fixed;
     }
@@ -113,14 +123,15 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
       vertical-align: top;
       font-weight: 700;
       text-transform: uppercase;
+      overflow: hidden;
     }
     .left { width: 43%; }
     .center { text-align: center; }
     .middle { vertical-align: middle; }
-    .small { font-size: ${c ? '4px' : '11px'}; }
-    .tiny { font-size: ${c ? '3.5px' : '10px'}; }
+    .small { font-size: ${c ? '4.5px' : '11px'}; }
+    .tiny { font-size: ${c ? '4px' : '10px'}; }
     .cert-line {
-      font-size: ${c ? '6px' : '18px'};
+      font-size: ${c ? '7px' : '18px'};
       font-weight: 800;
       text-align: center;
       letter-spacing: 0.3px;
@@ -128,7 +139,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     }
     .exporter {
       font-family: 'Arial Black', Arial, sans-serif;
-      font-size: ${c ? '6.5px' : '20px'};
+      font-size: ${c ? '7px' : '20px'};
       font-weight: 900;
       letter-spacing: ${c ? '0.3px' : '1px'};
       line-height: 1.05;
@@ -137,16 +148,16 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     }
     .trace {
       font-family: 'Courier New', monospace;
-      font-size: ${c ? '14px' : '43px'};
+      font-size: ${c ? '16px' : '43px'};
       font-weight: 800;
       line-height: 1;
       text-align: center;
-      padding: ${c ? '1px 0' : '6px 0'};
+      padding: ${c ? '2px 0' : '6px 0'};
       letter-spacing: 0;
     }
     @media print {
-      body { margin: 0; }
-      .label { margin: 0; }
+      html, body { margin: 0 !important; padding: 0 !important; }
+      .label { margin: 0 !important; }
     }
   </style>
 </head>
