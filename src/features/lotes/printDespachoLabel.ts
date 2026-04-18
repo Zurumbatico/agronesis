@@ -69,7 +69,7 @@ export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
 
 interface LabelSize { width: string; height: string; page: string; compact?: boolean }
 const SIZE_A4_LANDSCAPE: LabelSize = { width: '297mm', height: '210mm', page: 'A4 landscape' }
-const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '100mm 60mm', compact: true }
+const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '60mm 100mm', compact: true }
 
 function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = SIZE_A4_LANDSCAPE): string {
   const variedad = lote.producto
@@ -96,17 +96,16 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
       line-height: ${c ? '1.05' : '1.15'};
       color: #000;
       background: #fff;
-      width: ${size.width};
-      height: ${size.height};
-      margin: 0 auto;
+      width: ${c ? size.height : size.width};
+      height: ${c ? size.width : size.height};
+      margin: 0;
       padding: 0;
       overflow: hidden;
     }
     .label {
-      width: 100%;
-      height: 100%;
+      ${c ? `width: ${size.width}; height: ${size.height}; transform: rotate(-90deg) translateX(-${size.width}); transform-origin: top left;` : 'width: 100%; height: 100%;'}
       border: ${c ? '1px' : '2px'} solid #000;
-      margin: 0 auto;
+      margin: 0;
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -197,7 +196,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
         </td>
       </tr>
       <tr>
-        <td class="left middle">GGN: 4069453556065</td>
+        <td class="left middle"><div>GGN: 4069453556065</div><div>CoC NUMBER: 4069453397316</div></td>
         <td>
           <div>TRACEABILITY CODE:</div>
           <div class="trace">${escapeHtml(code)}</div>
