@@ -88,7 +88,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     @page {
       size: ${size.page};
-      margin: 0;
+      margin: ${c ? '3mm 0 0 0' : '0'};
     }
     html, body {
       font-family: 'Arial Narrow', Arial, sans-serif;
@@ -99,7 +99,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
       width: ${size.width};
       height: ${size.height};
       margin: 0;
-      padding: ${c ? '2mm 0 0 0' : '0'};
+      padding: 0;
       overflow: hidden;
     }
     .label {
@@ -197,7 +197,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
         </td>
       </tr>
       <tr>
-        <td class="left middle" style="font-size:${c ? '13px' : '16px'};"><div>GGN: 4069453556065</div><div style="border-top:1px solid #000; margin-top:1px; padding-top:1px;">COC NUMBER: 4069453397316</div></td>
+        <td class="left middle" style="font-size:${c ? '12px' : '16px'};"><div>GGN: 4069453556065</div><div style="border-top:1px solid #000; margin-top:1px; padding-top:1px;">COC NUMBER: 4069453397316</div></td>
         <td>
           <div>TRACEABILITY CODE:</div>
           <div class="trace">${escapeHtml(code)}</div>
