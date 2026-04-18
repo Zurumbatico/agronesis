@@ -67,7 +67,11 @@ export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
   return getTraceabilityCodeForDate(lote, despacho.fecha_despacho)
 }
 
-function buildTraceabilityLabelHtml(lote: Lote, code: string): string {
+interface LabelSize { width: string; height: string; page: string }
+const SIZE_A4_LANDSCAPE: LabelSize = { width: '297mm', height: '210mm', page: 'A4 landscape' }
+const SIZE_EMPAQUETADO: LabelSize = { width: '245mm', height: '400mm', page: '245mm 400mm' }
+
+function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = SIZE_A4_LANDSCAPE): string {
   const variedad = lote.producto
     ? VARIEDAD_PRODUCTO_CONFIG[lote.producto.variedad].label.toUpperCase()
     : 'N/A'
@@ -80,15 +84,15 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string): string {
   <title>Etiqueta – ${escapeHtml(lote.codigo)}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { size: A4 landscape; margin: 0; }
+    @page { size: ${size.page}; margin: 0; }
     body {
       font-family: 'Arial Narrow', Arial, sans-serif;
       font-size: 12px;
       line-height: 1.15;
       color: #000;
       background: #fff;
-      width: 297mm;
-      height: 210mm;
+      width: ${size.width};
+      height: ${size.height};
     }
     .label {
       width: 100%;
@@ -205,16 +209,16 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string): string {
 </html>`
 }
 
-export function printTraceabilityLabel(lote: Lote, code: string): void {
+export function printTraceabilityLabel(lote: Lote, code: string, size?: LabelSize): void {
   const printWindow = window.open('', '_blank', 'width=640,height=500')
   if (!printWindow) return
-  printWindow.document.write(buildTraceabilityLabelHtml(lote, code))
+  printWindow.document.write(buildTraceabilityLabelHtml(lote, code, size))
   printWindow.document.close()
 }
 
 export function printEmpaquetadoLabel(lote: Lote, empaquetado: Pick<Empaquetado, 'fecha_empaquetado' | 'codigo_trazabilidad'>): void {
   const code = empaquetado.codigo_trazabilidad || getTraceabilityCodeForDate(lote, empaquetado.fecha_empaquetado)
-  printTraceabilityLabel(lote, code)
+  printTraceabilityLabel(lote, code, SIZE_EMPAQUETADO)
 }
 
 export function printDespachoLabel(lote: Lote, despacho: Despacho): void {
