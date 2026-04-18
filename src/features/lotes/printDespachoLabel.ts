@@ -69,7 +69,7 @@ export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
 
 interface LabelSize { width: string; height: string; page: string; compact?: boolean }
 const SIZE_A4_LANDSCAPE: LabelSize = { width: '297mm', height: '210mm', page: 'A4 landscape' }
-const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '60mm 100mm', compact: true }
+const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '100mm 60mm', compact: true }
 
 function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = SIZE_A4_LANDSCAPE): string {
   const variedad = lote.producto
