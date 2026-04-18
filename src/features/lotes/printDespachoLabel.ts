@@ -69,7 +69,7 @@ export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
 
 interface LabelSize { width: string; height: string; page: string; compact?: boolean }
 const SIZE_A4_LANDSCAPE: LabelSize = { width: '297mm', height: '210mm', page: 'A4 landscape' }
-const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '60mm 100mm landscape', compact: true }
+const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '100mm 60mm', compact: true }
 
 function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = SIZE_A4_LANDSCAPE): string {
   const variedad = lote.producto
@@ -92,7 +92,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     }
     html, body {
       font-family: 'Arial Narrow', Arial, sans-serif;
-      font-size: ${c ? '7px' : '12px'};
+      font-size: ${c ? '9px' : '12px'};
       line-height: ${c ? '1.05' : '1.15'};
       color: #000;
       background: #fff;
@@ -128,10 +128,10 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     .left { width: 43%; }
     .center { text-align: center; }
     .middle { vertical-align: middle; }
-    .small { font-size: ${c ? '5.5px' : '11px'}; }
-    .tiny { font-size: ${c ? '5px' : '10px'}; }
+    .small { font-size: ${c ? '7px' : '11px'}; }
+    .tiny { font-size: ${c ? '6.5px' : '10px'}; }
     .cert-line {
-      font-size: ${c ? '8.5px' : '18px'};
+      font-size: ${c ? '11px' : '18px'};
       font-weight: 800;
       text-align: center;
       letter-spacing: 0.3px;
@@ -139,7 +139,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     }
     .exporter {
       font-family: 'Arial Black', Arial, sans-serif;
-      font-size: ${c ? '9px' : '20px'};
+      font-size: ${c ? '11px' : '20px'};
       font-weight: 900;
       letter-spacing: ${c ? '0.3px' : '1px'};
       line-height: 1.05;
@@ -148,7 +148,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     }
     .trace {
       font-family: 'Courier New', monospace;
-      font-size: ${c ? '20px' : '43px'};
+      font-size: ${c ? '24px' : '43px'};
       font-weight: 800;
       line-height: 1;
       text-align: center;
