@@ -128,6 +128,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     .left { width: 43%; }
     .center { text-align: center; }
     .middle { vertical-align: middle; }
+    .last-row td { padding: ${c ? '1px 2px' : '4px 6px'}; height: 1px; }
     .small { font-size: ${c ? '8px' : '11px'}; }
     .tiny { font-size: ${c ? '6.5px' : '10px'}; }
     .cert-line {
@@ -206,7 +207,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
       <tr>
         <td colspan="2" class="cert-line">${escapeHtml(CERTIFICACION_SENASA)}</td>
       </tr>
-      <tr>
+      <tr class="last-row">
         <td class="center">PRODUCE OF PERU</td>
         <td class="center">KEEP IN REFRIGERATION&nbsp;&nbsp;&nbsp;&nbsp;2°C</td>
       </tr>
