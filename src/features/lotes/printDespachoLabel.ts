@@ -92,13 +92,13 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     }
     html, body {
       font-family: 'Arial Narrow', Arial, sans-serif;
-      font-size: ${c ? '5.5px' : '12px'};
+      font-size: ${c ? '7px' : '12px'};
       line-height: ${c ? '1.05' : '1.15'};
       color: #000;
       background: #fff;
       width: ${size.width};
       height: ${size.height};
-      margin: 0;
+      margin: 0 auto;
       padding: 0;
       overflow: hidden;
     }
@@ -106,7 +106,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
       width: 100%;
       height: 100%;
       border: ${c ? '1px' : '2px'} solid #000;
-      margin: 0;
+      margin: 0 auto;
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -119,7 +119,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     }
     td {
       border: 1px solid #000;
-      padding: ${c ? '1px 2px' : '4px 6px'};
+      padding: ${c ? '1.5px 2px' : '4px 6px'};
       vertical-align: top;
       font-weight: 700;
       text-transform: uppercase;
@@ -128,18 +128,18 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     .left { width: 43%; }
     .center { text-align: center; }
     .middle { vertical-align: middle; }
-    .small { font-size: ${c ? '4.5px' : '11px'}; }
-    .tiny { font-size: ${c ? '4px' : '10px'}; }
+    .small { font-size: ${c ? '5.5px' : '11px'}; }
+    .tiny { font-size: ${c ? '5px' : '10px'}; }
     .cert-line {
-      font-size: ${c ? '7px' : '18px'};
+      font-size: ${c ? '8.5px' : '18px'};
       font-weight: 800;
       text-align: center;
       letter-spacing: 0.3px;
-      padding: ${c ? '1px 0' : '6px 0'};
+      padding: ${c ? '1.5px 0' : '6px 0'};
     }
     .exporter {
       font-family: 'Arial Black', Arial, sans-serif;
-      font-size: ${c ? '7px' : '20px'};
+      font-size: ${c ? '9px' : '20px'};
       font-weight: 900;
       letter-spacing: ${c ? '0.3px' : '1px'};
       line-height: 1.05;
@@ -148,7 +148,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     }
     .trace {
       font-family: 'Courier New', monospace;
-      font-size: ${c ? '16px' : '43px'};
+      font-size: ${c ? '20px' : '43px'};
       font-weight: 800;
       line-height: 1;
       text-align: center;
