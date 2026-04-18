@@ -67,15 +67,17 @@ export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
   return getTraceabilityCodeForDate(lote, despacho.fecha_despacho)
 }
 
-interface LabelSize { width: string; height: string; page: string }
+interface LabelSize { width: string; height: string; page: string; compact?: boolean }
 const SIZE_A4_LANDSCAPE: LabelSize = { width: '297mm', height: '210mm', page: 'A4 landscape' }
-const SIZE_EMPAQUETADO: LabelSize = { width: '245mm', height: '400mm', page: '245mm 400mm' }
+const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '100mm 60mm', compact: true }
 
 function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = SIZE_A4_LANDSCAPE): string {
   const variedad = lote.producto
     ? VARIEDAD_PRODUCTO_CONFIG[lote.producto.variedad].label.toUpperCase()
     : 'N/A'
   const exporterName = EXPORTADOR_NOMBRE
+
+  const c = size.compact
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -87,8 +89,8 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     @page { size: ${size.page}; margin: 0; }
     body {
       font-family: 'Arial Narrow', Arial, sans-serif;
-      font-size: 12px;
-      line-height: 1.15;
+      font-size: ${c ? '4.5px' : '12px'};
+      line-height: ${c ? '1.1' : '1.15'};
       color: #000;
       background: #fff;
       width: ${size.width};
@@ -97,7 +99,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     .label {
       width: 100%;
       height: 100%;
-      border: 2px solid #000;
+      border: ${c ? '1px' : '2px'} solid #000;
       margin: 0;
     }
     table {
@@ -107,7 +109,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     }
     td {
       border: 1px solid #000;
-      padding: 4px 6px;
+      padding: ${c ? '1px 2px' : '4px 6px'};
       vertical-align: top;
       font-weight: 700;
       text-transform: uppercase;
@@ -115,31 +117,31 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     .left { width: 43%; }
     .center { text-align: center; }
     .middle { vertical-align: middle; }
-    .small { font-size: 11px; }
-    .tiny { font-size: 10px; }
+    .small { font-size: ${c ? '4px' : '11px'}; }
+    .tiny { font-size: ${c ? '3.5px' : '10px'}; }
     .cert-line {
-      font-size: 18px;
+      font-size: ${c ? '6px' : '18px'};
       font-weight: 800;
       text-align: center;
       letter-spacing: 0.3px;
-      padding: 6px 0;
+      padding: ${c ? '1px 0' : '6px 0'};
     }
     .exporter {
       font-family: 'Arial Black', Arial, sans-serif;
-      font-size: 20px;
+      font-size: ${c ? '6.5px' : '20px'};
       font-weight: 900;
-      letter-spacing: 1px;
+      letter-spacing: ${c ? '0.3px' : '1px'};
       line-height: 1.05;
       white-space: nowrap;
-      margin: 2px 0 4px;
+      margin: ${c ? '0 0 1px' : '2px 0 4px'};
     }
     .trace {
       font-family: 'Courier New', monospace;
-      font-size: 43px;
+      font-size: ${c ? '14px' : '43px'};
       font-weight: 800;
       line-height: 1;
       text-align: center;
-      padding: 6px 0;
+      padding: ${c ? '1px 0' : '6px 0'};
       letter-spacing: 0;
     }
     @media print {
