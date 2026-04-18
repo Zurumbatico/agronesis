@@ -88,7 +88,7 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
     * { margin: 0; padding: 0; box-sizing: border-box; }
     @page {
       size: ${size.page};
-      margin: ${c ? '3mm 0 0 0' : '0'};
+      margin: ${c ? '1mm 0 0 0' : '0'};
     }
     html, body {
       font-family: 'Arial Narrow', Arial, sans-serif;
