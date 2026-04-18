@@ -69,7 +69,7 @@ export function getTraceabilityCode(lote: Lote, despacho: Despacho): string {
 
 interface LabelSize { width: string; height: string; page: string; compact?: boolean }
 const SIZE_A4_LANDSCAPE: LabelSize = { width: '297mm', height: '210mm', page: 'A4 landscape' }
-const SIZE_EMPAQUETADO: LabelSize = { width: '100mm', height: '60mm', page: '100mm 60mm', compact: true }
+const SIZE_EMPAQUETADO: LabelSize = { width: '60mm', height: '100mm', page: '60mm 100mm', compact: true }
 
 function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = SIZE_A4_LANDSCAPE): string {
   const variedad = lote.producto
@@ -103,13 +103,13 @@ function buildTraceabilityLabelHtml(lote: Lote, code: string, size: LabelSize = 
       overflow: hidden;
     }
     .label {
-      width: 100%;
-      height: 100%;
+      ${c ? 'width: 100mm; height: 60mm;' : 'width: 100%; height: 100%;'}
       border: ${c ? '1px' : '2px'} solid #000;
       margin: 0;
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      ${c ? 'transform: rotate(-90deg) translateX(-100%); transform-origin: top left;' : ''}
     }
     table {
       width: 100%;
