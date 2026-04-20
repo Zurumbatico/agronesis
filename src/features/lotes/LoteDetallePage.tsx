@@ -107,7 +107,8 @@ export default function LoteDetallePage() {
 
   const canPrintLoteTicket = hasPermission(roles, APP_PERMISSIONS.LOTES_PRINT_TICKET)
   const canPrintLoteLabels = hasPermission(roles, APP_PERMISSIONS.LOTES_PRINT_LABELS)
-  const canChangeLoteStatus = hasPermission(roles, APP_PERMISSIONS.LOTES_CHANGE_STATUS)
+  const canProcessLote = hasPermission(roles, APP_PERMISSIONS.LOTES_PROCESS)
+  const canDispatchLote = hasPermission(roles, APP_PERMISSIONS.LOTES_DISPATCH)
 
   const acopiadorNombre = lote.acopiador
     ? `${lote.acopiador.apellido}, ${lote.acopiador.nombre}`
@@ -132,7 +133,7 @@ export default function LoteDetallePage() {
                 <Printer className="h-4 w-4" /> Imprimir ticket
               </Button>
             )}
-            {canChangeLoteStatus && (lote.estado === 'ingresado' || lote.estado === 'en_clasificacion') && (
+            {canProcessLote && (lote.estado === 'ingresado' || lote.estado === 'en_clasificacion') && (
               <Button
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
                 onClick={() => navigate(`/lotes/${id}/clasificar`)}
@@ -140,7 +141,7 @@ export default function LoteDetallePage() {
                 Clasificar
               </Button>
             )}
-            {canChangeLoteStatus && lote.estado === 'clasificado' && (
+            {canProcessLote && lote.estado === 'clasificado' && (
               <Button
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
                 onClick={() => navigate(`/lotes/${id}/empaquetar`)}
@@ -148,7 +149,7 @@ export default function LoteDetallePage() {
                 Empaquetar
               </Button>
             )}
-            {canChangeLoteStatus && lote.estado === 'empaquetado' && (
+            {canProcessLote && lote.estado === 'empaquetado' && (
               <Button
                 className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
                 onClick={() => navigate(`/lotes/${id}/empaquetar`)}
@@ -156,7 +157,7 @@ export default function LoteDetallePage() {
                 Empaquetar
               </Button>
             )}
-            {canChangeLoteStatus && lote.estado === 'en_despacho' && (
+            {canDispatchLote && lote.estado === 'en_despacho' && (
               <Button
                 className="bg-orange-600 hover:bg-orange-700 text-white font-semibold shadow-sm"
                 onClick={() => navigate(ROUTES.DESPACHOS_NUEVO)}
@@ -164,7 +165,7 @@ export default function LoteDetallePage() {
                 Registrar despacho
               </Button>
             )}
-            {canChangeLoteStatus && lote.estado === 'despachado' && (
+            {canDispatchLote && lote.estado === 'despachado' && (
               <Button
                 className="bg-emerald-700 hover:bg-emerald-800 text-white font-semibold shadow-sm"
                 onClick={() => navigate(`/liquidaciones/agricultores/nueva?agricultor_id=${lote.agricultor_id}`)}

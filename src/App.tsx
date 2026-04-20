@@ -53,12 +53,12 @@ export default function App() {
             <Route path={ROUTES.CENTROS_ACOPIO} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><CentrosAcopioPage /></ProtectedRoute>} />
             <Route path={ROUTES.LOTES} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_VIEW}><LotesPage /></ProtectedRoute>} />
             <Route path={ROUTES.LOTES_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_VIEW}><LoteDetallePage /></ProtectedRoute>} />
-            <Route path={ROUTES.CLASIFICACIONES} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_CHANGE_STATUS}><ClasificarLotePage /></ProtectedRoute>} />
-            <Route path={ROUTES.EMPAQUETAR} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_CHANGE_STATUS}><EmpaquetarLotePage /></ProtectedRoute>} />
-            <Route path={ROUTES.DESPACHOS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><DespachosPage /></ProtectedRoute>} />
-            <Route path={ROUTES.DESPACHOS_NUEVO} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_CHANGE_STATUS}><NuevoDespachoPage /></ProtectedRoute>} />
-            <Route path={ROUTES.DESPACHOS_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><DetalleDespachoPage /></ProtectedRoute>} />
-            <Route path={ROUTES.DESPACHOS_EDITAR} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><NuevoDespachoPage /></ProtectedRoute>} />
+            <Route path={ROUTES.CLASIFICACIONES} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_PROCESS}><ClasificarLotePage /></ProtectedRoute>} />
+            <Route path={ROUTES.EMPAQUETAR} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_PROCESS}><EmpaquetarLotePage /></ProtectedRoute>} />
+            <Route path={ROUTES.DESPACHOS} element={<ProtectedRoute permission={APP_PERMISSIONS.DESPACHOS_VIEW}><DespachosPage /></ProtectedRoute>} />
+            <Route path={ROUTES.DESPACHOS_NUEVO} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_DISPATCH}><NuevoDespachoPage /></ProtectedRoute>} />
+            <Route path={ROUTES.DESPACHOS_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.DESPACHOS_VIEW}><DetalleDespachoPage /></ProtectedRoute>} />
+            <Route path={ROUTES.DESPACHOS_EDITAR} element={<ProtectedRoute permission={APP_PERMISSIONS.DESPACHOS_MANAGE}><NuevoDespachoPage /></ProtectedRoute>} />
             <Route
               path={ROUTES.CUBETAS}
               element={ENABLED_MODULES.CUBETAS ? <ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><CubetasPage /></ProtectedRoute> : <Navigate to={ROUTES.DASHBOARD} replace />}

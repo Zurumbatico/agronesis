@@ -13,6 +13,8 @@ import { DESTINO_DESPACHO_CONFIG, ROUTES, TIPO_DESPACHO_CONFIG, VARIEDAD_PRODUCT
 import { getDespachos, deleteDespacho } from '@/services/despachos.service'
 import { formatFecha, formatPeso } from '@/utils/formatters'
 import type { Despacho } from '@/types/models'
+import { useAuthStore } from '@/store/auth.store'
+import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 
 function resumirPorVariedad(despacho: Despacho) {
   return (despacho.pallets ?? []).reduce((acc, pallet) => {
@@ -25,12 +27,14 @@ function resumirPorVariedad(despacho: Despacho) {
 
 export default function DespachosPage() {
   const navigate = useNavigate()
+  const roles = useAuthStore((state) => state.roles)
   const [despachos, setDespachos] = useState<Despacho[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
   const [despachoAEliminar, setDespachoAEliminar] = useState<Despacho | null>(null)
   const [eliminando, setEliminando] = useState(false)
+  const canManageDespachos = hasPermission(roles, APP_PERMISSIONS.DESPACHOS_MANAGE)
 
   const cargar = async () => {
     setLoading(true)
@@ -79,11 +83,11 @@ export default function DespachosPage() {
       <PageHeader
         title="Despachos"
         description="Registro operativo de despachos a partir de pallets empaquetados."
-        actions={
+        actions={canManageDespachos ? (
           <Button onClick={() => navigate(ROUTES.DESPACHOS_NUEVO)}>
             <Plus className="h-4 w-4 mr-2" /> Nuevo despacho
           </Button>
-        }
+        ) : undefined}
       />
 
       <div className="relative mb-4">
@@ -121,32 +125,34 @@ export default function DespachosPage() {
                     {(despacho.transportista || despacho.placa_vehiculo) && (
                       <p className="text-xs text-muted-foreground mt-1">{despacho.transportista || '-'}{despacho.placa_vehiculo ? ` · ${despacho.placa_vehiculo}` : ''}</p>
                     )}
-                    <div className="mt-2">
-                      <div className="flex gap-1.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDespachoAEliminar(despacho)
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            navigate(`/despachos/${despacho.id}/editar`)
-                          }}
-                        >
-                          <Pencil className="h-4 w-4 mr-2" /> Editar
-                        </Button>
+                    {canManageDespachos && (
+                      <div className="mt-2">
+                        <div className="flex gap-1.5">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDespachoAEliminar(despacho)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate(`/despachos/${despacho.id}/editar`)
+                            }}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" /> Editar
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -155,16 +161,18 @@ export default function DespachosPage() {
         </div>
       )}
 
-      <ConfirmDialog
-        open={Boolean(despachoAEliminar)}
-        title="Eliminar despacho"
-        description={`¿Está seguro que desea eliminar el despacho ${despachoAEliminar?.codigo ?? ''}? Se eliminarán también los pallets asociados. Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
-        variant="destructive"
-        loading={eliminando}
-        onConfirm={handleEliminar}
-        onCancel={() => setDespachoAEliminar(null)}
-      />
+      {canManageDespachos && (
+        <ConfirmDialog
+          open={Boolean(despachoAEliminar)}
+          title="Eliminar despacho"
+          description={`¿Está seguro que desea eliminar el despacho ${despachoAEliminar?.codigo ?? ''}? Se eliminarán también los pallets asociados. Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          variant="destructive"
+          loading={eliminando}
+          onConfirm={handleEliminar}
+          onCancel={() => setDespachoAEliminar(null)}
+        />
+      )}
     </div>
   )
 }

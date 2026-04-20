@@ -12,10 +12,13 @@ import { generatePackingListExcel } from '@/utils/packing-list-excel'
 import { generateAnexo41Excel } from '@/utils/anexo41-excel'
 import { formatFecha, formatPeso } from '@/utils/formatters'
 import type { Despacho } from '@/types/models'
+import { useAuthStore } from '@/store/auth.store'
+import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 
 export default function DetalleDespachoPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const roles = useAuthStore((state) => state.roles)
   const [despacho, setDespacho] = useState<Despacho | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +77,8 @@ export default function DetalleDespachoPage() {
   if (error) return <ErrorMessage message={error} onRetry={cargar} />
   if (!despacho) return null
 
+  const canManageDespachos = hasPermission(roles, APP_PERMISSIONS.DESPACHOS_MANAGE)
+
   return (
     <div className="max-w-5xl mx-auto flex flex-col gap-4">
       <PageHeader
@@ -89,9 +94,11 @@ export default function DetalleDespachoPage() {
               <Button variant="outline" onClick={descargarPackingList} disabled={descargando}>
                 <Download className="h-4 w-4 mr-2" /> {descargando ? 'Generando…' : 'Packing List'}
               </Button>
-              <Button onClick={() => navigate(`/despachos/${id}/editar`)}>
-                <Pencil className="h-4 w-4 mr-2" /> Editar despacho
-              </Button>
+              {canManageDespachos && (
+                <Button onClick={() => navigate(`/despachos/${id}/editar`)}>
+                  <Pencil className="h-4 w-4 mr-2" /> Editar despacho
+                </Button>
+              )}
             </div>
           ) : null
         }
