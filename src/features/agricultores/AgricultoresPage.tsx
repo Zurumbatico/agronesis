@@ -18,9 +18,12 @@ import {
 } from '@/components/ui/dialog'
 import type { Agricultor } from '@/types/models'
 import type { AgricultorFormData } from '@/utils/validators'
+import { useAuthStore } from '@/store/auth.store'
+import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 
 export default function AgricultoresPage() {
   const { agricultores, loading, error, reload, crear, actualizar, eliminar } = useAgricultores()
+  const roles = useAuthStore((state) => state.roles)
   const [busqueda, setBusqueda] = useState('')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editando, setEditando] = useState<Agricultor | null>(null)
@@ -31,6 +34,7 @@ export default function AgricultoresPage() {
   const [paginaActual, setPaginaActual] = useState(1)
   const [tamanoPagina, setTamanoPagina] = useState(12)
   const [aEliminar, setAEliminar] = useState<string | null>(null)
+  const canManageAgricultores = hasPermission(roles, APP_PERMISSIONS.AGRICULTORES_MANAGE)
 
   const filtrados = agricultores.filter((a) =>
     `${a.nombre} ${a.apellido} ${a.codigo} ${a.dni ?? ''} ${a.numero_cuenta ?? ''} ${a.fecha_alta ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
@@ -47,6 +51,7 @@ export default function AgricultoresPage() {
   }, [paginaActual, totalPaginas])
 
   const abrirNuevo = () => {
+    if (!canManageAgricultores) return
     setEditando(null)
     setEditandoId(null)
     setDialogError(null)
@@ -55,6 +60,7 @@ export default function AgricultoresPage() {
   }
 
   const abrirEditar = async (a: Agricultor) => {
+    if (!canManageAgricultores) return
     setDialogOpen(true)
     setEditando(null)
     setEditandoId(a.id)
@@ -90,6 +96,7 @@ export default function AgricultoresPage() {
   }
 
   const handleEliminar = async (id: string) => {
+    if (!canManageAgricultores) return
     await eliminar(id)
   }
 
@@ -100,11 +107,11 @@ export default function AgricultoresPage() {
     <div>
       <PageHeader
         title="Agricultores"
-        actions={
+        actions={canManageAgricultores ? (
           <Button onClick={abrirNuevo}>
             <Plus className="h-4 w-4" /> Nuevo
           </Button>
-        }
+        ) : undefined}
       />
 
       {/* Búsqueda */}
@@ -163,7 +170,7 @@ export default function AgricultoresPage() {
         <EmptyState
           title={busqueda ? 'Sin resultados' : 'No hay agricultores registrados'}
           description={busqueda ? 'Prueba con otro término de búsqueda.' : 'Agrega el primer agricultor.'}
-          action={!busqueda ? <Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Agregar agricultor</Button> : undefined}
+          action={!busqueda && canManageAgricultores ? <Button onClick={abrirNuevo}><Plus className="h-4 w-4" /> Agregar agricultor</Button> : undefined}
         />
       ) : vista === 'cards' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -189,14 +196,16 @@ export default function AgricultoresPage() {
                 )}
               </div>
 
-              <div className="flex gap-2 pt-1 border-t">
-                <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(a)}>
-                  <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
-                </Button>
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(a.id)}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+              {canManageAgricultores && (
+                <div className="flex gap-2 pt-1 border-t">
+                  <Button variant="ghost" size="sm" className="flex-1" onClick={() => abrirEditar(a)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1" /> Editar
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(a.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -212,7 +221,7 @@ export default function AgricultoresPage() {
                 <TableHead>Fecha alta</TableHead>
                 <TableHead>Ubicación</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                {canManageAgricultores && <TableHead className="text-right">Acciones</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -230,16 +239,18 @@ export default function AgricultoresPage() {
                   <TableCell>
                     <EstadoActivoBadge estado={a.estado} />
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => abrirEditar(a)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(a.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {canManageAgricultores && (
+                    <TableCell className="text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => abrirEditar(a)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setAEliminar(a.id)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>
@@ -279,39 +290,43 @@ export default function AgricultoresPage() {
       )}
 
       {/* Dialog formulario */}
-      <ConfirmDialog
-        open={!!aEliminar}
-        title="¿Eliminar agricultor?"
-        description="Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-        onConfirm={() => { handleEliminar(aEliminar!); setAEliminar(null) }}
-        onCancel={() => setAEliminar(null)}
-      />
+      {canManageAgricultores && (
+        <ConfirmDialog
+          open={!!aEliminar}
+          title="¿Eliminar agricultor?"
+          description="Esta acción no se puede deshacer."
+          confirmLabel="Eliminar"
+          onConfirm={() => { handleEliminar(aEliminar!); setAEliminar(null) }}
+          onCancel={() => setAEliminar(null)}
+        />
+      )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editandoId ? 'Editar agricultor' : 'Nuevo agricultor'}</DialogTitle>
-          </DialogHeader>
-          {dialogLoading ? (
-            <div className="flex min-h-40 items-center justify-center">
-              <Spinner />
-            </div>
-          ) : dialogError ? (
-            <ErrorMessage message={dialogError} onRetry={editandoId ? () => {
-              const current = agricultores.find((a) => a.id === editandoId)
-              if (current) void abrirEditar(current)
-            } : undefined} />
-          ) : (
-            <AgricultorForm
-              defaultValues={editando ?? undefined}
-              onSubmit={handleSubmit}
-              onCancel={cerrar}
-              isEditing={!!editandoId}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {canManageAgricultores && (
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{editandoId ? 'Editar agricultor' : 'Nuevo agricultor'}</DialogTitle>
+            </DialogHeader>
+            {dialogLoading ? (
+              <div className="flex min-h-40 items-center justify-center">
+                <Spinner />
+              </div>
+            ) : dialogError ? (
+              <ErrorMessage message={dialogError} onRetry={editandoId ? () => {
+                const current = agricultores.find((a) => a.id === editandoId)
+                if (current) void abrirEditar(current)
+              } : undefined} />
+            ) : (
+              <AgricultorForm
+                defaultValues={editando ?? undefined}
+                onSubmit={handleSubmit}
+                onCancel={cerrar}
+                isEditing={!!editandoId}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

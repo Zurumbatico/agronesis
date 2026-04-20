@@ -8,8 +8,10 @@ import {
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/store/ui.store'
+import { useAuthStore } from '@/store/auth.store'
 import { ROUTES, ENABLED_MODULES } from '@/constants'
 import { Button } from '@/components/ui/button'
+import { canAccessRoute } from '@/lib/permissions'
 
 interface NavItem {
   label: string
@@ -48,6 +50,7 @@ interface SidebarProps {
 export function Sidebar({ onCloseMobile }: SidebarProps) {
   const navigate = useNavigate()
   const { sidebarOpen, setSidebarOpen } = useUIStore()
+  const roles = useAuthStore((state) => state.roles)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -95,6 +98,11 @@ export function Sidebar({ onCloseMobile }: SidebarProps) {
             ? NAV_ITEMS.filter((i) => i.group === group)
             : NAV_ITEMS.filter((i) => !i.group)
           ).filter((item) => (item.featureKey ? ENABLED_MODULES[item.featureKey] : true))
+            .filter((item) => canAccessRoute(roles, item.href))
+
+          if (items.length === 0) {
+            return null
+          }
 
           return (
             <div key={group || '__root'} className="mb-2">

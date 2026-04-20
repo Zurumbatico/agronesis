@@ -4,6 +4,7 @@ import { useAuthInit } from '@/hooks/useAuthInit'
 import { useAuthStore } from '@/store/auth.store'
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { APP_PERMISSIONS, getDefaultRouteForRoles } from '@/lib/permissions'
 
 import LoginPage from '@/features/auth/LoginPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
@@ -27,10 +28,10 @@ import ConfigPreciosPage from '@/features/admin/ConfigPreciosPage'
 import PlanillasPage from '@/features/planillas/PlanillasPage'
 
 function LoginRoute() {
-  const { user, loading } = useAuthStore()
+  const { user, loading, roles } = useAuthStore()
 
   if (loading) return null
-  if (user) return <Navigate to={ROUTES.DASHBOARD} replace />
+  if (user) return <Navigate to={getDefaultRouteForRoles(roles)} replace />
   return <LoginPage />
 }
 
@@ -44,33 +45,33 @@ export default function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
-            <Route path={ROUTES.AGRICULTORES} element={<AgricultoresPage />} />
-            <Route path={ROUTES.ACOPIADORES} element={<AcopiadoresPage />} />
-            <Route path={ROUTES.COLABORADORES} element={<ColaboradoresPage />} />
-            <Route path={ROUTES.PRODUCTOS} element={<ProductosPage />} />
-            <Route path={ROUTES.CENTROS_ACOPIO} element={<CentrosAcopioPage />} />
-            <Route path={ROUTES.LOTES} element={<LotesPage />} />
-            <Route path={ROUTES.LOTES_DETALLE} element={<LoteDetallePage />} />
-            <Route path={ROUTES.CLASIFICACIONES} element={<ClasificarLotePage />} />
-            <Route path={ROUTES.EMPAQUETAR} element={<EmpaquetarLotePage />} />
-            <Route path={ROUTES.DESPACHOS} element={<DespachosPage />} />
-            <Route path={ROUTES.DESPACHOS_NUEVO} element={<NuevoDespachoPage />} />
-            <Route path={ROUTES.DESPACHOS_DETALLE} element={<DetalleDespachoPage />} />
-            <Route path={ROUTES.DESPACHOS_EDITAR} element={<NuevoDespachoPage />} />
+            <Route path={ROUTES.DASHBOARD} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><DashboardPage /></ProtectedRoute>} />
+            <Route path={ROUTES.AGRICULTORES} element={<ProtectedRoute permission={APP_PERMISSIONS.AGRICULTORES_VIEW}><AgricultoresPage /></ProtectedRoute>} />
+            <Route path={ROUTES.ACOPIADORES} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><AcopiadoresPage /></ProtectedRoute>} />
+            <Route path={ROUTES.COLABORADORES} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><ColaboradoresPage /></ProtectedRoute>} />
+            <Route path={ROUTES.PRODUCTOS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><ProductosPage /></ProtectedRoute>} />
+            <Route path={ROUTES.CENTROS_ACOPIO} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><CentrosAcopioPage /></ProtectedRoute>} />
+            <Route path={ROUTES.LOTES} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_VIEW}><LotesPage /></ProtectedRoute>} />
+            <Route path={ROUTES.LOTES_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_VIEW}><LoteDetallePage /></ProtectedRoute>} />
+            <Route path={ROUTES.CLASIFICACIONES} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_CHANGE_STATUS}><ClasificarLotePage /></ProtectedRoute>} />
+            <Route path={ROUTES.EMPAQUETAR} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_CHANGE_STATUS}><EmpaquetarLotePage /></ProtectedRoute>} />
+            <Route path={ROUTES.DESPACHOS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><DespachosPage /></ProtectedRoute>} />
+            <Route path={ROUTES.DESPACHOS_NUEVO} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_CHANGE_STATUS}><NuevoDespachoPage /></ProtectedRoute>} />
+            <Route path={ROUTES.DESPACHOS_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><DetalleDespachoPage /></ProtectedRoute>} />
+            <Route path={ROUTES.DESPACHOS_EDITAR} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><NuevoDespachoPage /></ProtectedRoute>} />
             <Route
               path={ROUTES.CUBETAS}
-              element={ENABLED_MODULES.CUBETAS ? <CubetasPage /> : <Navigate to={ROUTES.DASHBOARD} replace />}
+              element={ENABLED_MODULES.CUBETAS ? <ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><CubetasPage /></ProtectedRoute> : <Navigate to={ROUTES.DASHBOARD} replace />}
             />
-            <Route path={ROUTES.LIQUIDACIONES_AGRI} element={<LiquidacionesAgriPage />} />
-            <Route path={ROUTES.LIQUIDACIONES_AGRI_NUEVA} element={<NuevaLiquidacionAgriPage />} />
-            <Route path={ROUTES.LIQUIDACIONES_AGRI_DETALLE} element={<DetalleLiquidacionAgriPage />} />
-            <Route path={ROUTES.PLANILLAS} element={<PlanillasPage />} />
-            <Route path={ROUTES.CONFIG_PRECIOS} element={<ConfigPreciosPage />} />
+            <Route path={ROUTES.LIQUIDACIONES_AGRI} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><LiquidacionesAgriPage /></ProtectedRoute>} />
+            <Route path={ROUTES.LIQUIDACIONES_AGRI_NUEVA} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><NuevaLiquidacionAgriPage /></ProtectedRoute>} />
+            <Route path={ROUTES.LIQUIDACIONES_AGRI_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><DetalleLiquidacionAgriPage /></ProtectedRoute>} />
+            <Route path={ROUTES.PLANILLAS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><PlanillasPage /></ProtectedRoute>} />
+            <Route path={ROUTES.CONFIG_PRECIOS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><ConfigPreciosPage /></ProtectedRoute>} />
           </Route>
         </Route>
 
-        <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} replace />} />
+        <Route path="*" element={<Navigate to={ROUTES.LOGIN} replace />} />
       </Routes>
     </BrowserRouter>
   )

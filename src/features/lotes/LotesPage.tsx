@@ -20,10 +20,13 @@ import { formatFecha, formatPeso } from '@/utils/formatters'
 import { calcularPesoPorJaba } from '@/utils/business-rules'
 import type { LoteFormData } from '@/utils/validators'
 import type { EstadoLote, Lote } from '@/types/models'
+import { useAuthStore } from '@/store/auth.store'
+import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 
 export default function LotesPage() {
   const { lotes, loading, error, reload, crear, eliminar } = useLotes()
   const navigate = useNavigate()
+  const roles = useAuthStore((state) => state.roles)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoLote | 'todos'>('todos')
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -32,6 +35,9 @@ export default function LotesPage() {
   const [loteAEliminar, setLoteAEliminar] = useState<Lote | null>(null)
   const [eliminando, setEliminando] = useState(false)
   const [errorEliminacion, setErrorEliminacion] = useState<string | null>(null)
+  const canCreateLotes = hasPermission(roles, APP_PERMISSIONS.LOTES_CREATE)
+  const canDeleteLotes = hasPermission(roles, APP_PERMISSIONS.LOTES_DELETE)
+  const canPrintLoteTicket = hasPermission(roles, APP_PERMISSIONS.LOTES_PRINT_TICKET)
 
   const getAcopiadorLabel = (lote: Lote) => {
     if (lote.acopiador) return `${lote.acopiador.apellido}, ${lote.acopiador.nombre}`
@@ -57,7 +63,7 @@ export default function LotesPage() {
   }
 
   const handleEliminar = async () => {
-    if (!loteAEliminar) return
+    if (!canDeleteLotes || !loteAEliminar) return
     setEliminando(true)
     try {
       await eliminar(loteAEliminar.id)
@@ -85,7 +91,7 @@ export default function LotesPage() {
       <PageHeader
         title="Lotes"
         description={`${lotes.length} registrados`}
-        actions={<Button onClick={() => { setDialogError(null); setDialogOpen(true) }}><Plus className="h-4 w-4" /> Nuevo lote</Button>}
+        actions={canCreateLotes ? <Button onClick={() => { setDialogError(null); setDialogOpen(true) }}><Plus className="h-4 w-4" /> Nuevo lote</Button> : undefined}
       />
 
       {/* Filtros */}
@@ -112,7 +118,7 @@ export default function LotesPage() {
         <EmptyState
           title="Sin lotes"
           description="Registra el primer lote del día."
-          action={<Button onClick={() => { setDialogError(null); setDialogOpen(true) }}><Plus className="h-4 w-4" /> Nuevo lote</Button>}
+          action={canCreateLotes ? <Button onClick={() => { setDialogError(null); setDialogOpen(true) }}><Plus className="h-4 w-4" /> Nuevo lote</Button> : undefined}
         />
       ) : (
         <div className="flex flex-col gap-2">
@@ -135,12 +141,16 @@ export default function LotesPage() {
                 </p>
               </div>
               <div className="flex gap-1.5 shrink-0">
-                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); printLoteTicket(l) }}>
-                  <Printer className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setLoteAEliminar(l) }}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                {canPrintLoteTicket && (
+                  <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); printLoteTicket(l) }}>
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                )}
+                {canDeleteLotes && (
+                  <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setLoteAEliminar(l) }}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); navigate(`/lotes/${l.id}`) }}>
                   <Eye className="h-4 w-4 mr-1" /> Ver
                 </Button>
@@ -150,13 +160,15 @@ export default function LotesPage() {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Registrar nuevo lote</DialogTitle></DialogHeader>
-          {dialogError && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{dialogError}</p>}
-          <LoteForm onSubmit={handleSubmit} onCancel={() => { setDialogError(null); setDialogOpen(false) }} />
-        </DialogContent>
-      </Dialog>
+      {canCreateLotes && (
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Registrar nuevo lote</DialogTitle></DialogHeader>
+            {dialogError && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{dialogError}</p>}
+            <LoteForm onSubmit={handleSubmit} onCancel={() => { setDialogError(null); setDialogOpen(false) }} />
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={Boolean(ticketLote)} onOpenChange={(open) => !open && setTicketLote(null)}>
         <DialogContent className="max-w-md">
@@ -242,9 +254,11 @@ export default function LotesPage() {
                   <Button type="button" variant="outline" className="w-full" onClick={() => setTicketLote(null)}>
                     Cerrar
                   </Button>
-                  <Button type="button" variant="secondary" className="w-full" onClick={() => printLoteTicket(ticketLote)}>
-                    <Printer className="h-4 w-4" /> Imprimir
-                  </Button>
+                  {canPrintLoteTicket && (
+                    <Button type="button" variant="secondary" className="w-full" onClick={() => printLoteTicket(ticketLote)}>
+                      <Printer className="h-4 w-4" /> Imprimir
+                    </Button>
+                  )}
                   <Button type="button" className="w-full" onClick={() => {
                     const loteId = ticketLote.id
                     setTicketLote(null)
@@ -258,16 +272,18 @@ export default function LotesPage() {
           )}
         </DialogContent>
       </Dialog>
-      <ConfirmDialog
-        open={Boolean(loteAEliminar)}
-        title="Eliminar lote"
-        description={`¿Está seguro que desea eliminar el lote ${loteAEliminar?.codigo ?? ''}? Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
-        variant="destructive"
-        loading={eliminando}
-        onConfirm={handleEliminar}
-        onCancel={() => setLoteAEliminar(null)}
-      />
+      {canDeleteLotes && (
+        <ConfirmDialog
+          open={Boolean(loteAEliminar)}
+          title="Eliminar lote"
+          description={`¿Está seguro que desea eliminar el lote ${loteAEliminar?.codigo ?? ''}? Esta acción no se puede deshacer.`}
+          confirmLabel="Eliminar"
+          variant="destructive"
+          loading={eliminando}
+          onConfirm={handleEliminar}
+          onCancel={() => setLoteAEliminar(null)}
+        />
+      )}
 
       <Dialog open={Boolean(errorEliminacion)} onOpenChange={(open) => { if (!open) setErrorEliminacion(null) }}>
         <DialogContent className="max-w-sm">

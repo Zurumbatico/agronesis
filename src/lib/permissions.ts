@@ -1,0 +1,75 @@
+import { ROUTES } from '@/constants'
+import { APP_ROLES, type AppRole } from '@/types/auth'
+
+export const APP_PERMISSIONS = {
+  DASHBOARD_VIEW: 'dashboard.view',
+  AGRICULTORES_VIEW: 'agricultores.view',
+  AGRICULTORES_MANAGE: 'agricultores.manage',
+  LOTES_VIEW: 'lotes.view',
+  LOTES_CREATE: 'lotes.create',
+  LOTES_DELETE: 'lotes.delete',
+  LOTES_PRINT_TICKET: 'lotes.print_ticket',
+  LOTES_PRINT_LABELS: 'lotes.print_labels',
+  LOTES_CHANGE_STATUS: 'lotes.change_status',
+} as const
+
+export type AppPermission = (typeof APP_PERMISSIONS)[keyof typeof APP_PERMISSIONS]
+
+const ALL_PERMISSIONS = Object.values(APP_PERMISSIONS)
+
+const ROLE_PERMISSIONS: Record<string, AppPermission[]> = {
+  [APP_ROLES.ADMIN]: ALL_PERMISSIONS,
+  [APP_ROLES.OPERATIVO_RECEPCION]: [
+    APP_PERMISSIONS.AGRICULTORES_VIEW,
+    APP_PERMISSIONS.LOTES_VIEW,
+    APP_PERMISSIONS.LOTES_CREATE,
+    APP_PERMISSIONS.LOTES_PRINT_TICKET,
+  ],
+}
+
+const ROUTE_PERMISSIONS: Record<string, AppPermission> = {
+  [ROUTES.DASHBOARD]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.AGRICULTORES]: APP_PERMISSIONS.AGRICULTORES_VIEW,
+  [ROUTES.ACOPIADORES]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.COLABORADORES]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.PRODUCTOS]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.CENTROS_ACOPIO]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.LOTES]: APP_PERMISSIONS.LOTES_VIEW,
+  [ROUTES.LOTES_DETALLE]: APP_PERMISSIONS.LOTES_VIEW,
+  [ROUTES.CLASIFICACIONES]: APP_PERMISSIONS.LOTES_CHANGE_STATUS,
+  [ROUTES.EMPAQUETAR]: APP_PERMISSIONS.LOTES_CHANGE_STATUS,
+  [ROUTES.DESPACHOS]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.DESPACHOS_NUEVO]: APP_PERMISSIONS.LOTES_CHANGE_STATUS,
+  [ROUTES.DESPACHOS_DETALLE]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.DESPACHOS_EDITAR]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.CUBETAS]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.LIQUIDACIONES_AGRI]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.LIQUIDACIONES_AGRI_NUEVA]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.LIQUIDACIONES_AGRI_DETALLE]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.PLANILLAS]: APP_PERMISSIONS.DASHBOARD_VIEW,
+  [ROUTES.CONFIG_PRECIOS]: APP_PERMISSIONS.DASHBOARD_VIEW,
+}
+
+export function hasPermission(roles: AppRole[], permission: AppPermission): boolean {
+  if (roles.length === 0 || roles.includes(APP_ROLES.ADMIN)) {
+    return true
+  }
+
+  return roles.some((role) => ROLE_PERMISSIONS[role]?.includes(permission))
+}
+
+export function canAccessRoute(roles: AppRole[], route: string): boolean {
+  const permission = ROUTE_PERMISSIONS[route]
+
+  if (!permission) {
+    return roles.length === 0 || roles.includes(APP_ROLES.ADMIN)
+  }
+
+  return hasPermission(roles, permission)
+}
+
+export function getDefaultRouteForRoles(roles: AppRole[]): string {
+  const candidates = [ROUTES.DASHBOARD, ROUTES.LOTES, ROUTES.AGRICULTORES]
+
+  return candidates.find((route) => canAccessRoute(roles, route)) ?? ROUTES.DASHBOARD
+}
