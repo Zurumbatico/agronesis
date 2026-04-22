@@ -8,6 +8,7 @@ import {
   getResumenColaboradoresPeriodo,
   type ResumenColaboradorPeriodo,
 } from '@/services/planillas.service'
+import { CLAVE_PAGO_RECEPCION_KG, getValorNumericoSistema } from '@/services/config-precios.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { FormField } from '@/components/shared/FormField'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -28,12 +29,15 @@ import { formatFecha, formatMoneda } from '@/utils/formatters'
 import { format } from 'date-fns'
 import { Eye } from 'lucide-react'
 import type { PlanillaQuincenal } from '@/types/models'
+import { DEFAULT_PAGO_RECEPCION_KG } from '@/utils/business-rules'
 
 const PAGO_POR_CAJA = 0.32   // S/ 0.32 por caja empaquetada (Módulo D PDF)
 
 type DetalleForm = {
   colaborador_id: string
   nombre_display: string
+  kg_bruto_recepcion: number
+  pago_recepcion: number
   kg_cat1_seleccion: number
   kg_cat2_seleccion: number
   pago_seleccion: number
@@ -55,6 +59,7 @@ export default function PlanillasPage() {
   const [creando, setCreando] = useState(false)
   const [cargandoResumen, setCargandoResumen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pagoRecepcionKg, setPagoRecepcionKg] = useState(DEFAULT_PAGO_RECEPCION_KG)
   const [detallePlanilla, setDetallePlanilla] = useState<PlanillaQuincenal | null>(null)
   const [cargandoDetalle, setCargandoDetalle] = useState(false)
   const [planillaAConfirmar, setPlanillaAConfirmar] = useState<string | null>(null)
@@ -74,8 +79,14 @@ export default function PlanillasPage() {
 
   const cargar = () => {
     setLoading(true)
-    getPlanillasQuincenales()
-      .then(setPlanillas)
+    Promise.all([
+      getPlanillasQuincenales(),
+      getValorNumericoSistema(CLAVE_PAGO_RECEPCION_KG, DEFAULT_PAGO_RECEPCION_KG),
+    ])
+      .then(([planillasDb, pagoRecepcion]) => {
+        setPlanillas(planillasDb)
+        setPagoRecepcionKg(pagoRecepcion)
+      })
       .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false))
   }
@@ -86,10 +97,12 @@ export default function PlanillasPage() {
     if (!watchInicio || !watchFin) return
     setCargandoResumen(true)
     try {
-      const resumen: ResumenColaboradorPeriodo[] = await getResumenColaboradoresPeriodo(watchInicio, watchFin)
+      const resumen: ResumenColaboradorPeriodo[] = await getResumenColaboradoresPeriodo(watchInicio, watchFin, pagoRecepcionKg)
       replace(resumen.map((r) => ({
         colaborador_id: r.colaborador_id,
         nombre_display: `${r.apellido}, ${r.nombre}`,
+        kg_bruto_recepcion: r.kg_bruto_recepcion,
+        pago_recepcion: r.pago_recepcion,
         kg_cat1_seleccion: r.kg_cat1_seleccion,
         kg_cat2_seleccion: r.kg_cat2_seleccion,
         pago_seleccion: r.pago_seleccion,
@@ -107,10 +120,12 @@ export default function PlanillasPage() {
     if (!user) return
     const detalles = data.detalles.map((d) => {
       const monto_empaquetado = d.n_cajas_empaquetado * PAGO_POR_CAJA
-      const total = d.pago_seleccion + monto_empaquetado + (d.otros_montos ?? 0)
+      const total = d.pago_recepcion + d.pago_seleccion + monto_empaquetado + (d.otros_montos ?? 0)
       return {
         colaborador_id: d.colaborador_id,
         planilla_id: '',   // se reemplaza en el service
+        kg_bruto_recepcion: d.kg_bruto_recepcion,
+        pago_recepcion: d.pago_recepcion,
         kg_cat1_seleccion: d.kg_cat1_seleccion,
         kg_cat2_seleccion: d.kg_cat2_seleccion,
         pago_seleccion: d.pago_seleccion,
@@ -160,9 +175,10 @@ export default function PlanillasPage() {
   // Live calculation
   const totalEstimado = fields.reduce((acc, _, i) => {
     const pago_sel = watch(`detalles.${i}.pago_seleccion`) ?? 0
+    const pago_recep = watch(`detalles.${i}.pago_recepcion`) ?? 0
     const n_cajas = watch(`detalles.${i}.n_cajas_empaquetado`) ?? 0
     const otros = watch(`detalles.${i}.otros_montos`) ?? 0
-    return acc + pago_sel + (n_cajas * PAGO_POR_CAJA) + otros
+    return acc + pago_recep + pago_sel + (n_cajas * PAGO_POR_CAJA) + otros
   }, 0)
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando...</div>
@@ -212,6 +228,7 @@ export default function PlanillasPage() {
                 >
                   {cargandoResumen ? 'Cargando...' : 'Cargar colaboradores del período'}
                 </Button>
+                <p className="text-xs text-muted-foreground">Recepción: S/{pagoRecepcionKg.toFixed(2)}/kg bruto</p>
                 {fields.length > 0 && (
                   <p className="text-xs text-muted-foreground">{fields.length} operario(s) cargados</p>
                 )}
@@ -222,10 +239,12 @@ export default function PlanillasPage() {
                 <div className="flex flex-col gap-3">
                   {fields.map((field, i) => {
                     const pago_sel = watch(`detalles.${i}.pago_seleccion`) ?? 0
+                    const pago_recep = watch(`detalles.${i}.pago_recepcion`) ?? 0
+                    const kg_bruto_recep = watch(`detalles.${i}.kg_bruto_recepcion`) ?? 0
                     const nCajas = watch(`detalles.${i}.n_cajas_empaquetado`) ?? 0
                     const otros = watch(`detalles.${i}.otros_montos`) ?? 0
                     const pago_empaque = nCajas * PAGO_POR_CAJA
-                    const total = pago_sel + pago_empaque + otros
+                    const total = pago_recep + pago_sel + pago_empaque + otros
                     return (
                       <div key={field.id} className="border rounded-lg overflow-hidden">
                         {/* Header del operario */}
@@ -237,7 +256,13 @@ export default function PlanillasPage() {
                           </div>
                         </div>
                         {/* Cuerpo: 3 secciones */}
-                        <div className="grid grid-cols-3 divide-x text-sm">
+                        <div className="grid grid-cols-4 divide-x text-sm">
+                          {/* Recepción — solo lectura */}
+                          <div className="px-4 py-3 bg-blue-50/40">
+                            <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-2">Recepción</p>
+                            <p className="text-lg font-bold text-blue-700">{formatMoneda(pago_recep)}</p>
+                            <p className="mt-2 text-xs text-muted-foreground">{kg_bruto_recep.toFixed(2)} kg × S/{pagoRecepcionKg.toFixed(2)}</p>
+                          </div>
                           {/* Selección — solo lectura */}
                           <div className="px-4 py-3 bg-green-50/40">
                             <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-2">Selección (Tareo A)</p>
@@ -373,7 +398,12 @@ export default function PlanillasPage() {
                             <span className="font-semibold">{colName}</span>
                             <span className="font-bold">{formatMoneda(d.total)}</span>
                           </div>
-                          <div className="grid grid-cols-3 divide-x">
+                          <div className="grid grid-cols-4 divide-x">
+                            <div className="px-3 py-2 bg-blue-50/40">
+                              <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-1">Recepción</p>
+                              <p className="font-bold text-blue-700">{formatMoneda(d.pago_recepcion)}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{d.kg_bruto_recepcion.toFixed(2)} kg</p>
+                            </div>
                             <div className="px-3 py-2 bg-green-50/40">
                               <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-1">Selección</p>
                               <p className="font-bold text-green-700">{formatMoneda(d.pago_seleccion)}</p>
@@ -385,7 +415,7 @@ export default function PlanillasPage() {
                             <div className="px-3 py-2">
                               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Empaquetado</p>
                               <p className="font-bold">{formatMoneda(d.monto_empaquetado)}</p>
-                              <p className="text-xs text-muted-foreground mt-1">{d.n_cajas_empaquetado} cajas × S/0.32</p>
+                              <p className="text-xs text-muted-foreground mt-1">{d.n_cajas_empaquetado} cajas × S/{PAGO_POR_CAJA.toFixed(2)}</p>
                             </div>
                             <div className="px-3 py-2">
                               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Otros</p>

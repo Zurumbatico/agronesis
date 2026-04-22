@@ -26,6 +26,7 @@ import DetalleLiquidacionAgriPage from '@/features/liquidaciones-agri/DetalleLiq
 import CubetasPage from '@/features/cubetas/CubetasPage.tsx'
 import ConfigPreciosPage from '@/features/admin/ConfigPreciosPage'
 import PlanillasPage from '@/features/planillas/PlanillasPage'
+import TareoDiarioPage from '@/features/tareo/TareoDiarioPage'
 
 function LoginRoute() {
   const { user, loading, roles } = useAuthStore()
@@ -47,10 +48,10 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path={ROUTES.DASHBOARD} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><DashboardPage /></ProtectedRoute>} />
             <Route path={ROUTES.AGRICULTORES} element={<ProtectedRoute permission={APP_PERMISSIONS.AGRICULTORES_VIEW}><AgricultoresPage /></ProtectedRoute>} />
-            <Route path={ROUTES.ACOPIADORES} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><AcopiadoresPage /></ProtectedRoute>} />
-            <Route path={ROUTES.COLABORADORES} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><ColaboradoresPage /></ProtectedRoute>} />
-            <Route path={ROUTES.PRODUCTOS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><ProductosPage /></ProtectedRoute>} />
-            <Route path={ROUTES.CENTROS_ACOPIO} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><CentrosAcopioPage /></ProtectedRoute>} />
+            <Route path={ROUTES.ACOPIADORES} element={<ProtectedRoute permission={APP_PERMISSIONS.MAESTROS_MANAGE}><AcopiadoresPage /></ProtectedRoute>} />
+            <Route path={ROUTES.COLABORADORES} element={<ProtectedRoute permission={APP_PERMISSIONS.MAESTROS_MANAGE}><ColaboradoresPage /></ProtectedRoute>} />
+            <Route path={ROUTES.PRODUCTOS} element={<ProtectedRoute permission={APP_PERMISSIONS.MAESTROS_MANAGE}><ProductosPage /></ProtectedRoute>} />
+            <Route path={ROUTES.CENTROS_ACOPIO} element={<ProtectedRoute permission={APP_PERMISSIONS.MAESTROS_MANAGE}><CentrosAcopioPage /></ProtectedRoute>} />
             <Route path={ROUTES.LOTES} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_VIEW}><LotesPage /></ProtectedRoute>} />
             <Route path={ROUTES.LOTES_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_VIEW}><LoteDetallePage /></ProtectedRoute>} />
             <Route path={ROUTES.CLASIFICACIONES} element={<ProtectedRoute permission={APP_PERMISSIONS.LOTES_PROCESS}><ClasificarLotePage /></ProtectedRoute>} />
@@ -67,7 +68,8 @@ export default function App() {
             <Route path={ROUTES.LIQUIDACIONES_AGRI_NUEVA} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><NuevaLiquidacionAgriPage /></ProtectedRoute>} />
             <Route path={ROUTES.LIQUIDACIONES_AGRI_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><DetalleLiquidacionAgriPage /></ProtectedRoute>} />
             <Route path={ROUTES.PLANILLAS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><PlanillasPage /></ProtectedRoute>} />
-            <Route path={ROUTES.CONFIG_PRECIOS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><ConfigPreciosPage /></ProtectedRoute>} />
+            <Route path={ROUTES.TAREO} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><TareoDiarioPage /></ProtectedRoute>} />
+            <Route path={ROUTES.CONFIG_PRECIOS} element={<ProtectedRoute permission={APP_PERMISSIONS.CONFIG_PRECIOS_MANAGE}><ConfigPreciosPage /></ProtectedRoute>} />
           </Route>
         </Route>
 

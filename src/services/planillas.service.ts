@@ -68,6 +68,8 @@ export interface ResumenColaboradorPeriodo {
   colaborador_id: string
   nombre: string
   apellido: string
+  kg_bruto_recepcion: number
+  pago_recepcion: number
   kg_cat1_seleccion: number
   kg_cat2_seleccion: number
   pago_seleccion: number
@@ -75,9 +77,40 @@ export interface ResumenColaboradorPeriodo {
 
 export async function getResumenColaboradoresPeriodo(
   fechaInicio: string,
-  fechaFin: string
+  fechaFin: string,
+  pagoRecepcionKg = 0.02
 ): Promise<ResumenColaboradorPeriodo[]> {
   const mapa = new Map<string, ResumenColaboradorPeriodo>()
+
+  // 0. Recepción del período (kg brutos de lotes por recepcionista)
+  const { data: lotes, error: errLotes } = await supabase
+    .from('lotes')
+    .select('recepcionista_id, peso_bruto_kg, recepcionista:colaboradores(nombre, apellido)')
+    .not('recepcionista_id', 'is', null)
+    .gte('fecha_ingreso', fechaInicio)
+    .lte('fecha_ingreso', fechaFin)
+  if (errLotes) throw new Error(errLotes.message)
+
+  for (const row of (lotes ?? []) as any[]) {
+    const cid = row.recepcionista_id as string | null
+    if (!cid) continue
+
+    if (!mapa.has(cid)) {
+      mapa.set(cid, {
+        colaborador_id: cid,
+        nombre: row.recepcionista?.nombre ?? '',
+        apellido: row.recepcionista?.apellido ?? '',
+        kg_bruto_recepcion: 0,
+        pago_recepcion: 0,
+        kg_cat1_seleccion: 0,
+        kg_cat2_seleccion: 0,
+        pago_seleccion: 0,
+      })
+    }
+
+    const entry = mapa.get(cid)!
+    entry.kg_bruto_recepcion += Number(row.peso_bruto_kg ?? 0)
+  }
 
   // 1. Aportes de selección del período
   const { data: sesiones, error: errSes } = await supabase
@@ -102,6 +135,8 @@ export async function getResumenColaboradoresPeriodo(
           colaborador_id: cid,
           nombre: row.colaborador?.nombre ?? '',
           apellido: row.colaborador?.apellido ?? '',
+          kg_bruto_recepcion: 0,
+          pago_recepcion: 0,
           kg_cat1_seleccion: 0,
           kg_cat2_seleccion: 0,
           pago_seleccion: 0,
@@ -117,6 +152,11 @@ export async function getResumenColaboradoresPeriodo(
       ) / 100
     })
   }
+
+  mapa.forEach((entry) => {
+    entry.kg_bruto_recepcion = Math.round(entry.kg_bruto_recepcion * 100) / 100
+    entry.pago_recepcion = Math.round(entry.kg_bruto_recepcion * pagoRecepcionKg * 100) / 100
+  })
 
   return Array.from(mapa.values())
 }

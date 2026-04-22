@@ -13,6 +13,7 @@ import { useAgricultores } from '@/features/agricultores/hooks/useAgricultores'
 import { useAcopiadores } from '@/features/acopiadores/hooks/useAcopiadores'
 import { useProductos } from '@/features/productos/hooks/useProductos'
 import { useCentrosAcopio } from '@/features/centros-acopio/hooks/useCentrosAcopio'
+import { useColaboradores } from '@/features/colaboradores/hooks/useColaboradores'
 import { calcularPesoPorJaba } from '@/utils/business-rules'
 import { format } from 'date-fns'
 
@@ -30,6 +31,7 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
   const { acopiadores } = useAcopiadores()
   const { productos } = useProductos()
   const { centros } = useCentrosAcopio()
+  const { colaboradores } = useColaboradores()
 
   const normalizedDefaults = useMemo<Partial<LoteFormInput>>(() => {
     const fechaIngreso = defaultValues?.fecha_ingreso ?? format(new Date(), 'yyyy-MM-dd')
@@ -37,6 +39,7 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
     return {
       codigo: defaultValues?.codigo ?? 'AUTO',
       agricultor_id: defaultValues?.agricultor_id ?? '',
+      recepcionista_id: defaultValues?.recepcionista_id ?? '',
       acopiador_combined: defaultValues?.acopiador_agricultor_id
         ? `agri:${defaultValues.acopiador_agricultor_id}`
         : defaultValues?.acopiador_id
@@ -82,6 +85,7 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
   }, [pesoBruto, pesoTara, numCubetas, setValue])
 
   const agricultoresActivos = agricultores.filter((a) => a.estado === 'activo')
+  const recepcionistasActivos = colaboradores.filter((c) => c.estado === 'activo' && c.rol === 'recepcionista')
   const acopiadoresActivos = acopiadores.filter((a) => a.estado === 'activo')
   const productosActivos = productos
   const centrosActivos = centros.filter((c) => c.estado === 'activo')
@@ -118,6 +122,22 @@ export function LoteForm({ defaultValues, onSubmit, onCancel, isEditing }: LoteF
               <SelectContent>
                 {agricultoresActivos.map((a) => (
                   <SelectItem key={a.id} value={a.id}>{a.apellido}, {a.nombre} ({a.codigo})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )} />
+        </FormField>
+
+        <FormField label="Nombre del recepcionista" error={errors.recepcionista_id?.message} required className="sm:col-span-2">
+          <Controller name="recepcionista_id" control={control} render={({ field }) => (
+            <Select
+              onValueChange={field.onChange}
+              value={field.value ?? ''}
+            >
+              <SelectTrigger><SelectValue placeholder="Seleccionar recepcionista..." /></SelectTrigger>
+              <SelectContent>
+                {recepcionistasActivos.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.apellido}, {c.nombre} ({c.codigo})</SelectItem>
                 ))}
               </SelectContent>
             </Select>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Search, Eye, Filter, Printer, Trash2 } from 'lucide-react'
 import { useLotes } from './hooks/useLotes'
@@ -29,6 +29,9 @@ export default function LotesPage() {
   const roles = useAuthStore((state) => state.roles)
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoLote | 'todos'>('todos')
+  const [filtroFechaIngreso, setFiltroFechaIngreso] = useState('')
+  const [paginaActual, setPaginaActual] = useState(1)
+  const [tamanoPagina, setTamanoPagina] = useState(10)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [ticketLote, setTicketLote] = useState<Lote | null>(null)
@@ -38,6 +41,7 @@ export default function LotesPage() {
   const canCreateLotes = hasPermission(roles, APP_PERMISSIONS.LOTES_CREATE)
   const canDeleteLotes = hasPermission(roles, APP_PERMISSIONS.LOTES_DELETE)
   const canPrintLoteTicket = hasPermission(roles, APP_PERMISSIONS.LOTES_PRINT_TICKET)
+  const hasFiltrosActivos = busqueda.trim() !== '' || filtroEstado !== 'todos' || filtroFechaIngreso !== ''
 
   const getAcopiadorLabel = (lote: Lote) => {
     if (lote.acopiador) return `${lote.acopiador.apellido}, ${lote.acopiador.nombre}`
@@ -48,8 +52,21 @@ export default function LotesPage() {
   const filtrados = lotes.filter((l) => {
     const coincideBusqueda = `${l.codigo} ${l.agricultor?.nombre ?? ''} ${l.agricultor?.apellido ?? ''} ${l.acopiador?.nombre ?? ''} ${l.acopiador?.apellido ?? ''}`.toLowerCase().includes(busqueda.toLowerCase())
     const coincideEstado = filtroEstado === 'todos' || l.estado === filtroEstado
-    return coincideBusqueda && coincideEstado
+    const coincideFechaIngreso = !filtroFechaIngreso || l.fecha_ingreso === filtroFechaIngreso
+    return coincideBusqueda && coincideEstado && coincideFechaIngreso
   })
+
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / tamanoPagina))
+  const paginaSegura = Math.min(paginaActual, totalPaginas)
+  const inicio = (paginaSegura - 1) * tamanoPagina
+  const fin = inicio + tamanoPagina
+  const paginados = filtrados.slice(inicio, fin)
+
+  useEffect(() => {
+    if (paginaActual > totalPaginas) {
+      setPaginaActual(totalPaginas)
+    }
+  }, [paginaActual, totalPaginas])
 
   const handleSubmit = async (data: LoteFormData) => {
     try {
@@ -98,9 +115,23 @@ export default function LotesPage() {
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Código o agricultor..." className="pl-9" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+          <Input
+            placeholder="Código o agricultor..."
+            className="pl-9"
+            value={busqueda}
+            onChange={(e) => {
+              setBusqueda(e.target.value)
+              setPaginaActual(1)
+            }}
+          />
         </div>
-        <Select value={filtroEstado} onValueChange={(v) => setFiltroEstado(v as EstadoLote | 'todos')}>
+        <Select
+          value={filtroEstado}
+          onValueChange={(v) => {
+            setFiltroEstado(v as EstadoLote | 'todos')
+            setPaginaActual(1)
+          }}
+        >
           <SelectTrigger className="w-full sm:w-48">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue />
@@ -112,6 +143,44 @@ export default function LotesPage() {
             ))}
           </SelectContent>
         </Select>
+        <Input
+          type="date"
+          className="w-full sm:w-48"
+          value={filtroFechaIngreso}
+          onChange={(e) => {
+            setFiltroFechaIngreso(e.target.value)
+            setPaginaActual(1)
+          }}
+        />
+        <Select
+          value={String(tamanoPagina)}
+          onValueChange={(value) => {
+            setTamanoPagina(Number(value))
+            setPaginaActual(1)
+          }}
+        >
+          <SelectTrigger className="w-full sm:w-36">
+            <SelectValue placeholder="Tamano" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="10">10 / pag</SelectItem>
+            <SelectItem value="20">20 / pag</SelectItem>
+            <SelectItem value="50">50 / pag</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            setBusqueda('')
+            setFiltroEstado('todos')
+            setFiltroFechaIngreso('')
+            setPaginaActual(1)
+          }}
+          disabled={!hasFiltrosActivos}
+        >
+          Limpiar filtros
+        </Button>
       </div>
 
       {filtrados.length === 0 ? (
@@ -122,7 +191,7 @@ export default function LotesPage() {
         />
       ) : (
         <div className="flex flex-col gap-2">
-          {filtrados.map((l) => (
+          {paginados.map((l) => (
             <div
               key={l.id}
               className="bg-card border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:shadow-md transition-shadow cursor-pointer"
@@ -157,6 +226,37 @@ export default function LotesPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {filtrados.length > 0 && (
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {inicio + 1}-{Math.min(fin, filtrados.length)} de {filtrados.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPaginaActual((prev) => Math.max(prev - 1, 1))}
+              disabled={paginaSegura === 1}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Pagina {paginaSegura} de {totalPaginas}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPaginaActual((prev) => Math.min(prev + 1, totalPaginas))}
+              disabled={paginaSegura === totalPaginas}
+            >
+              Siguiente
+            </Button>
+          </div>
         </div>
       )}
 

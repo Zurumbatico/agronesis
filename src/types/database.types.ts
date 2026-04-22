@@ -133,6 +133,7 @@ export interface Database {
           created_by: string
           codigo: string
           agricultor_id: string
+          recepcionista_id: string | null
           acopiador_id: string | null
           acopiador_agricultor_id: string | null
           producto_id: string
@@ -431,6 +432,8 @@ export interface Database {
           created_by: string
           planilla_id: string
           colaborador_id: string
+          kg_bruto_recepcion: number
+          pago_recepcion: number
           kg_cat1_seleccion: number
           kg_cat2_seleccion: number
           pago_seleccion: number

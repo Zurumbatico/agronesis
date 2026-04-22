@@ -207,6 +207,10 @@ export default function LoteDetallePage() {
                     <p className="text-xs text-muted-foreground">Acopiador</p>
                     <p className="font-medium">{acopiadorNombre}</p>
                   </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Recepcionista</p>
+                    <p className="font-medium">{lote.recepcionista ? `${lote.recepcionista.apellido}, ${lote.recepcionista.nombre}` : '-'}</p>
+                  </div>
                 </section>
 
                 <section className="rounded-lg border bg-muted/20 p-3 space-y-2">

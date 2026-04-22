@@ -415,6 +415,7 @@ create table if not exists public.lotes (
   created_by uuid not null references auth.users(id) on delete restrict,
   codigo text not null unique default public.generate_lote_codigo(),
   agricultor_id uuid not null references public.agricultores(id) on delete restrict,
+  recepcionista_id uuid references public.colaboradores(id) on delete restrict,
   acopiador_id uuid references public.acopiadores(id) on delete restrict,
   acopiador_agricultor_id uuid references public.agricultores(id) on delete restrict,
   producto_id uuid not null references public.productos(id) on delete restrict,
@@ -433,6 +434,24 @@ create table if not exists public.lotes (
 
 alter table public.lotes alter column codigo set default public.generate_lote_codigo();
 alter table public.centros_acopio alter column codigo set default public.generate_centro_acopio_codigo();
+alter table public.lotes add column if not exists recepcionista_id uuid;
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.table_constraints tc
+    where tc.table_schema = 'public'
+      and tc.table_name = 'lotes'
+      and tc.constraint_name = 'lotes_recepcionista_id_fkey'
+  ) then
+    alter table public.lotes
+      add constraint lotes_recepcionista_id_fkey
+      foreign key (recepcionista_id)
+      references public.colaboradores(id)
+      on delete restrict;
+  end if;
+end;
+$$;
 alter table public.lotes add column if not exists acopiador_id uuid;
 do $$
 begin
@@ -1039,6 +1058,8 @@ alter table public.clasificacion_aportes add column if not exists kg_neto_descar
 do $$
 begin
   if to_regclass('public.planilla_detalles') is not null then
+    alter table public.planilla_detalles add column if not exists kg_bruto_recepcion numeric(12,2) not null default 0 check (kg_bruto_recepcion >= 0);
+    alter table public.planilla_detalles add column if not exists pago_recepcion numeric(10,2) not null default 0 check (pago_recepcion >= 0);
     alter table public.planilla_detalles add column if not exists kg_cat1_seleccion numeric(12,2) not null default 0 check (kg_cat1_seleccion >= 0);
     alter table public.planilla_detalles add column if not exists kg_cat2_seleccion numeric(12,2) not null default 0 check (kg_cat2_seleccion >= 0);
     alter table public.planilla_detalles add column if not exists pago_seleccion numeric(10,2) not null default 0 check (pago_seleccion >= 0);
@@ -1108,6 +1129,8 @@ create table if not exists public.planilla_detalles (
   created_by uuid not null references auth.users(id) on delete restrict,
   planilla_id uuid not null references public.planillas_quincenales(id) on delete cascade,
   colaborador_id uuid not null references public.colaboradores(id) on delete restrict,
+  kg_bruto_recepcion numeric(12,2) not null default 0 check (kg_bruto_recepcion >= 0),
+  pago_recepcion numeric(10,2) not null default 0 check (pago_recepcion >= 0),
   kg_cat1_seleccion numeric(12,2) not null default 0 check (kg_cat1_seleccion >= 0),
   kg_cat2_seleccion numeric(12,2) not null default 0 check (kg_cat2_seleccion >= 0),
   pago_seleccion numeric(10,2) not null default 0 check (pago_seleccion >= 0),

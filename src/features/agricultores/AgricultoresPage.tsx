@@ -189,7 +189,7 @@ export default function AgricultoresPage() {
                   <span className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />{a.telefono}</span>
                 )}
                 {a.numero_cuenta && (
-                  <span>N° cuenta: {a.numero_cuenta}</span>
+                  <span>N° cuenta: {formatearNumeroCuentaVisible(a.numero_cuenta, canManageAgricultores)}</span>
                 )}
                 {a.ubicacion && (
                   <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{a.ubicacion}</span>
@@ -233,7 +233,7 @@ export default function AgricultoresPage() {
                   </TableCell>
                   <TableCell>{a.dni || '—'}</TableCell>
                   <TableCell>{a.telefono || '—'}</TableCell>
-                  <TableCell>{a.numero_cuenta || '—'}</TableCell>
+                  <TableCell>{a.numero_cuenta ? formatearNumeroCuentaVisible(a.numero_cuenta, canManageAgricultores) : '—'}</TableCell>
                   <TableCell>{a.fecha_alta || '—'}</TableCell>
                   <TableCell className="max-w-[260px] truncate">{a.ubicacion || '—'}</TableCell>
                   <TableCell>
@@ -329,4 +329,13 @@ export default function AgricultoresPage() {
       )}
     </div>
   )
+}
+
+function formatearNumeroCuentaVisible(numeroCuenta: string, puedeGestionar: boolean): string {
+  if (puedeGestionar) return numeroCuenta
+
+  const limpio = numeroCuenta.replace(/\s+/g, '')
+  if (limpio.length <= 4) return limpio
+
+  return `${'*'.repeat(limpio.length - 4)}${limpio.slice(-4)}`
 }

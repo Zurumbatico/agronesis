@@ -5,6 +5,7 @@ const TABLE = 'lotes' as const
 const SELECT_COMPLETO = `
   *,
   agricultor:agricultores!lotes_agricultor_id_fkey(*),
+  recepcionista:colaboradores!lotes_recepcionista_id_fkey(*),
   acopiador:acopiadores(*),
   acopiador_agricultor:agricultores!lotes_acopiador_agricultor_id_fkey(*),
   producto:productos(*),

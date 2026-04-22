@@ -99,6 +99,7 @@ export type EstadoLote =
 export interface Lote extends BaseEntity {
   codigo: string
   agricultor_id: UUID
+  recepcionista_id: UUID | null
   acopiador_id: UUID | null
   acopiador_agricultor_id: UUID | null
   producto_id: UUID
@@ -115,13 +116,14 @@ export interface Lote extends BaseEntity {
   estado: EstadoLote
   // relaciones (join)
   agricultor?: Agricultor
+  recepcionista?: Colaborador
   acopiador?: Acopiador
   acopiador_agricultor?: Agricultor
   producto?: Producto
   centro_acopio?: CentroAcopio
 }
 
-export type LoteInsert = Omit<Lote, keyof BaseEntity | 'agricultor' | 'acopiador' | 'acopiador_agricultor' | 'producto' | 'centro_acopio'>
+export type LoteInsert = Omit<Lote, keyof BaseEntity | 'agricultor' | 'recepcionista' | 'acopiador' | 'acopiador_agricultor' | 'producto' | 'centro_acopio'>
 export type LoteUpdate = Partial<LoteInsert>
 
 // ─────────────────────────────────────────────
@@ -288,6 +290,8 @@ export type PlanillaQuincenalUpdate = Partial<PlanillaQuincenalInsert>
 export interface PlanillaDetalle extends BaseEntity {
   planilla_id: UUID
   colaborador_id: UUID
+  kg_bruto_recepcion: number      // Kg brutos recepcionados en lotes del período
+  pago_recepcion: number          // kg_bruto_recepcion * tarifa recepción
   kg_cat1_seleccion: number       // Tareo A — kg seleccionados Cat 1
   kg_cat2_seleccion: number       // Tareo A — kg seleccionados Cat 2
   pago_seleccion: number          // kg_cat1 × 0.20 + kg_cat2 × 0.28

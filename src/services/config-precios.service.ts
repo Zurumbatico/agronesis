@@ -11,6 +11,7 @@ const TABLE_SISTEMA = 'config_sistema' as const
 
 export const CLAVE_PESO_CAJA_EXPORTACION = 'peso_caja_exportacion_kg' as const
 export const CLAVE_PESO_CAJA_DESPACHO = 'peso_caja_despacho_kg' as const
+export const CLAVE_PAGO_RECEPCION_KG = 'pago_recepcion_kg' as const
 
 export async function getConfigPrecios(): Promise<ConfigPrecio[]> {
   const { data, error } = await supabase

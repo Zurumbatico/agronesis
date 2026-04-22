@@ -101,6 +101,7 @@ export const ROUTES = {
   LIQUIDACIONES_AGRI_NUEVA: '/liquidaciones/agricultores/nueva',
   LIQUIDACIONES_AGRI_DETALLE: '/liquidaciones/agricultores/:id',
   PLANILLAS:                '/planillas',
+  TAREO:                    '/tareo',
   CUBETAS:                  '/cubetas',
   DESPACHOS:                '/despachos',
   DESPACHOS_NUEVO:          '/despachos/nuevo',

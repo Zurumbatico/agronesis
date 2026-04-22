@@ -127,6 +127,7 @@ export const centroAcopioSchema = z.object({
 export const loteSchema = z.object({
   codigo:             codigoSchema,
   agricultor_id:      z.string().uuid('Seleccione un agricultor'),
+  recepcionista_id:   z.string().uuid('Seleccione un recepcionista'),
   acopiador_combined: z.string().optional().default(''),
   producto_id:        z.string().uuid('Seleccione un producto'),
   centro_acopio_id:   z.string().uuid('Seleccione un centro de acopio'),

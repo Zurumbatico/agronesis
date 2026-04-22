@@ -21,7 +21,9 @@ import { useAuthStore } from '@/store/auth.store'
 import { generarCodigoLiquidacionAgri } from '@/utils/formatters'
 import { calcularTotalesClasificacion, calcularTotalLiquidacionAgri, calcularPesoAgricultor } from '@/utils/business-rules'
 import { format, getISOWeek, getISOWeekYear, parseISO } from 'date-fns'
-import type { Clasificacion, ConfigPrecio } from '@/types/models'
+import type { CalidadProducto, CategoriaClasificacion, Clasificacion, ConfigPrecio, EstadoLote } from '@/types/models'
+
+const ESTADOS_LOTE_LIQUIDABLES = new Set<EstadoLote>(['clasificado', 'empaquetado', 'en_despacho', 'despachado'])
 
 const detalleSchema = z.object({
   lote_id:             z.string().uuid(),
@@ -85,9 +87,10 @@ export default function NuevaLiquidacionAgriPage() {
   }, [agricultoresActivos, agricultorSearch])
 
   const agricultorSeleccionado = agricultoresActivos.find((a) => a.id === agricultorId) ?? null
-  // Solo lotes en estado 'despachado' pueden liquidarse (ya salieron del establecimiento)
+  // Los lotes son liquidables desde 'clasificado' en adelante.
+  // Excluimos 'liquidado' para evitar re-liquidaciones de lotes ya pagados.
   const lotesDelAgricultor = agricultorId
-    ? lotes.filter((l) => l.agricultor_id === agricultorId && l.estado === 'despachado')
+    ? lotes.filter((l) => l.agricultor_id === agricultorId && ESTADOS_LOTE_LIQUIDABLES.has(l.estado))
     : []
 
   const cargarClasificaciones = async () => {
@@ -124,22 +127,24 @@ export default function NuevaLiquidacionAgriPage() {
     const totales = calcularTotalesClasificacion(cls)
     const lote = lotes.find((l) => l.id === loteId)
 
-    // Calcular semana/año ISO del lote para buscar precio configurado
+    // Semana ISO del lote para buscar precio configurado.
     const fechaLote = lote?.fecha_ingreso ? parseISO(lote.fecha_ingreso) : null
     const semanaLote = fechaLote ? getISOWeek(fechaLote) : null
     const anioLote = fechaLote ? getISOWeekYear(fechaLote) : null
+    // Fallback: semana de fecha inicio de liquidación (o semana actual).
+    const fechaInicioLiq = watch('fecha_inicio')
+    const fechaRefLiq = fechaInicioLiq ? parseISO(fechaInicioLiq) : new Date()
+    const semanaLiq = getISOWeek(fechaRefLiq)
+    const anioLiq = getISOWeekYear(fechaRefLiq)
     const variedadLote = lote?.producto?.variedad ?? null
-    const categoriaLote = lote?.producto?.calidad ?? null
-
-    const precioConf = (semanaLote && anioLote && variedadLote && categoriaLote)
-      ? configPrecios.find(
-          (c) => c.semana === semanaLote && c.anio === anioLote && c.variedad === variedadLote && c.categoria === categoriaLote
-        )
-      : undefined
 
     const categorias = Object.entries(totales) as [string, { peso_kg: number; num_cajas: number }][]
     categorias.forEach(([cat, { peso_kg }]) => {
       if (peso_kg > 0) {
+        const categoriaConfig = categoriaClasificacionAConfig(cat as CategoriaClasificacion)
+        const precioConf = (variedadLote && categoriaConfig)
+          ? buscarPrecioConfig(configPrecios, variedadLote, categoriaConfig, semanaLote, anioLote, semanaLiq, anioLiq)
+          : undefined
         // Aplicar 97%: descontar el 3% de Alan Melendrez (Módulo 1 PDF)
         const pesoAgricultor = calcularPesoAgricultor(peso_kg)
         const precioKg = precioConf?.precio_kg_sol ?? 0
@@ -315,4 +320,34 @@ export default function NuevaLiquidacionAgriPage() {
       </form>
     </div>
   )
+}
+
+function categoriaClasificacionAConfig(categoria: CategoriaClasificacion): CalidadProducto | null {
+  if (categoria === 'primera') return 'cat1'
+  if (categoria === 'segunda') return 'cat2'
+  return null
+}
+
+function buscarPrecioConfig(
+  configs: ConfigPrecio[],
+  variedad: ConfigPrecio['variedad'],
+  categoria: CalidadProducto,
+  semanaLote: number | null,
+  anioLote: number | null,
+  semanaLiq: number,
+  anioLiq: number,
+): ConfigPrecio | undefined {
+  const candidatos = [
+    semanaLote && anioLote ? { semana: semanaLote, anio: anioLote } : null,
+    { semana: semanaLiq, anio: anioLiq },
+  ].filter((c): c is { semana: number; anio: number } => Boolean(c))
+
+  for (const c of candidatos) {
+    const encontrado = configs.find(
+      (cfg) => cfg.semana === c.semana && cfg.anio === c.anio && cfg.variedad === variedad && cfg.categoria === categoria
+    )
+    if (encontrado) return encontrado
+  }
+
+  return undefined
 }
