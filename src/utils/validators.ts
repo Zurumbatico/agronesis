@@ -210,6 +210,7 @@ export const despachoSchema = z.object({
 
 export const empaquetadoSchema = z.object({
   lote_id: z.string().uuid(),
+  colaborador_id: z.string().uuid('Seleccione un empaquetador').nullable().optional(),
   fecha_empaquetado: z.string().min(1, 'Ingrese la fecha'),
   destino: z.enum(['europa', 'usa']),
   codigo_trazabilidad: z.string().trim().min(1, 'Código de trazabilidad inválido'),

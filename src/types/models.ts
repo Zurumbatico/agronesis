@@ -185,6 +185,7 @@ export type DestinoEmpaquetado = 'europa' | 'usa'
 
 export interface Empaquetado extends BaseEntity {
   lote_id: UUID
+  colaborador_id: UUID | null
   fecha_empaquetado: string
   destino: DestinoEmpaquetado
   codigo_trazabilidad: string
@@ -192,6 +193,7 @@ export interface Empaquetado extends BaseEntity {
   num_cajas: number
   observaciones: string | null
   lote?: Lote
+  colaborador?: Colaborador
 }
 
 export type EmpaquetadoInsert = Omit<Empaquetado, keyof BaseEntity | 'lote'>
@@ -272,7 +274,7 @@ export type LiquidacionAgriDetalleInsert = Omit<LiquidacionAgriDetalle, keyof Ba
 // ─────────────────────────────────────────────
 // PLANILLA QUINCENAL (Módulo 9 PDF)
 // ─────────────────────────────────────────────
-export type EstadoPlanilla = 'pendiente' | 'pagada'
+export type EstadoPlanilla = 'borrador' | 'confirmada' | 'pagada'
 
 export interface PlanillaQuincenal extends BaseEntity {
   periodo_inicio: string   // ISO date (ej. 2026-04-01)

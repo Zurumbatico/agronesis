@@ -3,12 +3,13 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import {
   getPlanillasQuincenales,
   createPlanillaQuincenal,
+  actualizarEstadoPlanilla,
   pagarPlanilla,
   getPlanillaConDetalles,
   getResumenColaboradoresPeriodo,
-  type ResumenColaboradorPeriodo,
+  getColaboradoresYaLiquidados,
 } from '@/services/planillas.service'
-import { CLAVE_PAGO_RECEPCION_KG, getValorNumericoSistema } from '@/services/config-precios.service'
+import { CLAVE_PAGO_RECEPCION_KG, CLAVE_PAGO_EMPAQUETADO_CAJA, getValorNumericoSistema } from '@/services/config-precios.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { FormField } from '@/components/shared/FormField'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
@@ -25,13 +26,12 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/store/auth.store'
+import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 import { formatFecha, formatMoneda } from '@/utils/formatters'
 import { format } from 'date-fns'
 import { Eye } from 'lucide-react'
-import type { PlanillaQuincenal } from '@/types/models'
-import { DEFAULT_PAGO_RECEPCION_KG } from '@/utils/business-rules'
-
-const PAGO_POR_CAJA = 0.32   // S/ 0.32 por caja empaquetada (Módulo D PDF)
+import type { EstadoPlanilla, PlanillaQuincenal } from '@/types/models'
+import { DEFAULT_PAGO_RECEPCION_KG, DEFAULT_PAGO_EMPAQUETADO_CAJA } from '@/utils/business-rules'
 
 type DetalleForm = {
   colaborador_id: string
@@ -53,16 +53,18 @@ type PlanillaForm = {
 }
 
 export default function PlanillasPage() {
-  const { user } = useAuthStore()
+  const { user, roles } = useAuthStore()
   const [planillas, setPlanillas] = useState<PlanillaQuincenal[]>([])
   const [loading, setLoading] = useState(true)
   const [creando, setCreando] = useState(false)
   const [cargandoResumen, setCargandoResumen] = useState(false)
+  const [excluidos, setExcluidos] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [pagoRecepcionKg, setPagoRecepcionKg] = useState(DEFAULT_PAGO_RECEPCION_KG)
+  const [pagoEmpaquetadoCaja, setPagoEmpaquetadoCaja] = useState(DEFAULT_PAGO_EMPAQUETADO_CAJA)
   const [detallePlanilla, setDetallePlanilla] = useState<PlanillaQuincenal | null>(null)
   const [cargandoDetalle, setCargandoDetalle] = useState(false)
-  const [planillaAConfirmar, setPlanillaAConfirmar] = useState<string | null>(null)
+  const [accionPendiente, setAccionPendiente] = useState<{ id: string; estado: 'confirmada' | 'pagada' } | null>(null)
 
   const { register, handleSubmit, watch, reset, control, formState: { errors, isSubmitting } } = useForm<PlanillaForm>({
     defaultValues: {
@@ -76,16 +78,19 @@ export default function PlanillasPage() {
   const { fields, remove, replace } = useFieldArray({ control, name: 'detalles' })
   const watchInicio = watch('periodo_inicio')
   const watchFin = watch('periodo_fin')
+  const puedePagar = hasPermission(roles, APP_PERMISSIONS.PLANILLAS_PAY)
 
   const cargar = () => {
     setLoading(true)
     Promise.all([
       getPlanillasQuincenales(),
       getValorNumericoSistema(CLAVE_PAGO_RECEPCION_KG, DEFAULT_PAGO_RECEPCION_KG),
+      getValorNumericoSistema(CLAVE_PAGO_EMPAQUETADO_CAJA, DEFAULT_PAGO_EMPAQUETADO_CAJA),
     ])
-      .then(([planillasDb, pagoRecepcion]) => {
+      .then(([planillasDb, pagoRecepcion, pagoEmpaquetado]) => {
         setPlanillas(planillasDb)
         setPagoRecepcionKg(pagoRecepcion)
+        setPagoEmpaquetadoCaja(pagoEmpaquetado)
       })
       .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false))
@@ -96,9 +101,15 @@ export default function PlanillasPage() {
   const cargarResumen = async () => {
     if (!watchInicio || !watchFin) return
     setCargandoResumen(true)
+    setExcluidos(0)
     try {
-      const resumen: ResumenColaboradorPeriodo[] = await getResumenColaboradoresPeriodo(watchInicio, watchFin, pagoRecepcionKg)
-      replace(resumen.map((r) => ({
+      const [resumen, yaLiquidados] = await Promise.all([
+        getResumenColaboradoresPeriodo(watchInicio, watchFin, pagoRecepcionKg, pagoEmpaquetadoCaja),
+        getColaboradoresYaLiquidados(watchInicio, watchFin),
+      ])
+      const filtrado = resumen.filter((r) => !yaLiquidados.has(r.colaborador_id))
+      setExcluidos(resumen.length - filtrado.length)
+      replace(filtrado.map((r) => ({
         colaborador_id: r.colaborador_id,
         nombre_display: `${r.apellido}, ${r.nombre}`,
         kg_bruto_recepcion: r.kg_bruto_recepcion,
@@ -106,7 +117,7 @@ export default function PlanillasPage() {
         kg_cat1_seleccion: r.kg_cat1_seleccion,
         kg_cat2_seleccion: r.kg_cat2_seleccion,
         pago_seleccion: r.pago_seleccion,
-        n_cajas_empaquetado: 0,
+        n_cajas_empaquetado: r.n_cajas_empaquetado,
         otros_montos: 0,
       })))
     } catch (e) {
@@ -119,7 +130,7 @@ export default function PlanillasPage() {
   const onSubmit = async (data: PlanillaForm) => {
     if (!user) return
     const detalles = data.detalles.map((d) => {
-      const monto_empaquetado = d.n_cajas_empaquetado * PAGO_POR_CAJA
+      const monto_empaquetado = d.n_cajas_empaquetado * pagoEmpaquetadoCaja
       const total = d.pago_recepcion + d.pago_seleccion + monto_empaquetado + (d.otros_montos ?? 0)
       return {
         colaborador_id: d.colaborador_id,
@@ -141,7 +152,7 @@ export default function PlanillasPage() {
         periodo_inicio: data.periodo_inicio,
         periodo_fin: data.periodo_fin,
         total_monto,
-        estado: 'pendiente',
+        estado: 'borrador',
         observaciones: data.observaciones || null,
       },
       detalles,
@@ -165,10 +176,22 @@ export default function PlanillasPage() {
     }
   }
 
-  const handlePagar = async () => {
-    if (!planillaAConfirmar) return
-    await pagarPlanilla(planillaAConfirmar)
-    setPlanillaAConfirmar(null)
+  const handleCambiarEstado = async () => {
+    if (!accionPendiente) return
+
+    if (accionPendiente.estado === 'pagada') {
+      if (!puedePagar) return
+      await pagarPlanilla(accionPendiente.id)
+    } else {
+      await actualizarEstadoPlanilla(accionPendiente.id, accionPendiente.estado)
+    }
+
+    if (detallePlanilla?.id === accionPendiente.id) {
+      const full = await getPlanillaConDetalles(accionPendiente.id)
+      setDetallePlanilla(full)
+    }
+
+    setAccionPendiente(null)
     cargar()
   }
 
@@ -178,7 +201,7 @@ export default function PlanillasPage() {
     const pago_recep = watch(`detalles.${i}.pago_recepcion`) ?? 0
     const n_cajas = watch(`detalles.${i}.n_cajas_empaquetado`) ?? 0
     const otros = watch(`detalles.${i}.otros_montos`) ?? 0
-    return acc + pago_recep + pago_sel + (n_cajas * PAGO_POR_CAJA) + otros
+    return acc + pago_recep + pago_sel + (n_cajas * pagoEmpaquetadoCaja) + otros
   }, 0)
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando...</div>
@@ -228,9 +251,13 @@ export default function PlanillasPage() {
                 >
                   {cargandoResumen ? 'Cargando...' : 'Cargar colaboradores del período'}
                 </Button>
-                <p className="text-xs text-muted-foreground">Recepción: S/{pagoRecepcionKg.toFixed(2)}/kg bruto</p>
-                {fields.length > 0 && (
+                  {fields.length > 0 && (
                   <p className="text-xs text-muted-foreground">{fields.length} operario(s) cargados</p>
+                )}
+                {excluidos > 0 && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                    {excluidos} trabajador{excluidos > 1 ? 'es' : ''} excluido{excluidos > 1 ? 's' : ''} — ya están en una planilla del período
+                  </p>
                 )}
               </div>
 
@@ -243,7 +270,7 @@ export default function PlanillasPage() {
                     const kg_bruto_recep = watch(`detalles.${i}.kg_bruto_recepcion`) ?? 0
                     const nCajas = watch(`detalles.${i}.n_cajas_empaquetado`) ?? 0
                     const otros = watch(`detalles.${i}.otros_montos`) ?? 0
-                    const pago_empaque = nCajas * PAGO_POR_CAJA
+                    const pago_empaque = nCajas * pagoEmpaquetadoCaja
                     const total = pago_recep + pago_sel + pago_empaque + otros
                     return (
                       <div key={field.id} className="border rounded-lg overflow-hidden">
@@ -278,23 +305,14 @@ export default function PlanillasPage() {
                               </div>
                             </div>
                           </div>
-                          {/* Empaquetado — editable */}
-                          <div className="px-4 py-3">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Empaquetado (Tareo D)</p>
-                            <div className="flex items-center gap-2 mb-1">
-                              <Input
-                                type="number"
-                                min="0"
-                                className="h-8 w-24"
-                                placeholder="0"
-                                {...register(`detalles.${i}.n_cajas_empaquetado`, { valueAsNumber: true })}
-                              />
-                              <span className="text-xs text-muted-foreground">cajas</span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
+                          {/* Empaquetado — solo lectura */}
+                          <div className="px-4 py-3 bg-amber-50/40">
+                            <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide mb-2">Empaquetado (Tareo D)</p>
+                            <p className="text-lg font-bold text-amber-700">{formatMoneda(pago_empaque)}</p>
+                            <p className="mt-2 text-xs text-muted-foreground">
                               {nCajas > 0
-                                ? <>{nCajas} × S/{PAGO_POR_CAJA} = <span className="font-semibold text-foreground">{formatMoneda(pago_empaque)}</span></>
-                                : <>S/{PAGO_POR_CAJA}/caja</>
+                                ? <>{nCajas} cajas × S/{pagoEmpaquetadoCaja.toFixed(2)}</>
+                                : <>0 cajas</>
                               }
                             </p>
                           </div>
@@ -324,9 +342,9 @@ export default function PlanillasPage() {
               )}
 
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => { setCreando(false); reset() }}>Cancelar</Button>
+                <Button type="button" variant="outline" onClick={() => { setCreando(false); reset(); setExcluidos(0) }}>Cancelar</Button>
                 <Button type="submit" disabled={isSubmitting || fields.length === 0}>
-                  {isSubmitting ? 'Guardando...' : 'Crear planilla'}
+                  {isSubmitting ? 'Guardando...' : 'Guardar borrador'}
                 </Button>
               </div>
             </form>
@@ -353,16 +371,27 @@ export default function PlanillasPage() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <p className="font-bold text-sm">{formatMoneda(p.total_monto)}</p>
-                    <Badge className={p.estado === 'pagada' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-700'}>
-                      {p.estado === 'pagada' ? 'Pagada' : 'Pendiente'}
+                    <Badge className={getPlanillaBadgeClassName(p.estado)}>
+                      {getPlanillaEstadoLabel(p.estado)}
                     </Badge>
                     <Button size="sm" variant="ghost" onClick={() => handleVerDetalle(p)}>
                       <Eye className="h-4 w-4" />
                     </Button>
-                    {p.estado === 'pendiente' && (
-                      <Button size="sm" variant="outline" onClick={() => setPlanillaAConfirmar(p.id)}>
-                        Marcar pagada
+                    {p.estado === 'borrador' && (
+                      <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: p.id, estado: 'confirmada' })}>
+                        Confirmar
                       </Button>
+                    )}
+                    {p.estado === 'confirmada' && (
+                      puedePagar ? (
+                        <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: p.id, estado: 'pagada' })}>
+                          Marcar pagada
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="secondary" disabled>
+                          Pago solo admin
+                        </Button>
+                      )
                     )}
                   </div>
                 </div>
@@ -383,6 +412,29 @@ export default function PlanillasPage() {
                   {detallePlanilla.observaciones && ` · ${detallePlanilla.observaciones}`}
                 </DialogDescription>
               </DialogHeader>
+              <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-3">
+                <Badge className={getPlanillaBadgeClassName(detallePlanilla.estado)}>
+                  {getPlanillaEstadoLabel(detallePlanilla.estado)}
+                </Badge>
+                <div className="flex items-center gap-2">
+                  {detallePlanilla.estado === 'borrador' && (
+                    <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: detallePlanilla.id, estado: 'confirmada' })}>
+                      Confirmar
+                    </Button>
+                  )}
+                  {detallePlanilla.estado === 'confirmada' && (
+                    puedePagar ? (
+                      <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: detallePlanilla.id, estado: 'pagada' })}>
+                        Marcar pagada
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="secondary" disabled>
+                        Pago solo admin
+                      </Button>
+                    )
+                  )}
+                </div>
+              </div>
               {cargandoDetalle ? (
                 <p className="text-center text-muted-foreground py-8">Cargando detalle...</p>
               ) : (
@@ -415,7 +467,7 @@ export default function PlanillasPage() {
                             <div className="px-3 py-2">
                               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Empaquetado</p>
                               <p className="font-bold">{formatMoneda(d.monto_empaquetado)}</p>
-                              <p className="text-xs text-muted-foreground mt-1">{d.n_cajas_empaquetado} cajas × S/{PAGO_POR_CAJA.toFixed(2)}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{d.n_cajas_empaquetado} cajas × S/{pagoEmpaquetadoCaja.toFixed(2)}</p>
                             </div>
                             <div className="px-3 py-2">
                               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Otros</p>
@@ -439,15 +491,29 @@ export default function PlanillasPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirm pagar */}
+      {/* Confirmar acción */}
       <ConfirmDialog
-        open={!!planillaAConfirmar}
-        title="¿Marcar como pagada?"
-        description="Esta acción no se puede deshacer."
-        confirmLabel="Sí, marcar pagada"
-        onConfirm={handlePagar}
-        onCancel={() => setPlanillaAConfirmar(null)}
+        open={!!accionPendiente}
+        title={accionPendiente?.estado === 'pagada' ? '¿Marcar como pagada?' : '¿Confirmar planilla?'}
+        description={accionPendiente?.estado === 'pagada'
+          ? 'La planilla quedará marcada como pagada.'
+          : 'La planilla saldrá de borrador y quedará confirmada.'}
+        confirmLabel={accionPendiente?.estado === 'pagada' ? 'Sí, marcar pagada' : 'Sí, confirmar'}
+        onConfirm={() => { void handleCambiarEstado() }}
+        onCancel={() => setAccionPendiente(null)}
       />
     </div>
   )
+}
+
+function getPlanillaEstadoLabel(estado: EstadoPlanilla): string {
+  if (estado === 'borrador') return 'Borrador'
+  if (estado === 'confirmada') return 'Confirmada'
+  return 'Pagada'
+}
+
+function getPlanillaBadgeClassName(estado: EstadoPlanilla): string {
+  if (estado === 'borrador') return 'bg-gray-100 text-gray-700'
+  if (estado === 'confirmada') return 'bg-amber-100 text-amber-800'
+  return 'bg-green-100 text-green-800'
 }

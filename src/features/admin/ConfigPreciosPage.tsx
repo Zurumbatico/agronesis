@@ -1,35 +1,29 @@
-import { useState, useEffect } from 'react'
-import { useForm, Controller } from 'react-hook-form'
+import { useEffect, useState } from 'react'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { endOfISOWeek, format, getISOWeek, getYear, setISOWeek, setISOWeekYear, startOfISOWeek } from 'date-fns'
+import { Pencil, Plus, Settings, Trash2 } from 'lucide-react'
 import {
-  getConfigPrecios,
   createConfigPrecio,
-  updateConfigPrecio,
   deleteConfigPrecio,
-  getConfigSistemaPorClave,
-  upsertConfigSistemaNumerico,
-  CLAVE_PESO_CAJA_EXPORTACION,
-  CLAVE_PESO_CAJA_DESPACHO,
-  CLAVE_PAGO_RECEPCION_KG,
+  getConfigPrecios,
+  updateConfigPrecio,
 } from '@/services/config-precios.service'
+import { CALIDAD_PRODUCTO_CONFIG, VARIEDAD_PRODUCTO_CONFIG } from '@/constants'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { ErrorMessage } from '@/components/shared/ErrorMessage'
+import { FormField } from '@/components/shared/FormField'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
-import { ErrorMessage } from '@/components/shared/ErrorMessage'
-import { EmptyState } from '@/components/shared/EmptyState'
-import { FormField } from '@/components/shared/FormField'
-import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuthStore } from '@/store/auth.store'
-import { VARIEDAD_PRODUCTO_CONFIG, CALIDAD_PRODUCTO_CONFIG } from '@/constants'
-import { DEFAULT_PAGO_RECEPCION_KG, DEFAULT_PESO_CAJA_DESPACHO_KG, DEFAULT_PESO_CAJA_EXPORTACION_KG } from '@/utils/business-rules'
-import { Plus, Settings, Pencil, Trash2 } from 'lucide-react'
-import { endOfISOWeek, format, getISOWeek, getYear, setISOWeek, setISOWeekYear, startOfISOWeek } from 'date-fns'
 import type { ConfigPrecio } from '@/types/models'
 
 const configPrecioSchema = z.object({
@@ -42,57 +36,6 @@ const configPrecioSchema = z.object({
 
 type FormData = z.infer<typeof configPrecioSchema>
 
-const parametroCajaSchema = z.object({
-  peso_caja_exportacion_kg: z.number({ message: 'Ingrese un número' }).positive().max(100),
-  peso_caja_despacho_kg: z.number({ message: 'Ingrese un número' }).positive().max(100),
-  pago_recepcion_kg: z.number({ message: 'Ingrese un número' }).nonnegative().max(100),
-})
-
-type ParametroCajaFormData = z.infer<typeof parametroCajaSchema>
-type ParametroKey = keyof ParametroCajaFormData
-
-const PARAMETRO_CAJA_CONFIG: Record<ParametroKey, {
-  clave: string
-  nombre: string
-  descripcion: string
-  label: string
-  helper: string
-  min: number
-  step: string
-  placeholder: string
-}> = {
-  peso_caja_exportacion_kg: {
-    clave: CLAVE_PESO_CAJA_EXPORTACION,
-    nombre: 'Peso por caja de exportación',
-    descripcion: 'Peso objetivo en kg usado para convertir kg buenos clasificados a cajas exportables.',
-    label: 'Peso por caja (kg)',
-    helper: 'Afecta cálculo de cajas exportables.',
-    min: 0.01,
-    step: '0.01',
-    placeholder: '4.65',
-  },
-  peso_caja_despacho_kg: {
-    clave: CLAVE_PESO_CAJA_DESPACHO,
-    nombre: 'Peso por caja de despacho',
-    descripcion: 'Peso en kg por caja usado para calcular el peso neto total de los despachos.',
-    label: 'Peso caja despacho (kg)',
-    helper: 'Afecta cálculo del peso neto en despacho.',
-    min: 0.01,
-    step: '0.01',
-    placeholder: '4.50',
-  },
-  pago_recepcion_kg: {
-    clave: CLAVE_PAGO_RECEPCION_KG,
-    nombre: 'Pago recepción por kg bruto',
-    descripcion: 'Tarifa por kg bruto recepcionado usada en la planilla quincenal.',
-    label: 'Pago recepción (S/./kg)',
-    helper: 'Tarifa usada para planilla de recepción.',
-    min: 0,
-    step: '0.01',
-    placeholder: '0.02',
-  },
-}
-
 export default function ConfigPreciosPage() {
   const { user } = useAuthStore()
   const [precios, setPrecios] = useState<ConfigPrecio[]>([])
@@ -102,60 +45,66 @@ export default function ConfigPreciosPage() {
   const [editando, setEditando] = useState<ConfigPrecio | null>(null)
   const [precioAEliminar, setPrecioAEliminar] = useState<ConfigPrecio | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
-  const [parametroError, setParametroError] = useState<string | null>(null)
-  const [parametroSuccess, setParametroSuccess] = useState<string | null>(null)
-  const [guardandoParametro, setGuardandoParametro] = useState<ParametroKey | null>(null)
-  const [parametros, setParametros] = useState<ParametroCajaFormData>({
-    peso_caja_exportacion_kg: DEFAULT_PESO_CAJA_EXPORTACION_KG,
-    peso_caja_despacho_kg: DEFAULT_PESO_CAJA_DESPACHO_KG,
-    pago_recepcion_kg: DEFAULT_PAGO_RECEPCION_KG,
-  })
-  const [parametroFieldErrors, setParametroFieldErrors] = useState<Partial<Record<ParametroKey, string>>>({})
-  const [parametroPendienteConfirmacion, setParametroPendienteConfirmacion] = useState<ParametroKey | null>(null)
   const [precioPendienteConfirmacion, setPrecioPendienteConfirmacion] = useState<FormData | null>(null)
   const [guardandoPrecio, setGuardandoPrecio] = useState(false)
 
   const semanaActual = getISOWeek(new Date())
   const anioActual = getYear(new Date())
 
-  const { register, handleSubmit, control, reset, formState: { errors, isSubmitting } } = useForm<FormData>({
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<FormData>({
     resolver: zodResolver(configPrecioSchema),
-    defaultValues: { semana: semanaActual, anio: anioActual, variedad: 'snow_peas', categoria: 'cat1', precio_kg_sol: undefined },
+    defaultValues: {
+      semana: semanaActual,
+      anio: anioActual,
+      variedad: 'snow_peas',
+      categoria: 'cat1',
+      precio_kg_sol: undefined,
+    },
   })
 
   const cargar = async () => {
-    setLoading(true); setError(null)
+    setLoading(true)
+    setError(null)
     try {
-      const [preciosDb, pesoCajaConfig] = await Promise.all([
-        getConfigPrecios(),
-        Promise.all([
-          getConfigSistemaPorClave(CLAVE_PESO_CAJA_EXPORTACION),
-          getConfigSistemaPorClave(CLAVE_PESO_CAJA_DESPACHO),
-          getConfigSistemaPorClave(CLAVE_PAGO_RECEPCION_KG),
-        ]),
-      ])
-      setPrecios(preciosDb)
-        setParametros({
-        peso_caja_exportacion_kg: Number(pesoCajaConfig[0]?.valor_numerico ?? DEFAULT_PESO_CAJA_EXPORTACION_KG),
-        peso_caja_despacho_kg: Number(pesoCajaConfig[1]?.valor_numerico ?? DEFAULT_PESO_CAJA_DESPACHO_KG),
-        pago_recepcion_kg: Number(pesoCajaConfig[2]?.valor_numerico ?? DEFAULT_PAGO_RECEPCION_KG),
-      })
+      setPrecios(await getConfigPrecios())
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setLoading(false)
     }
-    catch (e) { setError((e as Error).message) }
-    finally { setLoading(false) }
   }
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => {
+    void cargar()
+  }, [])
 
   const abrirNuevo = () => {
     setEditando(null)
-    reset({ semana: semanaActual, anio: anioActual, variedad: 'snow_peas', categoria: 'cat1', precio_kg_sol: undefined })
+    reset({
+      semana: semanaActual,
+      anio: anioActual,
+      variedad: 'snow_peas',
+      categoria: 'cat1',
+      precio_kg_sol: undefined,
+    })
     setDialogOpen(true)
   }
 
-  const abrirEditar = (p: ConfigPrecio) => {
-    setEditando(p)
-    reset({ semana: p.semana, anio: p.anio, variedad: p.variedad, categoria: p.categoria, precio_kg_sol: p.precio_kg_sol })
+  const abrirEditar = (precio: ConfigPrecio) => {
+    setEditando(precio)
+    reset({
+      semana: precio.semana,
+      anio: precio.anio,
+      variedad: precio.variedad,
+      categoria: precio.categoria,
+      precio_kg_sol: precio.precio_kg_sol,
+    })
     setDialogOpen(true)
   }
 
@@ -165,19 +114,20 @@ export default function ConfigPreciosPage() {
   }
 
   const confirmarGuardadoPrecio = async () => {
-    if (!user) return
-    if (!precioPendienteConfirmacion) return
+    if (!user || !precioPendienteConfirmacion) return
 
     try {
       setGuardandoPrecio(true)
       setFormError(null)
+
       if (editando) {
         const updated = await updateConfigPrecio(editando.id, precioPendienteConfirmacion)
-        setPrecios((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
+        setPrecios((prev) => prev.map((precio) => (precio.id === updated.id ? updated : precio)))
       } else {
         const nuevo = await createConfigPrecio(precioPendienteConfirmacion, user.id)
         setPrecios((prev) => [nuevo, ...prev])
       }
+
       setPrecioPendienteConfirmacion(null)
       setDialogOpen(false)
     } catch (e) {
@@ -187,48 +137,10 @@ export default function ConfigPreciosPage() {
     }
   }
 
-  const guardarParametro = async (key: ParametroKey) => {
-    if (!user) return
-
-    const parsed = parametroCajaSchema.safeParse(parametros)
-    if (!parsed.success) {
-      const nextErrors: Partial<Record<ParametroKey, string>> = {}
-      for (const issue of parsed.error.issues) {
-        const field = issue.path[0] as ParametroKey | undefined
-        if (field) nextErrors[field] = issue.message
-      }
-      setParametroFieldErrors(nextErrors)
-      return
-    }
-
+  const eliminar = async (precio: ConfigPrecio) => {
     try {
-      setGuardandoParametro(key)
-      setParametroError(null)
-      setParametroSuccess(null)
-      setParametroFieldErrors((prev) => ({ ...prev, [key]: undefined }))
-
-      const config = PARAMETRO_CAJA_CONFIG[key]
-      const saved = await upsertConfigSistemaNumerico({
-        clave: config.clave,
-        nombre: config.nombre,
-        descripcion: config.descripcion,
-        valor_numerico: parametros[key],
-      }, user.id)
-
-      const savedValue = Number(saved.valor_numerico ?? parametros[key])
-      setParametros((prev) => ({ ...prev, [key]: savedValue }))
-      setParametroSuccess(`Guardado: ${config.label}`)
-    } catch (e) {
-      setParametroError((e as Error).message)
-    } finally {
-      setGuardandoParametro(null)
-    }
-  }
-
-  const eliminar = async (p: ConfigPrecio) => {
-    try {
-      await deleteConfigPrecio(p.id)
-      setPrecios((prev) => prev.filter((x) => x.id !== p.id))
+      await deleteConfigPrecio(precio.id)
+      setPrecios((prev) => prev.filter((item) => item.id !== precio.id))
     } catch (e) {
       setError((e as Error).message)
     }
@@ -237,68 +149,25 @@ export default function ConfigPreciosPage() {
   if (loading) return <LoadingPage />
   if (error) return <ErrorMessage message={error} onRetry={cargar} />
 
-  // Agrupar por año para mostrar separadores
-  const preciosPorAnio = precios.reduce<Record<number, ConfigPrecio[]>>((acc, p) => {
-    if (!acc[p.anio]) acc[p.anio] = []
-    acc[p.anio].push(p)
+  const preciosPorAnio = precios.reduce<Record<number, ConfigPrecio[]>>((acc, precio) => {
+    if (!acc[precio.anio]) acc[precio.anio] = []
+    acc[precio.anio].push(precio)
     return acc
   }, {})
 
   return (
     <div>
       <PageHeader
-        title="Configuración de Precios"
-        description="Precio S/./kg por semana, variedad y categoría, además de parámetros globales de empaque."
+        title="Precios por Semana"
+        description="Precio S/./kg por semana, variedad y categoría. Usado en liquidaciones de agricultores."
       />
 
-      <Card className="mb-6">
-        <CardContent className="pt-5">
-          <div>
-            <p className="text-sm font-semibold">Parámetros de empaquetado</p>
-            <p className="text-sm text-muted-foreground">Cada parámetro se guarda de forma independiente para evitar errores en bloque.</p>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
-            {(Object.keys(PARAMETRO_CAJA_CONFIG) as ParametroKey[]).map((key) => {
-              const config = PARAMETRO_CAJA_CONFIG[key]
-              return (
-                <div key={key} className="rounded-lg border p-3">
-                  <FormField label={config.label} error={parametroFieldErrors[key]} required>
-                    <Input
-                      type="number"
-                      step={config.step}
-                      min={config.min}
-                      placeholder={config.placeholder}
-                      value={parametros[key]}
-                      onChange={(e) => {
-                        const value = Number(e.target.value)
-                        setParametros((prev) => ({ ...prev, [key]: Number.isNaN(value) ? 0 : value }))
-                        setParametroFieldErrors((prev) => ({ ...prev, [key]: undefined }))
-                      }}
-                    />
-                  </FormField>
-                  <p className="text-xs text-muted-foreground mt-1">{config.helper}</p>
-                  <Button
-                    type="button"
-                    className="mt-3"
-                    loading={guardandoParametro === key}
-                    onClick={() => setParametroPendienteConfirmacion(key)}
-                  >
-                    Guardar
-                  </Button>
-                </div>
-              )
-            })}
-          </div>
-          {parametroError && <p className="mt-3 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{parametroError}</p>}
-          {parametroSuccess && <p className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">{parametroSuccess}</p>}
-        </CardContent>
-      </Card>
-
-      <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-medium text-muted-foreground">Precios configurados por semana</p>
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          Semana actual: <span className="font-medium">Sem. {semanaActual} / {anioActual}</span>
+        </p>
         <Button onClick={abrirNuevo}>
-          <Plus className="h-4 w-4 mr-2" /> Nuevo precio
+          <Plus className="mr-2 h-4 w-4" /> Nuevo precio
         </Button>
       </div>
 
@@ -315,14 +184,14 @@ export default function ConfigPreciosPage() {
             .sort((a, b) => b - a)
             .map((anio) => (
               <div key={anio}>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Año {anio}</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Año {anio}</p>
                 <Card>
                   <CardContent className="p-0">
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
                           <TableHead>Semana</TableHead>
-                          <TableHead>Rango semana</TableHead>
+                          <TableHead>Rango</TableHead>
                           <TableHead>Variedad</TableHead>
                           <TableHead>Categoría</TableHead>
                           <TableHead className="text-right">Precio S/./kg</TableHead>
@@ -332,19 +201,28 @@ export default function ConfigPreciosPage() {
                       <TableBody>
                         {preciosPorAnio[anio]
                           .sort((a, b) => b.semana - a.semana)
-                          .map((p) => (
-                            <TableRow key={p.id}>
-                              <TableCell className="font-medium">Sem. {p.semana}</TableCell>
-                              <TableCell>{FORMATEAR_RANGO_SEMANA_ISO(p.anio, p.semana)}</TableCell>
-                              <TableCell>{VARIEDAD_PRODUCTO_CONFIG[p.variedad].label}</TableCell>
-                              <TableCell>{CALIDAD_PRODUTO_CONFIG_SAFE(p.categoria)}</TableCell>
-                              <TableCell className="text-right font-semibold">S/. {Number(p.precio_kg_sol).toFixed(4)}</TableCell>
+                          .map((precio) => (
+                            <TableRow key={precio.id}>
+                              <TableCell className="font-medium">Sem. {precio.semana}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {formatearRangoSemanaIso(precio.anio, precio.semana)}
+                              </TableCell>
+                              <TableCell>{VARIEDAD_PRODUCTO_CONFIG[precio.variedad].label}</TableCell>
+                              <TableCell>{getCalidadProductoLabel(precio.categoria)}</TableCell>
+                              <TableCell className="text-right font-semibold">
+                                S/. {Number(precio.precio_kg_sol).toFixed(4)}
+                              </TableCell>
                               <TableCell>
-                                <div className="flex gap-1 justify-end">
-                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => abrirEditar(p)}>
+                                <div className="flex justify-end gap-1">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => abrirEditar(precio)}>
                                     <Pencil className="h-3.5 w-3.5" />
                                   </Button>
-                                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setPrecioAEliminar(p)}>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                    onClick={() => setPrecioAEliminar(precio)}
+                                  >
                                     <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 </div>
@@ -361,25 +239,16 @@ export default function ConfigPreciosPage() {
       )}
 
       <ConfirmDialog
-        open={!!parametroPendienteConfirmacion}
-        title="¿Confirmar guardado de parámetro?"
-        description={parametroPendienteConfirmacion ? `Se guardará: ${PARAMETRO_CAJA_CONFIG[parametroPendienteConfirmacion].label}` : ''}
-        confirmLabel="Sí, guardar"
-        variant="default"
-        loading={!!parametroPendienteConfirmacion && guardandoParametro === parametroPendienteConfirmacion}
-        onConfirm={() => {
-          if (parametroPendienteConfirmacion) void guardarParametro(parametroPendienteConfirmacion)
-          setParametroPendienteConfirmacion(null)
-        }}
-        onCancel={() => setParametroPendienteConfirmacion(null)}
-      />
-
-      <ConfirmDialog
         open={!!precioAEliminar}
         title="¿Eliminar precio?"
-        description={precioAEliminar ? `Sem ${precioAEliminar.semana}/${precioAEliminar.anio} — ${VARIEDAD_PRODUCTO_CONFIG[precioAEliminar.variedad].label} ${CALIDAD_PRODUCTO_CONFIG[precioAEliminar.categoria].label}` : ''}
+        description={precioAEliminar
+          ? `Sem ${precioAEliminar.semana}/${precioAEliminar.anio} — ${VARIEDAD_PRODUCTO_CONFIG[precioAEliminar.variedad].label} ${getCalidadProductoLabel(precioAEliminar.categoria)}`
+          : ''}
         confirmLabel="Eliminar"
-        onConfirm={() => { eliminar(precioAEliminar!); setPrecioAEliminar(null) }}
+        onConfirm={() => {
+          void eliminar(precioAEliminar!)
+          setPrecioAEliminar(null)
+        }}
         onCancel={() => setPrecioAEliminar(null)}
       />
 
@@ -387,12 +256,14 @@ export default function ConfigPreciosPage() {
         open={!!precioPendienteConfirmacion}
         title={editando ? '¿Confirmar actualización de precio?' : '¿Confirmar creación de precio?'}
         description={precioPendienteConfirmacion
-          ? `Sem ${precioPendienteConfirmacion.semana}/${precioPendienteConfirmacion.anio} · ${VARIEDAD_PRODUCTO_CONFIG[precioPendienteConfirmacion.variedad].label} · ${CALIDAD_PRODUCTO_CONFIG[precioPendienteConfirmacion.categoria].label} · S/. ${Number(precioPendienteConfirmacion.precio_kg_sol).toFixed(4)}`
+          ? `Sem ${precioPendienteConfirmacion.semana}/${precioPendienteConfirmacion.anio} · ${VARIEDAD_PRODUCTO_CONFIG[precioPendienteConfirmacion.variedad].label} · ${getCalidadProductoLabel(precioPendienteConfirmacion.categoria)} · S/. ${Number(precioPendienteConfirmacion.precio_kg_sol).toFixed(4)}`
           : ''}
         confirmLabel={editando ? 'Sí, actualizar' : 'Sí, crear'}
         variant="default"
         loading={guardandoPrecio}
-        onConfirm={() => { void confirmarGuardadoPrecio() }}
+        onConfirm={() => {
+          void confirmarGuardadoPrecio()
+        }}
         onCancel={() => setPrecioPendienteConfirmacion(null)}
       />
 
@@ -401,39 +272,57 @@ export default function ConfigPreciosPage() {
           <DialogHeader>
             <DialogTitle>{editando ? 'Editar precio' : 'Nuevo precio'}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-2">
-            {formError && <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{formError}</p>}
+
+          <form onSubmit={handleSubmit(onSubmit)} className="mt-2 flex flex-col gap-4">
+            {formError && (
+              <p className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {formError}
+              </p>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <FormField label="Año" error={errors.anio?.message} required>
                 <Input type="number" min="2024" {...register('anio', { valueAsNumber: true })} />
               </FormField>
-              <FormField label="Semana (1–53)" error={errors.semana?.message} required>
+              <FormField label="Semana (1-53)" error={errors.semana?.message} required>
                 <Input type="number" min="1" max="53" {...register('semana', { valueAsNumber: true })} />
               </FormField>
             </div>
 
             <FormField label="Variedad" error={errors.variedad?.message} required>
-              <Controller name="variedad" control={control} render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="snow_peas">Snow Peas</SelectItem>
-                    <SelectItem value="sugar">Sugar Snap</SelectItem>
-                  </SelectContent>
-                </Select>
-              )} />
+              <Controller
+                name="variedad"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="snow_peas">Snow Peas</SelectItem>
+                      <SelectItem value="sugar">Sugar Snap</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </FormField>
 
             <FormField label="Categoría" error={errors.categoria?.message} required>
-              <Controller name="categoria" control={control} render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cat1">CAT 1</SelectItem>
-                    <SelectItem value="cat2">CAT 2</SelectItem>
-                  </SelectContent>
-                </Select>
-              )} />
+              <Controller
+                name="categoria"
+                control={control}
+                render={({ field }) => (
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cat1">CAT 1</SelectItem>
+                      <SelectItem value="cat2">CAT 2</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </FormField>
 
             <FormField label="Precio S/./kg" error={errors.precio_kg_sol?.message} required>
@@ -447,8 +336,12 @@ export default function ConfigPreciosPage() {
             </FormField>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
-              <Button type="submit" loading={isSubmitting || guardandoPrecio}>{editando ? 'Guardar' : 'Crear'}</Button>
+              <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" loading={isSubmitting || guardandoPrecio}>
+                {editando ? 'Guardar' : 'Crear'}
+              </Button>
             </div>
           </form>
         </DialogContent>
@@ -457,14 +350,13 @@ export default function ConfigPreciosPage() {
   )
 }
 
-function CALIDAD_PRODUTO_CONFIG_SAFE(cat: string): string {
-  return CALIDAD_PRODUCTO_CONFIG[cat as keyof typeof CALIDAD_PRODUCTO_CONFIG]?.label ?? cat
+function getCalidadProductoLabel(categoria: string): string {
+  return CALIDAD_PRODUCTO_CONFIG[categoria as keyof typeof CALIDAD_PRODUCTO_CONFIG]?.label ?? categoria
 }
 
-function FORMATEAR_RANGO_SEMANA_ISO(anio: number, semana: number): string {
+function formatearRangoSemanaIso(anio: number, semana: number): string {
   const referencia = setISOWeek(setISOWeekYear(new Date(), anio), semana)
   const inicio = startOfISOWeek(referencia)
   const fin = endOfISOWeek(referencia)
-
   return `${format(inicio, 'dd/MM/yyyy')} - ${format(fin, 'dd/MM/yyyy')}`
 }

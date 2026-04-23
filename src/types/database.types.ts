@@ -417,7 +417,7 @@ export interface Database {
           periodo_inicio: string
           periodo_fin: string
           total_monto: number
-          estado: 'pendiente' | 'pagada'
+          estado: 'borrador' | 'confirmada' | 'pagada'
           observaciones: string | null
         }
         Insert: Omit<Database['public']['Tables']['planillas_quincenales']['Row'], 'id' | 'created_at' | 'updated_at'>

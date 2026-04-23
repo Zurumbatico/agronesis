@@ -5,25 +5,29 @@ import { cn } from '@/lib/utils'
 
 const PASOS: EstadoLote[] = [
   'ingresado', 'en_clasificacion', 'clasificado',
-  'empaquetado', 'liquidado',
+  'empaquetado', 'en_despacho', 'despachado', 'liquidado',
 ]
 
 interface LoteTimelineProps {
   estadoActual: EstadoLote
 }
 
+// Estados que representan una fase EN PROCESO (reloj ámbar)
+// Los demás estados son terminales de su fase → se muestran como completados (verde)
+const ESTADOS_EN_PROGRESO = new Set<EstadoLote>(['en_clasificacion', 'en_despacho'])
+
 export function LoteTimeline({ estadoActual }: LoteTimelineProps) {
-  const estadoVisual = estadoActual === 'en_despacho' || estadoActual === 'despachado'
-    ? 'empaquetado'
-    : estadoActual
-  const indexActual = PASOS.indexOf(estadoVisual)
+  const indexActual = PASOS.indexOf(estadoActual)
+  const isInProgress = ESTADOS_EN_PROGRESO.has(estadoActual)
 
   return (
     <div className="flex flex-col gap-0">
       {PASOS.map((paso, i) => {
         const esFinal = i === PASOS.length - 1
-        const completado = i < indexActual || (esFinal && i === indexActual)
-        const activo = i === indexActual && !esFinal
+        // completado = paso anterior al actual, O es el paso actual y NO está "en progreso"
+        const completado = i < indexActual || (i === indexActual && (!isInProgress || esFinal))
+        // activo = es el paso actual Y está en progreso Y no es el final
+        const activo = i === indexActual && isInProgress && !esFinal
         const { label } = ESTADO_LOTE_CONFIG[paso]
 
         return (

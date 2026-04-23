@@ -53,6 +53,21 @@ export async function createPlanillaQuincenal(
   return planData as PlanillaQuincenal
 }
 
+export async function actualizarEstadoPlanilla(
+  id: string,
+  estado: 'borrador' | 'confirmada' | 'pagada'
+): Promise<PlanillaQuincenal> {
+  const { data, error } = await supabase
+    .from('planillas_quincenales')
+    .update({ estado, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('*')
+    .single()
+
+  if (error) throw new Error(error.message)
+  return data as PlanillaQuincenal
+}
+
 export async function pagarPlanilla(id: string): Promise<void> {
   const { error } = await supabase
     .from('planillas_quincenales')
@@ -60,6 +75,36 @@ export async function pagarPlanilla(id: string): Promise<void> {
     .eq('id', id)
 
   if (error) throw new Error(error.message)
+}
+
+/**
+ * Retorna los colaborador_id que ya aparecen en planillas cuyo período
+ * se solapa con [fechaInicio, fechaFin], para evitar doble conteo.
+ */
+export async function getColaboradoresYaLiquidados(
+  fechaInicio: string,
+  fechaFin: string
+): Promise<Set<string>> {
+  // Planillas con rango solapado: periodo_fin >= fechaInicio AND periodo_inicio <= fechaFin
+  const { data: planillas, error: errP } = await supabase
+    .from('planillas_quincenales')
+    .select('id')
+    .lte('periodo_inicio', fechaFin)
+    .gte('periodo_fin', fechaInicio)
+
+  if (errP) throw new Error(errP.message)
+  if (!planillas || planillas.length === 0) return new Set()
+
+  const ids = planillas.map((p) => p.id)
+
+  const { data: detalles, error: errD } = await supabase
+    .from('planilla_detalles')
+    .select('colaborador_id')
+    .in('planilla_id', ids)
+
+  if (errD) throw new Error(errD.message)
+
+  return new Set((detalles ?? []).map((d) => d.colaborador_id as string))
 }
 
 // ─── Resumen por colaborador para pre-llenar planilla ─────────────────────────
@@ -73,12 +118,15 @@ export interface ResumenColaboradorPeriodo {
   kg_cat1_seleccion: number
   kg_cat2_seleccion: number
   pago_seleccion: number
+  n_cajas_empaquetado: number
+  pago_empaquetado: number
 }
 
 export async function getResumenColaboradoresPeriodo(
   fechaInicio: string,
   fechaFin: string,
-  pagoRecepcionKg = 0.02
+  pagoRecepcionKg = 0.02,
+  pagoEmpaquetadoCaja = 0.32
 ): Promise<ResumenColaboradorPeriodo[]> {
   const mapa = new Map<string, ResumenColaboradorPeriodo>()
 
@@ -105,6 +153,8 @@ export async function getResumenColaboradoresPeriodo(
         kg_cat1_seleccion: 0,
         kg_cat2_seleccion: 0,
         pago_seleccion: 0,
+        n_cajas_empaquetado: 0,
+        pago_empaquetado: 0,
       })
     }
 
@@ -140,6 +190,8 @@ export async function getResumenColaboradoresPeriodo(
           kg_cat1_seleccion: 0,
           kg_cat2_seleccion: 0,
           pago_seleccion: 0,
+          n_cajas_empaquetado: 0,
+          pago_empaquetado: 0,
         })
       }
       const entry = mapa.get(cid)!
@@ -158,5 +210,43 @@ export async function getResumenColaboradoresPeriodo(
     entry.pago_recepcion = Math.round(entry.kg_bruto_recepcion * pagoRecepcionKg * 100) / 100
   })
 
-  return Array.from(mapa.values())
+  // 2. Empaquetado del período — lotes despachados con fecha_empaquetado en el rango
+  const { data: empaquetados, error: errEmp } = await supabase
+    .from('empaquetados')
+    .select('colaborador_id, num_cajas, colaborador:colaboradores(nombre, apellido), lote:lotes(estado)')
+    .not('colaborador_id', 'is', null)
+    .gte('fecha_empaquetado', fechaInicio)
+    .lte('fecha_empaquetado', fechaFin)
+  if (errEmp) throw new Error(errEmp.message)
+
+  for (const row of (empaquetados ?? []) as any[]) {
+    const cid = row.colaborador_id as string | null
+    if (!cid) continue
+    if (!mapa.has(cid)) {
+      mapa.set(cid, {
+        colaborador_id: cid,
+        nombre: row.colaborador?.nombre ?? '',
+        apellido: row.colaborador?.apellido ?? '',
+        kg_bruto_recepcion: 0,
+        pago_recepcion: 0,
+        kg_cat1_seleccion: 0,
+        kg_cat2_seleccion: 0,
+        pago_seleccion: 0,
+        n_cajas_empaquetado: 0,
+        pago_empaquetado: 0,
+      })
+    }
+    const entry = mapa.get(cid)!
+    entry.n_cajas_empaquetado += row.num_cajas ?? 0
+  }
+
+  mapa.forEach((entry) => {
+    entry.n_cajas_empaquetado = Math.round(entry.n_cajas_empaquetado)
+    entry.pago_empaquetado = Math.round(entry.n_cajas_empaquetado * pagoEmpaquetadoCaja * 100) / 100
+  })
+
+  return Array.from(mapa.values()).sort((a, b) =>
+    a.apellido.localeCompare(b.apellido) || a.nombre.localeCompare(b.nombre)
+  )
 }
+

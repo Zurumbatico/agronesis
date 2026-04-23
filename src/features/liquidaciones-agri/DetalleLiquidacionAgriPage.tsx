@@ -9,10 +9,13 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useAuthStore } from '@/store/auth.store'
+import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 import { formatFecha, formatMoneda, formatPeso } from '@/utils/formatters'
 import type { LiquidacionAgri } from '@/types/models'
 
 export default function DetalleLiquidacionAgriPage() {
+  const roles = useAuthStore((state) => state.roles)
   const { id } = useParams<{ id: string }>()
   const [liquidacion, setLiquidacion] = useState<LiquidacionAgri | null>(null)
   const [loading, setLoading] = useState(true)
@@ -57,6 +60,7 @@ export default function DetalleLiquidacionAgriPage() {
 
   const agri = liquidacion.agricultor as any
   const detalles = (liquidacion.detalles as any[]) ?? []
+  const puedePagar = hasPermission(roles, APP_PERMISSIONS.LIQUIDACIONES_AGRI_PAY)
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -71,9 +75,15 @@ export default function DetalleLiquidacionAgriPage() {
               </Button>
             )}
             {liquidacion.estado === 'confirmada' && (
-              <Button disabled={cambiando} onClick={() => setAccionPendiente('pagada')}>
-                Marcar pagada
-              </Button>
+              puedePagar ? (
+                <Button disabled={cambiando} onClick={() => setAccionPendiente('pagada')}>
+                  Marcar pagada
+                </Button>
+              ) : (
+                <Button disabled variant="secondary">
+                  Pago solo admin
+                </Button>
+              )
             )}
             <EstadoLiquidacionBadge estado={liquidacion.estado} />
           </div>
@@ -150,7 +160,14 @@ export default function DetalleLiquidacionAgriPage() {
         confirmLabel={accionPendiente === 'pagada' ? 'Sí, marcar pagada' : 'Sí, confirmar'}
         variant={accionPendiente === 'pagada' ? 'default' : 'default'}
         loading={cambiando}
-        onConfirm={() => { cambiarEstado(accionPendiente!); setAccionPendiente(null) }}
+        onConfirm={() => {
+          if (accionPendiente === 'pagada' && !puedePagar) {
+            setAccionPendiente(null)
+            return
+          }
+          void cambiarEstado(accionPendiente!)
+          setAccionPendiente(null)
+        }}
         onCancel={() => setAccionPendiente(null)}
       />
     </div>

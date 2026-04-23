@@ -5,6 +5,9 @@ export const APP_PERMISSIONS = {
   DASHBOARD_VIEW: 'dashboard.view',
   MAESTROS_MANAGE: 'maestros.manage',
   CONFIG_PRECIOS_MANAGE: 'config_precios.manage',
+  CONFIG_PARAMETROS_MANAGE: 'config_parametros.manage',
+  LIQUIDACIONES_AGRI_PAY: 'liquidaciones_agri.pay',
+  PLANILLAS_PAY: 'planillas.pay',
   AGRICULTORES_VIEW: 'agricultores.view',
   AGRICULTORES_MANAGE: 'agricultores.manage',
   LOTES_VIEW: 'lotes.view',
@@ -27,6 +30,7 @@ const ROLE_PERMISSIONS: Record<string, AppPermission[]> = {
   [APP_ROLES.ADMINISTRADOR_PLANTA]: [
     APP_PERMISSIONS.DASHBOARD_VIEW,
     APP_PERMISSIONS.AGRICULTORES_VIEW,
+    APP_PERMISSIONS.CONFIG_PRECIOS_MANAGE,
     APP_PERMISSIONS.LOTES_VIEW,
     APP_PERMISSIONS.LOTES_CREATE,
     APP_PERMISSIONS.LOTES_DELETE,
@@ -85,6 +89,7 @@ const ROUTE_PERMISSIONS: Record<string, AppPermission> = {
   [ROUTES.PLANILLAS]: APP_PERMISSIONS.DASHBOARD_VIEW,
   [ROUTES.TAREO]: APP_PERMISSIONS.DASHBOARD_VIEW,
   [ROUTES.CONFIG_PRECIOS]: APP_PERMISSIONS.CONFIG_PRECIOS_MANAGE,
+  [ROUTES.CONFIG_PARAMETROS]: APP_PERMISSIONS.CONFIG_PARAMETROS_MANAGE,
 }
 
 export function hasPermission(roles: AppRole[], permission: AppPermission): boolean {

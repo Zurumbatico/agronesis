@@ -7,7 +7,7 @@ const TABLE = 'empaquetados' as const
 export async function getEmpaquetadosPorLote(loteId: string): Promise<Empaquetado[]> {
   const { data, error } = await supabase
     .from(TABLE)
-    .select('*')
+    .select('*, colaborador:colaboradores(id, nombre, apellido)')
     .eq('lote_id', loteId)
     .order('fecha_empaquetado', { ascending: false })
     .order('created_at', { ascending: false })

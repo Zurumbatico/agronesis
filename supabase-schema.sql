@@ -429,7 +429,7 @@ create table if not exists public.lotes (
   jabas_prestadas integer not null default 0,
   codigo_lote_agricultor text null,
   observaciones text null,
-  estado text not null default 'ingresado' check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'en_despacho', 'despachado', 'liquidado'))
+  estado text not null default 'ingresado' check (estado in ('ingresado', 'en_clasificacion', 'clasificado', 'empaquetado', 'en_despacho', 'despachado', 'liquidado'))
 );
 
 alter table public.lotes alter column codigo set default public.generate_lote_codigo();
@@ -542,6 +542,7 @@ create table if not exists public.empaquetados (
   updated_at timestamptz not null default now(),
   created_by uuid not null references auth.users(id) on delete restrict,
   lote_id uuid not null references public.lotes(id) on delete cascade,
+  colaborador_id uuid null references public.colaboradores(id) on delete set null,
   fecha_empaquetado date not null,
   destino text not null default 'europa' check (destino in ('europa', 'usa')),
   codigo_trazabilidad text not null,
@@ -549,6 +550,8 @@ create table if not exists public.empaquetados (
   num_cajas integer not null check (num_cajas > 0),
   observaciones text null
 );
+
+alter table public.empaquetados add column if not exists colaborador_id uuid null references public.colaboradores(id) on delete set null;
 
 alter table public.empaquetados drop constraint if exists empaquetados_destino_check;
 
@@ -1099,10 +1102,20 @@ create table if not exists public.planillas_quincenales (
   periodo_inicio date not null,
   periodo_fin date not null,
   total_monto numeric(12,2) not null default 0 check (total_monto >= 0),
-  estado text not null default 'pendiente' check (estado in ('pendiente', 'pagada')),
+  estado text not null default 'borrador' check (estado in ('borrador', 'confirmada', 'pagada')),
   observaciones text null,
   constraint uq_planilla_periodo unique (periodo_inicio, periodo_fin)
 );
+
+update public.planillas_quincenales
+set estado = 'confirmada'
+where estado = 'pendiente';
+
+alter table public.planillas_quincenales drop constraint if exists planillas_quincenales_estado_check;
+alter table public.planillas_quincenales drop constraint if exists planillas_quincenales_estado_check1;
+alter table public.planillas_quincenales alter column estado set default 'borrador';
+alter table public.planillas_quincenales add constraint planillas_quincenales_estado_check
+  check (estado in ('borrador', 'confirmada', 'pagada'));
 
 drop trigger if exists trg_planillas_quincenales_updated_at on public.planillas_quincenales;
 create trigger trg_planillas_quincenales_updated_at before update on public.planillas_quincenales for each row execute function public.set_updated_at();

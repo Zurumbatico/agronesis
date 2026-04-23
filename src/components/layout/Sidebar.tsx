@@ -2,7 +2,7 @@ import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Package, Warehouse,
-  Layers, Receipt, Truck,
+  Layers, Receipt, Truck, Settings,
   LogOut, ChevronLeft, Leaf, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -38,7 +38,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Planilla Quincenal', href: ROUTES.PLANILLAS,             icon: Receipt,       group: 'Liquidaciones' },
   { label: 'Tareo Diario',       href: ROUTES.TAREO,                 icon: Receipt,       group: 'Liquidaciones' },
   // Admin
-  { label: 'Config. Precios',    href: ROUTES.CONFIG_PRECIOS,        icon: Receipt,       group: 'Admin' },
+  { label: 'Precios por Semana',  href: ROUTES.CONFIG_PRECIOS,        icon: Receipt,       group: 'Admin' },
+  { label: 'Parámetros Sistema',  href: ROUTES.CONFIG_PARAMETROS,     icon: Settings,      group: 'Admin' },
 ]
 
 // Agrupar ítems

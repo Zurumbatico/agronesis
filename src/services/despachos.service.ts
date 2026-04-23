@@ -124,6 +124,53 @@ export async function getPalletsDisponiblesParaDespacho(despachoId?: string): Pr
   })
 }
 
+// ─────────────────────────────────────────────
+// Estado automático de lotes según despacho
+// ─────────────────────────────────────────────
+
+/**
+ * Para cada lote_id dado, compara sus pallets empaquetados con los pallets
+ * incluidos en cualquier despacho. Si TODOS los pallets del lote están
+ * despachados → estado 'despachado'. Si sólo algunos → 'en_despacho'.
+ * No modifica lotes en estado 'liquidado' u otros estados anteriores.
+ */
+async function verificarYActualizarEstadoLotes(loteIds: string[]): Promise<void> {
+  if (loteIds.length === 0) return
+
+  const [empResult, despResult] = await Promise.all([
+    supabase.from('empaquetados').select('lote_id, numero_pallet').in('lote_id', loteIds),
+    supabase.from(TABLE_PALLETS).select('lote_id, numero_pallet').in('lote_id', loteIds),
+  ])
+
+  if (empResult.error) throw new Error(empResult.error.message)
+  if (despResult.error) throw new Error(despResult.error.message)
+
+  const palletsEmp: Record<string, Set<string>> = {}
+  for (const row of empResult.data ?? []) {
+    if (!palletsEmp[row.lote_id]) palletsEmp[row.lote_id] = new Set()
+    palletsEmp[row.lote_id].add(normalizarNumeroPallet(row.numero_pallet ?? ''))
+  }
+
+  const palletsDes: Record<string, Set<string>> = {}
+  for (const row of despResult.data ?? []) {
+    if (!palletsDes[row.lote_id]) palletsDes[row.lote_id] = new Set()
+    palletsDes[row.lote_id].add(normalizarNumeroPallet(row.numero_pallet ?? ''))
+  }
+
+  for (const loteId of loteIds) {
+    const emp = palletsEmp[loteId] ?? new Set<string>()
+    const des = palletsDes[loteId] ?? new Set<string>()
+    const todosEnDespacho = emp.size > 0 && [...emp].every(p => des.has(p))
+    const nuevoEstado = todosEnDespacho ? 'despachado' : 'en_despacho'
+
+    await supabase
+      .from('lotes')
+      .update({ estado: nuevoEstado, updated_at: new Date().toISOString() })
+      .eq('id', loteId)
+      .in('estado', ['en_despacho', 'despachado'])
+  }
+}
+
 export async function createDespacho(
   input: DespachoInsert,
   pallets: Array<Pick<DespachoPallet, 'lote_id' | 'numero_pallet' | 'num_cajas'>>,
@@ -156,6 +203,7 @@ export async function createDespacho(
     if (palletsError) throw new Error(palletsError.message)
   }
 
+  await verificarYActualizarEstadoLotes(lotes.filter(Boolean) as string[])
   return getDespacho(despachoId)
 }
 
@@ -187,6 +235,13 @@ export async function updateDespachoCompleto(
 
   if (despachoError) throw new Error(despachoError.message)
 
+  // Capture old lote_ids before replacing pallets (needed to revert state if removed)
+  const { data: oldPalletsData } = await supabase
+    .from(TABLE_PALLETS)
+    .select('lote_id')
+    .eq('despacho_id', id)
+  const oldLoteIds = Array.from(new Set((oldPalletsData ?? []).map((r: { lote_id: string }) => r.lote_id)))
+
   const { error: deleteError } = await supabase
     .from(TABLE_PALLETS)
     .delete()
@@ -206,10 +261,19 @@ export async function updateDespachoCompleto(
 
   if (palletsError) throw new Error(palletsError.message)
 
+  const allLoteIds = Array.from(new Set([...oldLoteIds, ...lotes]))
+  await verificarYActualizarEstadoLotes(allLoteIds)
   return getDespacho(id)
 }
 
 export async function deleteDespacho(id: string): Promise<void> {
+  // Capture lote_ids before deleting so we can revert their state
+  const { data: palletsData } = await supabase
+    .from(TABLE_PALLETS)
+    .select('lote_id')
+    .eq('despacho_id', id)
+  const loteIds = Array.from(new Set((palletsData ?? []).map((r: { lote_id: string }) => r.lote_id)))
+
   const { error: palletsError } = await supabase
     .from(TABLE_PALLETS)
     .delete()
@@ -223,6 +287,9 @@ export async function deleteDespacho(id: string): Promise<void> {
     .eq('id', id)
 
   if (error) throw new Error(error.message)
+
+  // After deletion, recheck states — removed pallets may un-dispatch lotes
+  await verificarYActualizarEstadoLotes(loteIds)
 }
 
 // ─────────────────────────────────────────────

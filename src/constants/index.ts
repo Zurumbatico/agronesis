@@ -11,8 +11,8 @@ export const ESTADO_LOTE_CONFIG = {
   en_clasificacion: { label: 'Clasificando',          color: 'bg-yellow-100 text-yellow-800' },
   clasificado:      { label: 'Clasificado',           color: 'bg-purple-100 text-purple-800' },
   empaquetado:      { label: 'Empaquetado',           color: 'bg-indigo-100 text-indigo-800' },
-  en_despacho:      { label: 'En Despacho',           color: 'bg-orange-100 text-orange-800' },
-  despachado:       { label: 'Despachado',            color: 'bg-green-100 text-green-800' },
+  en_despacho:      { label: 'Por Despachar',         color: 'bg-orange-100 text-orange-800' },
+  despachado:       { label: 'Despachado',             color: 'bg-green-100 text-green-800' },
   liquidado:        { label: 'Liquidado',             color: 'bg-gray-100 text-gray-700' },
 } as const
 
@@ -108,6 +108,7 @@ export const ROUTES = {
   DESPACHOS_DETALLE:        '/despachos/:id',
   DESPACHOS_EDITAR:         '/despachos/:id/editar',
   CONFIG_PRECIOS:           '/admin/config-precios',
+  CONFIG_PARAMETROS:        '/admin/config-parametros',
 } as const
 
 // Controla módulos habilitados en UI/ruteo.

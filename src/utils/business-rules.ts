@@ -19,6 +19,8 @@ export const PRECIO_SELECCION_CAT1 = 0.20
 export const PRECIO_SELECCION_CAT2 = 0.28
 /** Tarifa de pago al empacador por caja completada (S/ 0.32/caja) */
 export const PRECIO_EMPAQUE_CAJA = 0.32
+/** Valor por defecto configurable para pago al empaquetador por caja (S/ 0.32/caja) */
+export const DEFAULT_PAGO_EMPAQUETADO_CAJA = 0.32
 /** Tarifa de pago al recepcionista por kg bruto recepcionado (S/ 0.02/kg) */
 export const DEFAULT_PAGO_RECEPCION_KG = 0.02
 

@@ -98,3 +98,29 @@ export async function pagarLiquidacionAgri(id: string): Promise<LiquidacionAgri>
   if (error) throw new Error(error.message)
   return data as unknown as LiquidacionAgri
 }
+
+/**
+ * Retorna el conjunto de lote_ids que ya están referenciados en alguna
+ * liquidación del agricultor (en cualquier estado: borrador, confirmada, pagada).
+ * Sirve para impedir que el mismo lote sea liquidado dos veces.
+ */
+export async function getLoteIdsEnLiquidacionAgri(agricultorId: string): Promise<Set<string>> {
+  const { data: liquidaciones, error: errLiq } = await supabase
+    .from(TABLE)
+    .select('id')
+    .eq('agricultor_id', agricultorId)
+
+  if (errLiq) throw new Error(errLiq.message)
+  if (!liquidaciones || liquidaciones.length === 0) return new Set()
+
+  const ids = liquidaciones.map((l) => l.id)
+
+  const { data: detalles, error: errDet } = await supabase
+    .from('liquidacion_agri_detalle')
+    .select('lote_id')
+    .in('liquidacion_id', ids)
+
+  if (errDet) throw new Error(errDet.message)
+
+  return new Set((detalles ?? []).map((d) => d.lote_id as string))
+}

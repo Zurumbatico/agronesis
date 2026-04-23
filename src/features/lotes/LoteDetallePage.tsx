@@ -482,6 +482,12 @@ export default function LoteDetallePage() {
                               <span>{item.num_cajas} cajas</span>
                               <span className="text-foreground font-medium uppercase">{item.destino}</span>
                             </div>
+                            {item.colaborador && (
+                              <p className="text-xs mt-0.5">
+                                <span className="text-muted-foreground">Empaquetador: </span>
+                                <span className="font-medium text-indigo-700">{item.colaborador.apellido}, {item.colaborador.nombre}</span>
+                              </p>
+                            )}
                             <p className="font-mono text-xs text-muted-foreground mt-0.5">Traz.: {item.codigo_trazabilidad}</p>
                           </div>
                           {canPrintLoteLabels && (

@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { Printer, Trash2 } from 'lucide-react'
 import { getLote, actualizarEstadoLote } from '@/services/lotes.service'
 import { getClasificacionesPorLote } from '@/services/clasificaciones.service'
+import { getColaboradores } from '@/services/colaboradores.service'
 import {
   createEmpaquetado,
   deleteEmpaquetado,
@@ -17,6 +18,7 @@ import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { ColaboradorPicker } from '@/components/shared/ColaboradorPicker'
 import { FormField } from '@/components/shared/FormField'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +30,7 @@ import { empaquetadoSchema, type EmpaquetadoFormData } from '@/utils/validators'
 import { formatFecha } from '@/utils/formatters'
 import { CAJAS_POR_PALLET, calcularCajasExportables, calcularPesoTotalClasificado, DEFAULT_PESO_CAJA_EXPORTACION_KG, normalizarNumeroPallet } from '@/utils/business-rules'
 import { getTraceabilityCodeForDate, printEmpaquetadoLabel } from './printDespachoLabel'
-import type { Clasificacion, Empaquetado, Lote } from '@/types/models'
+import type { Clasificacion, Colaborador, Empaquetado, Lote } from '@/types/models'
 
 const DESTINO_LABELS = {
   europa: 'Europa',
@@ -50,11 +52,13 @@ export default function EmpaquetarLotePage() {
   const [finalizando, setFinalizando] = useState(false)
   const [confirmarFinalizar, setConfirmarFinalizar] = useState(false)
   const [labelEmpaquetado, setLabelEmpaquetado] = useState<Empaquetado | null>(null)
+  const [empaquetadores, setEmpaquetadores] = useState<Colaborador[]>([])
 
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors, isSubmitting } } = useForm<EmpaquetadoFormData>({
     resolver: zodResolver(empaquetadoSchema) as never,
     defaultValues: {
       lote_id: id ?? '',
+      colaborador_id: null,
       fecha_empaquetado: format(new Date(), 'yyyy-MM-dd'),
       destino: 'europa',
       codigo_trazabilidad: '',
@@ -72,18 +76,20 @@ export default function EmpaquetarLotePage() {
     if (!id) return
     setLoading(true)
     try {
-      const [l, cls, emp, pallets, pesoCajaConfigurado] = await Promise.all([
+      const [l, cls, emp, pallets, pesoCajaConfigurado, colabs] = await Promise.all([
         getLote(id),
         getClasificacionesPorLote(id),
         getEmpaquetadosPorLote(id),
         getResumenPalletsEmpaquetado(id),
         getValorNumericoSistema(CLAVE_PESO_CAJA_EXPORTACION, DEFAULT_PESO_CAJA_EXPORTACION_KG),
+        getColaboradores(),
       ])
       setLote(l)
       setClasificaciones(cls)
       setEmpaquetados(emp)
       setResumenPallets(pallets)
       setPesoCajaExportacionKg(pesoCajaConfigurado)
+      setEmpaquetadores(colabs.filter((c) => c.rol === 'empaquetador'))
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -132,6 +138,7 @@ export default function EmpaquetarLotePage() {
       numero_pallet: numeroPalletNormalizado,
       codigo_trazabilidad: getTraceabilityCodeForDate(lote, data.fecha_empaquetado),
       lote_id: id,
+      colaborador_id: data.colaborador_id ?? null,
       observaciones: data.observaciones || null,
     }, user.id)
 
@@ -150,6 +157,7 @@ export default function EmpaquetarLotePage() {
 
     reset({
       lote_id: id,
+      colaborador_id: null,
       fecha_empaquetado: format(new Date(), 'yyyy-MM-dd'),
       destino: 'europa',
       codigo_trazabilidad: getTraceabilityCodeForDate(lote, format(new Date(), 'yyyy-MM-dd')),
@@ -222,13 +230,24 @@ export default function EmpaquetarLotePage() {
           </CardContent>
         </Card>
 
-        {puedeEditar && (
+        {puedeEditar && cajasPendientes > 0 && (
           <Card className="mb-4">
             <CardHeader><CardTitle className="text-base">Registrar empaquetado</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit(onSubmit as never)} className="flex flex-col gap-4">
                 <Input type="hidden" {...register('lote_id')} value={id} />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField label="Empaquetador" error={errors.colaborador_id?.message}>
+                    <Controller name="colaborador_id" control={control} render={({ field }) => (
+                      <ColaboradorPicker
+                        value={field.value ?? ''}
+                        onChange={(v) => field.onChange(v || null)}
+                        colaboradores={empaquetadores}
+                        placeholder="Seleccionar empaquetador..."
+                      />
+                    )} />
+                  </FormField>
+
                   <FormField label="Fecha de empaquetado" error={errors.fecha_empaquetado?.message} required>
                     <Input type="date" {...register('fecha_empaquetado')} />
                   </FormField>
@@ -278,6 +297,12 @@ export default function EmpaquetarLotePage() {
           </Card>
         )}
 
+        {puedeEditar && cajasPendientes === 0 && empaquetados.length > 0 && (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 font-medium">
+            Todas las cajas han sido empaquetadas ({totalCajasEmpaquetadas} / {totalCajasExportables}). Puedes confirmar el empaquetado para pasar al despacho.
+          </div>
+        )}
+
         {empaquetados.length > 0 && (
           <Card className="mb-4">
             <CardHeader><CardTitle className="text-base">Registros de empaquetado</CardTitle></CardHeader>
@@ -295,6 +320,15 @@ export default function EmpaquetarLotePage() {
                           <span className="text-indigo-700 font-medium">{item.num_cajas} cajas</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">Destino: {DESTINO_LABELS[item.destino]} · Acumulado del pallet: {acumuladoPallet} / {CAJAS_POR_PALLET}</p>
+                        {item.colaborador_id && (() => {
+                          const emp = empaquetadores.find((c) => c.id === item.colaborador_id)
+                          return emp ? (
+                            <p className="text-xs mt-1">
+                              <span className="text-muted-foreground">Empaquetador: </span>
+                              <span className="font-medium text-indigo-700">{emp.apellido}, {emp.nombre}</span>
+                            </p>
+                          ) : null
+                        })()}
                         <p className="font-mono text-xs text-muted-foreground mt-1">Traz.: {item.codigo_trazabilidad}</p>
                         {item.observaciones && <p className="text-xs text-muted-foreground mt-1">{item.observaciones}</p>}
                       </div>

@@ -25,6 +25,7 @@ import NuevaLiquidacionAgriPage from '@/features/liquidaciones-agri/NuevaLiquida
 import DetalleLiquidacionAgriPage from '@/features/liquidaciones-agri/DetalleLiquidacionAgriPage.tsx'
 import CubetasPage from '@/features/cubetas/CubetasPage.tsx'
 import ConfigPreciosPage from '@/features/admin/ConfigPreciosPage'
+import ConfigParametrosPage from '@/features/admin/ConfigParametrosPage'
 import PlanillasPage from '@/features/planillas/PlanillasPage'
 import TareoDiarioPage from '@/features/tareo/TareoDiarioPage'
 
@@ -70,6 +71,7 @@ export default function App() {
             <Route path={ROUTES.PLANILLAS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><PlanillasPage /></ProtectedRoute>} />
             <Route path={ROUTES.TAREO} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><TareoDiarioPage /></ProtectedRoute>} />
             <Route path={ROUTES.CONFIG_PRECIOS} element={<ProtectedRoute permission={APP_PERMISSIONS.CONFIG_PRECIOS_MANAGE}><ConfigPreciosPage /></ProtectedRoute>} />
+            <Route path={ROUTES.CONFIG_PARAMETROS} element={<ProtectedRoute permission={APP_PERMISSIONS.CONFIG_PARAMETROS_MANAGE}><ConfigParametrosPage /></ProtectedRoute>} />
           </Route>
         </Route>
 

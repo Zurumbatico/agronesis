@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { createLiquidacionAgri } from '@/services/liquidaciones-agri.service'
+import { createLiquidacionAgri, getLoteIdsEnLiquidacionAgri } from '@/services/liquidaciones-agri.service'
 import { getClasificacionesPorLote } from '@/services/clasificaciones.service'
 import { getConfigPrecios } from '@/services/config-precios.service'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -53,6 +53,7 @@ export default function NuevaLiquidacionAgriPage() {
   const { lotes } = useLotes()
   const [clasificacionesPorLote, setClasificacionesPorLote] = useState<Record<string, Clasificacion[]>>({})
   const [cargandoClasif, setCargandoClasif] = useState(false)
+  const [loteIdsYaLiquidados, setLoteIdsYaLiquidados] = useState<Set<string>>(new Set())
   const [configPrecios, setConfigPrecios] = useState<ConfigPrecio[]>([])
 
   useEffect(() => {
@@ -89,8 +90,12 @@ export default function NuevaLiquidacionAgriPage() {
   const agricultorSeleccionado = agricultoresActivos.find((a) => a.id === agricultorId) ?? null
   // Los lotes son liquidables desde 'clasificado' en adelante.
   // Excluimos 'liquidado' para evitar re-liquidaciones de lotes ya pagados.
+  // También excluimos lotes ya presentes en cualquier liquidación previa del agricultor.
   const lotesDelAgricultor = agricultorId
-    ? lotes.filter((l) => l.agricultor_id === agricultorId && ESTADOS_LOTE_LIQUIDABLES.has(l.estado))
+    ? lotes.filter((l) => l.agricultor_id === agricultorId && ESTADOS_LOTE_LIQUIDABLES.has(l.estado) && !loteIdsYaLiquidados.has(l.id))
+    : []
+  const lotesExcluidos = agricultorId
+    ? lotes.filter((l) => l.agricultor_id === agricultorId && ESTADOS_LOTE_LIQUIDABLES.has(l.estado) && loteIdsYaLiquidados.has(l.id))
     : []
 
   const cargarClasificaciones = async () => {
@@ -112,6 +117,7 @@ export default function NuevaLiquidacionAgriPage() {
     if (prevAgricultorRef[0] !== undefined && prevAgricultorRef[0] !== agricultorId) {
       setValue('detalles', [])
       setClasificacionesPorLote({})
+      setLoteIdsYaLiquidados(new Set())
     }
     prevAgricultorRef[0] = agricultorId
   }, [agricultorId])
@@ -119,6 +125,7 @@ export default function NuevaLiquidacionAgriPage() {
   useEffect(() => {
     if (agricultorId && lotes.length > 0) {
       cargarClasificaciones()
+      getLoteIdsEnLiquidacionAgri(agricultorId).then(setLoteIdsYaLiquidados).catch(() => {})
     }
   }, [agricultorId, lotes.length])
 
@@ -250,16 +257,30 @@ export default function NuevaLiquidacionAgriPage() {
         </Card>
 
         {/* Lotes disponibles */}
-        {agricultorId && lotesDelAgricultor.length > 0 && (
+        {agricultorId && (lotesDelAgricultor.length > 0 || lotesExcluidos.length > 0) && (
           <Card>
             <CardHeader><CardTitle className="text-base">Lotes disponibles</CardTitle></CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
+            <CardContent className="flex flex-col gap-3">
               {cargandoClasif ? <p className="text-sm text-muted-foreground">Cargando clasificaciones...</p> :
-                lotesDelAgricultor.map((l) => (
-                  <Button key={l.id} type="button" variant="outline" size="sm" onClick={() => agregarDetalleLote(l.id)}>
-                    {l.codigo}
-                  </Button>
-                ))
+                <>
+                  {lotesDelAgricultor.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {lotesDelAgricultor.map((l) => (
+                        <Button key={l.id} type="button" variant="outline" size="sm" onClick={() => agregarDetalleLote(l.id)}>
+                          {l.codigo}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  {lotesExcluidos.length > 0 && (
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                      {lotesExcluidos.length} lote{lotesExcluidos.length > 1 ? 's' : ''} excluido{lotesExcluidos.length > 1 ? 's' : ''} ({lotesExcluidos.map((l) => l.codigo).join(', ')}) — ya están en una liquidación previa
+                    </p>
+                  )}
+                  {lotesDelAgricultor.length === 0 && lotesExcluidos.length > 0 && (
+                    <p className="text-sm text-muted-foreground">No hay lotes disponibles sin liquidar para este agricultor.</p>
+                  )}
+                </>
               }
             </CardContent>
           </Card>
