@@ -65,10 +65,10 @@ export default function App() {
               path={ROUTES.CUBETAS}
               element={ENABLED_MODULES.CUBETAS ? <ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><CubetasPage /></ProtectedRoute> : <Navigate to={ROUTES.DASHBOARD} replace />}
             />
-            <Route path={ROUTES.LIQUIDACIONES_AGRI} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><LiquidacionesAgriPage /></ProtectedRoute>} />
-            <Route path={ROUTES.LIQUIDACIONES_AGRI_NUEVA} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><NuevaLiquidacionAgriPage /></ProtectedRoute>} />
-            <Route path={ROUTES.LIQUIDACIONES_AGRI_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><DetalleLiquidacionAgriPage /></ProtectedRoute>} />
-            <Route path={ROUTES.PLANILLAS} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><PlanillasPage /></ProtectedRoute>} />
+            <Route path={ROUTES.LIQUIDACIONES_AGRI} element={<ProtectedRoute permission={APP_PERMISSIONS.LIQUIDACIONES_AGRI_VIEW}><LiquidacionesAgriPage /></ProtectedRoute>} />
+            <Route path={ROUTES.LIQUIDACIONES_AGRI_NUEVA} element={<ProtectedRoute permission={APP_PERMISSIONS.LIQUIDACIONES_AGRI_VIEW}><NuevaLiquidacionAgriPage /></ProtectedRoute>} />
+            <Route path={ROUTES.LIQUIDACIONES_AGRI_DETALLE} element={<ProtectedRoute permission={APP_PERMISSIONS.LIQUIDACIONES_AGRI_VIEW}><DetalleLiquidacionAgriPage /></ProtectedRoute>} />
+            <Route path={ROUTES.PLANILLAS} element={<ProtectedRoute permission={APP_PERMISSIONS.PLANILLAS_VIEW}><PlanillasPage /></ProtectedRoute>} />
             <Route path={ROUTES.TAREO} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><TareoDiarioPage /></ProtectedRoute>} />
             <Route path={ROUTES.CONFIG_PRECIOS} element={<ProtectedRoute permission={APP_PERMISSIONS.CONFIG_PRECIOS_MANAGE}><ConfigPreciosPage /></ProtectedRoute>} />
             <Route path={ROUTES.CONFIG_PARAMETROS} element={<ProtectedRoute permission={APP_PERMISSIONS.CONFIG_PARAMETROS_MANAGE}><ConfigParametrosPage /></ProtectedRoute>} />

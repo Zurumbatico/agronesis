@@ -635,8 +635,18 @@ create table if not exists public.liquidaciones_agri (
   total_monto numeric(12,2) not null default 0,
   estado text not null default 'borrador' check (estado in ('borrador', 'confirmada', 'pagada')),
   observaciones text null,
+  fecha_pago date null,
+  numero_operacion text null,
+  modalidad_pago text null check (modalidad_pago in ('transferencia', 'yape_plin', 'efectivo')),
   numero_senasa text null
 );
+
+alter table public.liquidaciones_agri add column if not exists fecha_pago date null;
+alter table public.liquidaciones_agri add column if not exists numero_operacion text null;
+alter table public.liquidaciones_agri add column if not exists modalidad_pago text null;
+alter table public.liquidaciones_agri drop constraint if exists liquidaciones_agri_modalidad_pago_check;
+alter table public.liquidaciones_agri add constraint liquidaciones_agri_modalidad_pago_check
+  check (modalidad_pago is null or modalidad_pago in ('transferencia', 'yape_plin', 'efectivo'));
 
 create table if not exists public.liquidacion_agri_detalle (
   id uuid primary key default gen_random_uuid(),
@@ -1104,8 +1114,18 @@ create table if not exists public.planillas_quincenales (
   total_monto numeric(12,2) not null default 0 check (total_monto >= 0),
   estado text not null default 'borrador' check (estado in ('borrador', 'confirmada', 'pagada')),
   observaciones text null,
+  fecha_pago date null,
+  numero_operacion text null,
+  modalidad_pago text null check (modalidad_pago in ('transferencia', 'yape_plin', 'efectivo')),
   constraint uq_planilla_periodo unique (periodo_inicio, periodo_fin)
 );
+
+alter table public.planillas_quincenales add column if not exists fecha_pago date null;
+alter table public.planillas_quincenales add column if not exists numero_operacion text null;
+alter table public.planillas_quincenales add column if not exists modalidad_pago text null;
+alter table public.planillas_quincenales drop constraint if exists planillas_quincenales_modalidad_pago_check;
+alter table public.planillas_quincenales add constraint planillas_quincenales_modalidad_pago_check
+  check (modalidad_pago is null or modalidad_pago in ('transferencia', 'yape_plin', 'efectivo'));
 
 update public.planillas_quincenales
 set estado = 'confirmada'

@@ -240,6 +240,7 @@ export type DespachoPalletInsert = Omit<DespachoPallet, keyof BaseEntity | 'lote
 // LIQUIDACIÓN AGRICULTOR
 // ─────────────────────────────────────────────
 export type EstadoLiquidacion = 'borrador' | 'confirmada' | 'pagada'
+export type ModalidadPago = 'transferencia' | 'yape_plin' | 'efectivo'
 
 export interface LiquidacionAgri extends BaseEntity {
   codigo: string
@@ -250,6 +251,9 @@ export interface LiquidacionAgri extends BaseEntity {
   total_monto: number
   estado: EstadoLiquidacion
   observaciones: string | null
+  fecha_pago: string | null
+  numero_operacion: string | null
+  modalidad_pago: ModalidadPago | null
   // relaciones
   agricultor?: Agricultor
   detalles?: LiquidacionAgriDetalle[]
@@ -266,7 +270,11 @@ export interface LiquidacionAgriDetalle extends BaseEntity {
   lote?: Lote
 }
 
-export type LiquidacionAgriInsert = Omit<LiquidacionAgri, keyof BaseEntity | 'agricultor' | 'detalles'>
+export type LiquidacionAgriInsert = Omit<LiquidacionAgri, keyof BaseEntity | 'agricultor' | 'detalles' | 'fecha_pago' | 'numero_operacion' | 'modalidad_pago'> & {
+  fecha_pago?: string | null
+  numero_operacion?: string | null
+  modalidad_pago?: ModalidadPago | null
+}
 export type LiquidacionAgriUpdate = Partial<LiquidacionAgriInsert>
 
 export type LiquidacionAgriDetalleInsert = Omit<LiquidacionAgriDetalle, keyof BaseEntity | 'lote'>
@@ -282,11 +290,18 @@ export interface PlanillaQuincenal extends BaseEntity {
   total_monto: number
   estado: EstadoPlanilla
   observaciones: string | null
+  fecha_pago: string | null
+  numero_operacion: string | null
+  modalidad_pago: ModalidadPago | null
   // relaciones
   detalles?: PlanillaDetalle[]
 }
 
-export type PlanillaQuincenalInsert = Omit<PlanillaQuincenal, keyof BaseEntity | 'detalles'>
+export type PlanillaQuincenalInsert = Omit<PlanillaQuincenal, keyof BaseEntity | 'detalles' | 'fecha_pago' | 'numero_operacion' | 'modalidad_pago'> & {
+  fecha_pago?: string | null
+  numero_operacion?: string | null
+  modalidad_pago?: ModalidadPago | null
+}
 export type PlanillaQuincenalUpdate = Partial<PlanillaQuincenalInsert>
 
 export interface PlanillaDetalle extends BaseEntity {

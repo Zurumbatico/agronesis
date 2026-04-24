@@ -300,6 +300,9 @@ export interface Database {
           total_monto: number
           estado: 'borrador' | 'confirmada' | 'pagada'
           observaciones: string | null
+          fecha_pago: string | null
+          numero_operacion: string | null
+          modalidad_pago: 'transferencia' | 'yape_plin' | 'efectivo' | null
         }
         Insert: Omit<Database['public']['Tables']['liquidaciones_agri']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['liquidaciones_agri']['Insert']>
@@ -419,6 +422,9 @@ export interface Database {
           total_monto: number
           estado: 'borrador' | 'confirmada' | 'pagada'
           observaciones: string | null
+          fecha_pago: string | null
+          numero_operacion: string | null
+          modalidad_pago: 'transferencia' | 'yape_plin' | 'efectivo' | null
         }
         Insert: Omit<Database['public']['Tables']['planillas_quincenales']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['planillas_quincenales']['Insert']>

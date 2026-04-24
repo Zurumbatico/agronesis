@@ -13,6 +13,7 @@ import { CLAVE_PAGO_RECEPCION_KG, CLAVE_PAGO_EMPAQUETADO_CAJA, getValorNumericoS
 import { PageHeader } from '@/components/shared/PageHeader'
 import { FormField } from '@/components/shared/FormField'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { RegistrarPagoDialog, type RegistroPagoPayload } from '@/components/shared/RegistrarPagoDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -27,9 +28,11 @@ import {
 } from '@/components/ui/dialog'
 import { useAuthStore } from '@/store/auth.store'
 import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
+import { APP_ROLES } from '@/types/auth'
 import { formatFecha, formatMoneda } from '@/utils/formatters'
+import { generatePlanillaQuincenalExcel } from '@/utils/planilla-quincenal-excel'
 import { format } from 'date-fns'
-import { Eye } from 'lucide-react'
+import { Eye, Download } from 'lucide-react'
 import type { EstadoPlanilla, PlanillaQuincenal } from '@/types/models'
 import { DEFAULT_PAGO_RECEPCION_KG, DEFAULT_PAGO_EMPAQUETADO_CAJA } from '@/utils/business-rules'
 
@@ -64,7 +67,11 @@ export default function PlanillasPage() {
   const [pagoEmpaquetadoCaja, setPagoEmpaquetadoCaja] = useState(DEFAULT_PAGO_EMPAQUETADO_CAJA)
   const [detallePlanilla, setDetallePlanilla] = useState<PlanillaQuincenal | null>(null)
   const [cargandoDetalle, setCargandoDetalle] = useState(false)
-  const [accionPendiente, setAccionPendiente] = useState<{ id: string; estado: 'confirmada' | 'pagada' } | null>(null)
+  const [accionPendiente, setAccionPendiente] = useState<{ id: string; estado: 'confirmada' } | null>(null)
+  const [pagoPendienteId, setPagoPendienteId] = useState<string | null>(null)
+  const [descargandoId, setDescargandoId] = useState<string | null>(null)
+  const [filtroDesde, setFiltroDesde] = useState('')
+  const [filtroHasta, setFiltroHasta] = useState('')
 
   const { register, handleSubmit, watch, reset, control, formState: { errors, isSubmitting } } = useForm<PlanillaForm>({
     defaultValues: {
@@ -79,6 +86,7 @@ export default function PlanillasPage() {
   const watchInicio = watch('periodo_inicio')
   const watchFin = watch('periodo_fin')
   const puedePagar = hasPermission(roles, APP_PERMISSIONS.PLANILLAS_PAY)
+  const esTesoreria = roles.includes(APP_ROLES.TESORERIA)
 
   const cargar = () => {
     setLoading(true)
@@ -179,12 +187,7 @@ export default function PlanillasPage() {
   const handleCambiarEstado = async () => {
     if (!accionPendiente) return
 
-    if (accionPendiente.estado === 'pagada') {
-      if (!puedePagar) return
-      await pagarPlanilla(accionPendiente.id)
-    } else {
-      await actualizarEstadoPlanilla(accionPendiente.id, accionPendiente.estado)
-    }
+    await actualizarEstadoPlanilla(accionPendiente.id, accionPendiente.estado)
 
     if (detallePlanilla?.id === accionPendiente.id) {
       const full = await getPlanillaConDetalles(accionPendiente.id)
@@ -195,6 +198,33 @@ export default function PlanillasPage() {
     cargar()
   }
 
+  const handleRegistrarPago = async (payload: RegistroPagoPayload) => {
+    if (!pagoPendienteId) return
+    if (!puedePagar) return
+
+    await pagarPlanilla(pagoPendienteId, payload)
+
+    if (detallePlanilla?.id === pagoPendienteId) {
+      const full = await getPlanillaConDetalles(pagoPendienteId)
+      setDetallePlanilla(full)
+    }
+
+    setPagoPendienteId(null)
+    cargar()
+  }
+
+  const handleDescargar = async (planillaId: string) => {
+    setDescargandoId(planillaId)
+    try {
+      const full = await getPlanillaConDetalles(planillaId)
+      generatePlanillaQuincenalExcel(full)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setDescargandoId(null)
+    }
+  }
+
   // Live calculation
   const totalEstimado = fields.reduce((acc, _, i) => {
     const pago_sel = watch(`detalles.${i}.pago_seleccion`) ?? 0
@@ -203,6 +233,19 @@ export default function PlanillasPage() {
     const otros = watch(`detalles.${i}.otros_montos`) ?? 0
     return acc + pago_recep + pago_sel + (n_cajas * pagoEmpaquetadoCaja) + otros
   }, 0)
+
+  const planillasFiltradas = planillas
+    .filter((p) => !esTesoreria || ['confirmada', 'pagada'].includes(p.estado))
+    .filter((p) => {
+      if (!filtroDesde && !filtroHasta) return true
+
+      const inicio = p.periodo_inicio
+      const fin = p.periodo_fin
+
+      if (filtroDesde && fin < filtroDesde) return false
+      if (filtroHasta && inicio > filtroHasta) return false
+      return true
+    })
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando...</div>
 
@@ -219,6 +262,24 @@ export default function PlanillasPage() {
       />
 
       {error && <p className="text-sm text-destructive mb-4">{error}</p>}
+
+      <Card className="mb-4">
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <FormField label="Desde">
+              <Input type="date" value={filtroDesde} onChange={(e) => setFiltroDesde(e.target.value)} />
+            </FormField>
+            <FormField label="Hasta">
+              <Input type="date" value={filtroHasta} onChange={(e) => setFiltroHasta(e.target.value)} />
+            </FormField>
+            <div className="md:col-span-2 flex gap-2">
+              <Button type="button" variant="outline" onClick={() => { setFiltroDesde(''); setFiltroHasta('') }}>
+                Limpiar filtros
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Formulario nueva planilla */}
       {creando && (
@@ -353,11 +414,11 @@ export default function PlanillasPage() {
       )}
 
       {/* Listado */}
-      {planillas.length === 0 && !creando ? (
+      {planillasFiltradas.length === 0 && !creando ? (
         <p className="text-center text-muted-foreground py-12">No hay planillas registradas.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {planillas.map((p) => (
+          {planillasFiltradas.map((p) => (
             <Card key={p.id}>
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between gap-4">
@@ -368,12 +429,36 @@ export default function PlanillasPage() {
                     {p.observaciones && (
                       <p className="text-xs text-muted-foreground mt-0.5">{p.observaciones}</p>
                     )}
+                    {esTesoreria && p.estado === 'pagada' && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Pago: {p.fecha_pago ? formatFecha(p.fecha_pago) : '-'}
+                        {' · '}Operacion: {p.numero_operacion || '-'}
+                        {' · '}Modalidad: {p.modalidad_pago === 'transferencia'
+                          ? 'Transferencia'
+                          : p.modalidad_pago === 'yape_plin'
+                            ? 'Yape/Plin'
+                            : p.modalidad_pago === 'efectivo'
+                              ? 'Efectivo'
+                              : '-'}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <p className="font-bold text-sm">{formatMoneda(p.total_monto)}</p>
                     <Badge className={getPlanillaBadgeClassName(p.estado)}>
                       {getPlanillaEstadoLabel(p.estado)}
                     </Badge>
+                    {esTesoreria && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={descargandoId === p.id}
+                        onClick={() => { void handleDescargar(p.id) }}
+                        title="Descargar reporte"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" onClick={() => handleVerDetalle(p)}>
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -384,7 +469,7 @@ export default function PlanillasPage() {
                     )}
                     {p.estado === 'confirmada' && (
                       puedePagar ? (
-                        <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: p.id, estado: 'pagada' })}>
+                        <Button size="sm" variant="outline" onClick={() => setPagoPendienteId(p.id)}>
                           Marcar pagada
                         </Button>
                       ) : (
@@ -424,7 +509,7 @@ export default function PlanillasPage() {
                   )}
                   {detallePlanilla.estado === 'confirmada' && (
                     puedePagar ? (
-                      <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: detallePlanilla.id, estado: 'pagada' })}>
+                      <Button size="sm" variant="outline" onClick={() => setPagoPendienteId(detallePlanilla.id)}>
                         Marcar pagada
                       </Button>
                     ) : (
@@ -494,13 +579,19 @@ export default function PlanillasPage() {
       {/* Confirmar acción */}
       <ConfirmDialog
         open={!!accionPendiente}
-        title={accionPendiente?.estado === 'pagada' ? '¿Marcar como pagada?' : '¿Confirmar planilla?'}
-        description={accionPendiente?.estado === 'pagada'
-          ? 'La planilla quedará marcada como pagada.'
-          : 'La planilla saldrá de borrador y quedará confirmada.'}
-        confirmLabel={accionPendiente?.estado === 'pagada' ? 'Sí, marcar pagada' : 'Sí, confirmar'}
+        title="¿Confirmar planilla?"
+        description="La planilla saldrá de borrador y quedará confirmada."
+        confirmLabel="Sí, confirmar"
         onConfirm={() => { void handleCambiarEstado() }}
         onCancel={() => setAccionPendiente(null)}
+      />
+
+      <RegistrarPagoDialog
+        open={!!pagoPendienteId}
+        title="Registrar pago de planilla"
+        description="Ingresa los datos del pago para marcar la planilla como pagada."
+        onConfirm={(payload) => handleRegistrarPago(payload)}
+        onCancel={() => setPagoPendienteId(null)}
       />
     </div>
   )

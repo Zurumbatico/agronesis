@@ -1,31 +1,37 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLiquidacionesAgri, actualizarEstadoLiquidacionAgri, pagarLiquidacionAgri } from '@/services/liquidaciones-agri.service'
+import { getLiquidacionesAgri, getLiquidacionAgri, actualizarEstadoLiquidacionAgri, pagarLiquidacionAgri } from '@/services/liquidaciones-agri.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { EstadoLiquidacionBadge } from '@/components/shared/StatusBadge'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { RegistrarPagoDialog, type RegistroPagoPayload } from '@/components/shared/RegistrarPagoDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatFecha, formatMoneda } from '@/utils/formatters'
-import { Plus, FileText, Search } from 'lucide-react'
+import { generateLiquidacionAgriExcel } from '@/utils/liquidacion-agri-excel'
+import { Plus, FileText, Search, Download } from 'lucide-react'
 import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 import { useAuthStore } from '@/store/auth.store'
+import { APP_ROLES } from '@/types/auth'
 import type { LiquidacionAgri } from '@/types/models'
 
 export default function LiquidacionesAgriPage() {
   const navigate = useNavigate()
   const { roles } = useAuthStore()
   const puedePagar = hasPermission(roles, APP_PERMISSIONS.LIQUIDACIONES_AGRI_PAY)
+  const esTesoreria = roles.includes(APP_ROLES.TESORERIA)
   
   const [liquidaciones, setLiquidaciones] = useState<LiquidacionAgri[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
-  const [accionPendiente, setAccionPendiente] = useState<{ id: string; estado: 'confirmada' | 'pagada' } | null>(null)
+  const [accionPendiente, setAccionPendiente] = useState<{ id: string; estado: 'confirmada' } | null>(null)
+  const [pagoPendienteId, setPagoPendienteId] = useState<string | null>(null)
+  const [descargandoId, setDescargandoId] = useState<string | null>(null)
   const [cambiando, setCambiando] = useState(false)
 
   const cargar = async () => {
@@ -41,11 +47,7 @@ export default function LiquidacionesAgriPage() {
     if (!accionPendiente) return
     setCambiando(true)
     try {
-      if (accionPendiente.estado === 'pagada') {
-        await pagarLiquidacionAgri(accionPendiente.id)
-      } else {
-        await actualizarEstadoLiquidacionAgri(accionPendiente.id, accionPendiente.estado)
-      }
+      await actualizarEstadoLiquidacionAgri(accionPendiente.id, accionPendiente.estado)
       await cargar()
       setAccionPendiente(null)
     } catch (e) {
@@ -55,9 +57,37 @@ export default function LiquidacionesAgriPage() {
     }
   }
 
+  const handleRegistrarPago = async (payload: RegistroPagoPayload) => {
+    if (!pagoPendienteId) return
+    setCambiando(true)
+    try {
+      await pagarLiquidacionAgri(pagoPendienteId, payload)
+      await cargar()
+      setPagoPendienteId(null)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setCambiando(false)
+    }
+  }
+
+  const handleDescargar = async (id: string) => {
+    setDescargandoId(id)
+    try {
+      const full = await getLiquidacionAgri(id)
+      generateLiquidacionAgriExcel(full)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setDescargandoId(null)
+    }
+  }
+
   useEffect(() => { cargar() }, [])
 
   const filtradas = liquidaciones.filter((l) => {
+    if (esTesoreria && !['confirmada', 'pagada'].includes(l.estado)) return false
+
     if (!busqueda) return true
     const q = busqueda.toLowerCase()
     return l.codigo?.toLowerCase().includes(q) ||
@@ -99,10 +129,34 @@ export default function LiquidacionesAgriPage() {
                       {(l.agricultor as any)?.apellido}, {(l.agricultor as any)?.nombre}
                       {' · '}{formatFecha(l.fecha_inicio)} – {formatFecha(l.fecha_fin)}
                     </p>
+                    {esTesoreria && l.estado === 'pagada' && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Pago: {l.fecha_pago ? formatFecha(l.fecha_pago) : '-'}
+                        {' · '}Operacion: {l.numero_operacion || '-'}
+                        {' · '}Modalidad: {l.modalidad_pago === 'transferencia'
+                          ? 'Transferencia'
+                          : l.modalidad_pago === 'yape_plin'
+                            ? 'Yape/Plin'
+                            : l.modalidad_pago === 'efectivo'
+                              ? 'Efectivo'
+                              : '-'}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <p className="font-bold text-sm">{formatMoneda(l.total_monto ?? 0)}</p>
                     <EstadoLiquidacionBadge estado={l.estado} />
+                    {esTesoreria && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={descargandoId === l.id}
+                        onClick={() => { void handleDescargar(l.id) }}
+                        title="Descargar reporte"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
                     {l.estado === 'borrador' && (
                       <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: l.id, estado: 'confirmada' })}>
                         Confirmar
@@ -110,7 +164,7 @@ export default function LiquidacionesAgriPage() {
                     )}
                     {l.estado === 'confirmada' && (
                       puedePagar ? (
-                        <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: l.id, estado: 'pagada' })}>
+                        <Button size="sm" variant="outline" onClick={() => setPagoPendienteId(l.id)}>
                           Marcar pagada
                         </Button>
                       ) : (
@@ -130,14 +184,21 @@ export default function LiquidacionesAgriPage() {
       {/* Confirmar acción */}
       <ConfirmDialog
         open={!!accionPendiente}
-        title={accionPendiente?.estado === 'pagada' ? '¿Marcar como pagada?' : '¿Confirmar liquidación?'}
-        description={accionPendiente?.estado === 'pagada'
-          ? 'La liquidación quedará marcada como pagada.'
-          : 'La liquidación saldrá de borrador y quedará confirmada.'}
-        confirmLabel={accionPendiente?.estado === 'pagada' ? 'Sí, marcar pagada' : 'Sí, confirmar'}
+        title="¿Confirmar liquidación?"
+        description="La liquidación saldrá de borrador y quedará confirmada."
+        confirmLabel="Sí, confirmar"
         loading={cambiando}
         onConfirm={() => { void handleCambiarEstado() }}
         onCancel={() => setAccionPendiente(null)}
+      />
+
+      <RegistrarPagoDialog
+        open={!!pagoPendienteId}
+        loading={cambiando}
+        title="Registrar pago de liquidación"
+        description="Ingresa los datos del pago para marcar la liquidación como pagada."
+        onConfirm={(payload) => handleRegistrarPago(payload)}
+        onCancel={() => setPagoPendienteId(null)}
       />
     </div>
   )

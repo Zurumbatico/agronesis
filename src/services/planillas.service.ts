@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 import type {
   PlanillaQuincenal, PlanillaQuincenalInsert,
   PlanillaDetalleInsert,
+  ModalidadPago,
 } from '@/types/models'
 
 // ─── Planillas ───────────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ export async function createPlanillaQuincenal(
 ): Promise<PlanillaQuincenal> {
   const { data: planData, error: planError } = await supabase
     .from('planillas_quincenales')
-    .insert({ ...planilla, created_by: userId })
+    .insert({ ...planilla, created_by: userId, fecha_pago: planilla.fecha_pago ?? null, numero_operacion: planilla.numero_operacion ?? null, modalidad_pago: planilla.modalidad_pago ?? null })
     .select()
     .single()
 
@@ -68,10 +69,19 @@ export async function actualizarEstadoPlanilla(
   return data as PlanillaQuincenal
 }
 
-export async function pagarPlanilla(id: string): Promise<void> {
+export async function pagarPlanilla(
+  id: string,
+  pago: { fecha_pago: string; numero_operacion: string; modalidad_pago: ModalidadPago }
+): Promise<void> {
   const { error } = await supabase
     .from('planillas_quincenales')
-    .update({ estado: 'pagada', updated_at: new Date().toISOString() })
+    .update({
+      estado: 'pagada',
+      fecha_pago: pago.fecha_pago,
+      numero_operacion: pago.numero_operacion,
+      modalidad_pago: pago.modalidad_pago,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id)
 
   if (error) throw new Error(error.message)

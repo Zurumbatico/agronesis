@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { getLiquidacionAgri, actualizarEstadoLiquidacionAgri, pagarLiquidacionAgri } from '@/services/liquidaciones-agri.service'
+import { RegistrarPagoDialog, type RegistroPagoPayload } from '@/components/shared/RegistrarPagoDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -21,7 +22,8 @@ export default function DetalleLiquidacionAgriPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cambiando, setCambiando] = useState(false)
-  const [accionPendiente, setAccionPendiente] = useState<'confirmada' | 'pagada' | null>(null)
+  const [accionPendiente, setAccionPendiente] = useState<'confirmada' | null>(null)
+  const [pagoDialogOpen, setPagoDialogOpen] = useState(false)
 
   const cargar = async () => {
     if (!id) return
@@ -39,16 +41,24 @@ export default function DetalleLiquidacionAgriPage() {
 
   useEffect(() => { cargar() }, [id])
 
-  const cambiarEstado = async (nuevoEstado: 'confirmada' | 'pagada') => {
+  const cambiarEstado = async (nuevoEstado: 'confirmada') => {
     if (!liquidacion) return
     setCambiando(true)
     try {
-      if (nuevoEstado === 'pagada') {
-        await pagarLiquidacionAgri(liquidacion.id)
-      } else {
-        await actualizarEstadoLiquidacionAgri(liquidacion.id, nuevoEstado)
-      }
+      await actualizarEstadoLiquidacionAgri(liquidacion.id, nuevoEstado)
       await cargar()
+    } finally {
+      setCambiando(false)
+    }
+  }
+
+  const handleRegistrarPago = async (payload: RegistroPagoPayload) => {
+    if (!liquidacion) return
+    setCambiando(true)
+    try {
+      await pagarLiquidacionAgri(liquidacion.id, payload)
+      await cargar()
+      setPagoDialogOpen(false)
     } finally {
       setCambiando(false)
     }
@@ -76,7 +86,7 @@ export default function DetalleLiquidacionAgriPage() {
             )}
             {liquidacion.estado === 'confirmada' && (
               puedePagar ? (
-                <Button disabled={cambiando} onClick={() => setAccionPendiente('pagada')}>
+                <Button disabled={cambiando} onClick={() => setPagoDialogOpen(true)}>
                   Marcar pagada
                 </Button>
               ) : (
@@ -155,20 +165,24 @@ export default function DetalleLiquidacionAgriPage() {
 
       <ConfirmDialog
         open={!!accionPendiente}
-        title={accionPendiente === 'pagada' ? '¿Marcar como pagada?' : '¿Confirmar liquidación?'}
-        description={accionPendiente === 'pagada' ? 'Todos los lotes asociados quedarán marcados como LIQUIDADO.' : undefined}
-        confirmLabel={accionPendiente === 'pagada' ? 'Sí, marcar pagada' : 'Sí, confirmar'}
-        variant={accionPendiente === 'pagada' ? 'default' : 'default'}
+        title="¿Confirmar liquidación?"
+        description="La liquidación saldrá de borrador y quedará confirmada."
+        confirmLabel="Sí, confirmar"
         loading={cambiando}
         onConfirm={() => {
-          if (accionPendiente === 'pagada' && !puedePagar) {
-            setAccionPendiente(null)
-            return
-          }
-          void cambiarEstado(accionPendiente!)
+          void cambiarEstado('confirmada')
           setAccionPendiente(null)
         }}
         onCancel={() => setAccionPendiente(null)}
+      />
+
+      <RegistrarPagoDialog
+        open={pagoDialogOpen}
+        loading={cambiando}
+        title="Registrar pago de liquidación"
+        description="Ingresa los datos del pago para marcar la liquidación como pagada."
+        onConfirm={(payload) => handleRegistrarPago(payload)}
+        onCancel={() => setPagoDialogOpen(false)}
       />
     </div>
   )

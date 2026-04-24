@@ -3,6 +3,7 @@ import type {
   LiquidacionAgri,
   LiquidacionAgriInsert,
   LiquidacionAgriDetalleInsert,
+  ModalidadPago,
 } from '@/types/models'
 
 const TABLE = 'liquidaciones_agri' as const
@@ -39,7 +40,7 @@ export async function createLiquidacionAgri(
 ): Promise<LiquidacionAgri> {
   const { data: liq, error: liqError } = await supabase
     .from(TABLE)
-    .insert({ ...input, created_by: userId })
+    .insert({ ...input, created_by: userId, fecha_pago: input.fecha_pago ?? null, numero_operacion: input.numero_operacion ?? null, modalidad_pago: input.modalidad_pago ?? null })
     .select()
     .single()
 
@@ -73,7 +74,10 @@ export async function actualizarEstadoLiquidacionAgri(
  * Marca la liquidación como pagada y actualiza todos sus lotes asociados a 'liquidado'.
  * Llama a esto en lugar de actualizarEstadoLiquidacionAgri cuando el pago es confirmado.
  */
-export async function pagarLiquidacionAgri(id: string): Promise<LiquidacionAgri> {
+export async function pagarLiquidacionAgri(
+  id: string,
+  pago: { fecha_pago: string; numero_operacion: string; modalidad_pago: ModalidadPago }
+): Promise<LiquidacionAgri> {
   // Traer la liquidación con sus detalles para obtener los lote_ids
   const liquidacion = await getLiquidacionAgri(id)
   const loteIds = [...new Set((liquidacion.detalles ?? []).map((d) => d.lote_id))]
@@ -90,7 +94,13 @@ export async function pagarLiquidacionAgri(id: string): Promise<LiquidacionAgri>
   // Marcar la liquidación como pagada
   const { data, error } = await supabase
     .from(TABLE)
-    .update({ estado: 'pagada', updated_at: new Date().toISOString() })
+    .update({
+      estado: 'pagada',
+      fecha_pago: pago.fecha_pago,
+      numero_operacion: pago.numero_operacion,
+      modalidad_pago: pago.modalidad_pago,
+      updated_at: new Date().toISOString(),
+    })
     .eq('id', id)
     .select('*, agricultor:agricultores(*)')
     .single()
