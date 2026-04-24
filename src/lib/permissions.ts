@@ -21,6 +21,7 @@ export const APP_PERMISSIONS = {
   LOTES_DISPATCH: 'lotes.dispatch',
   DESPACHOS_VIEW: 'despachos.view',
   DESPACHOS_MANAGE: 'despachos.manage',
+  AUDIT_VIEW: 'audit.view',
 } as const
 
 export type AppPermission = (typeof APP_PERMISSIONS)[keyof typeof APP_PERMISSIONS]
@@ -101,6 +102,7 @@ const ROUTE_PERMISSIONS: Record<string, AppPermission> = {
   [ROUTES.TAREO]: APP_PERMISSIONS.DASHBOARD_VIEW,
   [ROUTES.CONFIG_PRECIOS]: APP_PERMISSIONS.CONFIG_PRECIOS_MANAGE,
   [ROUTES.CONFIG_PARAMETROS]: APP_PERMISSIONS.CONFIG_PARAMETROS_MANAGE,
+  [ROUTES.AUDIT_LOG]: APP_PERMISSIONS.AUDIT_VIEW,
 }
 
 export function hasPermission(roles: AppRole[], permission: AppPermission): boolean {

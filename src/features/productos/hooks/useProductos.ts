@@ -21,19 +21,19 @@ export function useProductos() {
 
   const crear = async (data: ProductoFormData) => {
     if (!user) throw new Error('No autenticado')
-    const nuevo = await createProducto(data as Parameters<typeof createProducto>[0], user.id)
+    const nuevo = await createProducto(data as Parameters<typeof createProducto>[0], user.id, user.email ?? '')
     setProductos((prev) => [nuevo, ...prev])
     return nuevo
   }
 
   const actualizar = async (id: string, data: ProductoFormData) => {
-    const actualizado = await updateProducto(id, data)
+    const actualizado = await updateProducto(id, data, user?.id ?? '', user?.email ?? '')
     setProductos((prev) => prev.map((p) => (p.id === id ? actualizado : p)))
     return actualizado
   }
 
   const eliminar = async (id: string) => {
-    await deleteProducto(id)
+    await deleteProducto(id, user?.id ?? '', user?.email ?? '')
     setProductos((prev) => prev.filter((p) => p.id !== id))
   }
 

@@ -236,7 +236,6 @@ create table if not exists public.agricultores (
   numero_cuenta text null,
   fecha_alta date not null default current_date,
   ubicacion text null,
-  ggn text null,
   estado text not null default 'activo' check (estado in ('activo', 'inactivo'))
 );
 
@@ -523,7 +522,7 @@ alter table public.despachos add column if not exists marca_caja text null;
 alter table public.despachos alter column precio_venta_kg set default 0;
 update public.despachos set precio_venta_kg = coalesce(precio_venta_kg, 0) where precio_venta_kg is null;
 alter table public.despachos alter column precio_venta_kg set not null;
-alter table public.agricultores add column if not exists ggn text null;
+alter table public.agricultores drop column if exists ggn;
 
 create table if not exists public.clasificaciones (
   id uuid primary key default gen_random_uuid(),
@@ -1183,4 +1182,29 @@ create trigger trg_planilla_detalles_updated_at before update on public.planilla
 alter table public.planilla_detalles enable row level security;
 drop policy if exists planilla_detalles_authenticated_all on public.planilla_detalles;
 create policy planilla_detalles_authenticated_all on public.planilla_detalles for all to authenticated using (true) with check (auth.uid() is not null);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- AUDIT_LOGS — Trazabilidad de acciones por usuario (Módulo Gerencia)
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  user_id uuid not null references auth.users(id) on delete restrict,
+  user_email text not null,
+  accion text not null check (accion in ('crear', 'actualizar', 'eliminar')),
+  modulo text not null,
+  registro_id text not null,
+  descripcion text not null,
+  datos_anteriores jsonb null,
+  datos_nuevos jsonb null
+);
+
+create index if not exists idx_audit_logs_created_at on public.audit_logs(created_at desc);
+create index if not exists idx_audit_logs_user_id on public.audit_logs(user_id);
+create index if not exists idx_audit_logs_modulo on public.audit_logs(modulo);
+create index if not exists idx_audit_logs_registro_id on public.audit_logs(registro_id);
+
+alter table public.audit_logs enable row level security;
+drop policy if exists audit_logs_authenticated_all on public.audit_logs;
+create policy audit_logs_authenticated_all on public.audit_logs for all to authenticated using (true) with check (auth.uid() is not null);
 

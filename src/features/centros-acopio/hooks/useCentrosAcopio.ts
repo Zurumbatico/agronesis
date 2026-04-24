@@ -21,19 +21,19 @@ export function useCentrosAcopio() {
 
   const crear = async (data: CentroAcopioFormData) => {
     if (!user) throw new Error('No autenticado')
-    const nuevo = await createCentroAcopio(data as Parameters<typeof createCentroAcopio>[0], user.id)
+    const nuevo = await createCentroAcopio(data as Parameters<typeof createCentroAcopio>[0], user.id, user.email ?? '')
     setCentros((prev) => [nuevo, ...prev])
     return nuevo
   }
 
   const actualizar = async (id: string, data: CentroAcopioFormData) => {
-    const actualizado = await updateCentroAcopio(id, data)
+    const actualizado = await updateCentroAcopio(id, data, user?.id ?? '', user?.email ?? '')
     setCentros((prev) => prev.map((c) => (c.id === id ? actualizado : c)))
     return actualizado
   }
 
   const eliminar = async (id: string) => {
-    await deleteCentroAcopio(id)
+    await deleteCentroAcopio(id, user?.id ?? '', user?.email ?? '')
     setCentros((prev) => prev.filter((c) => c.id !== id))
   }
 

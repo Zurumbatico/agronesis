@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Package, Warehouse,
   Layers, Receipt, Truck, Settings,
-  LogOut, ChevronLeft, Leaf, X,
+  LogOut, ChevronLeft, Leaf, X, ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -40,10 +40,12 @@ const NAV_ITEMS: NavItem[] = [
   // Admin
   { label: 'Precios por Semana',  href: ROUTES.CONFIG_PRECIOS,        icon: Receipt,       group: 'Admin' },
   { label: 'Parámetros Sistema',  href: ROUTES.CONFIG_PARAMETROS,     icon: Settings,      group: 'Admin' },
+  // Gerencia
+  { label: 'Logs de Auditoría',   href: ROUTES.AUDIT_LOG,             icon: ClipboardList, group: 'Gerencia' },
 ]
 
 // Agrupar ítems
-const groups = ['', 'Maestros', 'Operaciones', 'Liquidaciones', 'Admin']
+const groups = ['', 'Maestros', 'Operaciones', 'Liquidaciones', 'Admin', 'Gerencia']
 
 interface SidebarProps {
   onCloseMobile?: () => void

@@ -28,6 +28,7 @@ import ConfigPreciosPage from '@/features/admin/ConfigPreciosPage'
 import ConfigParametrosPage from '@/features/admin/ConfigParametrosPage'
 import PlanillasPage from '@/features/planillas/PlanillasPage'
 import TareoDiarioPage from '@/features/tareo/TareoDiarioPage'
+import AuditLogPage from '@/features/gerencia/AuditLogPage'
 
 function LoginRoute() {
   const { user, loading, roles } = useAuthStore()
@@ -72,6 +73,7 @@ export default function App() {
             <Route path={ROUTES.TAREO} element={<ProtectedRoute permission={APP_PERMISSIONS.DASHBOARD_VIEW}><TareoDiarioPage /></ProtectedRoute>} />
             <Route path={ROUTES.CONFIG_PRECIOS} element={<ProtectedRoute permission={APP_PERMISSIONS.CONFIG_PRECIOS_MANAGE}><ConfigPreciosPage /></ProtectedRoute>} />
             <Route path={ROUTES.CONFIG_PARAMETROS} element={<ProtectedRoute permission={APP_PERMISSIONS.CONFIG_PARAMETROS_MANAGE}><ConfigParametrosPage /></ProtectedRoute>} />
+            <Route path={ROUTES.AUDIT_LOG} element={<ProtectedRoute permission={APP_PERMISSIONS.AUDIT_VIEW}><AuditLogPage /></ProtectedRoute>} />
           </Route>
         </Route>
 

@@ -79,7 +79,6 @@ export const agricultorSchema = z.object({
   numero_cuenta: z.preprocess(nullableUpperTrim, z.string().max(50, 'Maximo 50 caracteres').nullable()),
   fecha_alta: z.string().min(1, 'Ingrese la fecha de alta'),
   ubicacion: z.preprocess(nullableUpperTrim, z.string().max(200).nullable()),
-  ggn:       z.preprocess(nullableUpperTrim, z.string().max(50, 'Máximo 50 caracteres').nullable()),
   estado:    z.enum(['activo', 'inactivo']),
 })
 

@@ -311,11 +311,6 @@ type LoteConRelaciones = {
   producto: { id: string; nombre: string; variedad: VariedadProducto; calidad: CalidadProducto } | null
 }
 
-type AgricultorGGN = {
-  id: string
-  ggn: string | null
-}
-
 const DESTINO_GEO: Record<string, string> = {
   europa: 'EUROPA',
   usa: 'USA',
@@ -348,29 +343,15 @@ export async function getPackingListData(despachoId: string): Promise<PackingLis
 
   const loteIds = [...new Set(pallets.map(p => p.lote_id))]
 
-  // 2. Obtener agricultores (con GGN) de los lotes involucrados
-  const agricultorIds = [...new Set(
-    pallets.map(p => p.lote?.agricultor_id).filter((id): id is string => !!id)
-  )]
-
-  const [empResult, agriResult] = await Promise.all([
+  // 2. Obtener empaquetados de los lotes involucrados
+  const [empResult] = await Promise.all([
     supabase
       .from('empaquetados')
       .select('lote_id, numero_pallet, codigo_trazabilidad, num_cajas, destino')
       .in('lote_id', loteIds),
-    agricultorIds.length > 0
-      ? supabase.from('agricultores').select('id, ggn').in('id', agricultorIds)
-      : Promise.resolve({ data: [] as AgricultorGGN[], error: null }),
   ])
 
   if (empResult.error) throw new Error(empResult.error.message)
-  if (agriResult.error) throw new Error(agriResult.error.message)
-
-  const ggnMap = new Map<string, string>(
-    ((agriResult.data ?? []) as AgricultorGGN[])
-      .filter(a => a.ggn)
-      .map(a => [a.id, a.ggn!])
-  )
 
   const palletMap = new Map(
     pallets.map(p => [
@@ -383,11 +364,10 @@ export async function getPackingListData(despachoId: string): Promise<PackingLis
     .filter(e => palletMap.has(`${e.lote_id}::${normalizarNumeroPallet(e.numero_pallet)}`))
     .map(e => {
       const pallet = palletMap.get(`${e.lote_id}::${normalizarNumeroPallet(e.numero_pallet)}`)!
-      const agricultorId = pallet.lote?.agricultor_id ?? ''
       return {
         numero_pallet: normalizarNumeroPallet(e.numero_pallet),
         codigo_trazabilidad: e.codigo_trazabilidad,
-        ggn: ggnMap.get(agricultorId) || '4069453556065',
+        ggn: '4069453556065',
         variedad: (pallet.lote?.producto?.variedad ?? 'snow_peas') as VariedadProducto,
         calidad: (pallet.lote?.producto?.calidad ?? 'cat1') as CalidadProducto,
         num_cajas: e.num_cajas,

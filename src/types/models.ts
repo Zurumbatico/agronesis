@@ -12,7 +12,6 @@ export interface Agricultor extends BaseEntity {
   numero_cuenta: string | null
   fecha_alta: string
   ubicacion: string | null
-  ggn: string | null
   estado: EstadoActivo
 }
 

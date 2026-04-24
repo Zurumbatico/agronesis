@@ -28,19 +28,19 @@ export function useAcopiadores() {
 
   const crear = async (data: AcopiadorFormData) => {
     if (!user) throw new Error('No autenticado')
-    const nuevo = await createAcopiador(data as Parameters<typeof createAcopiador>[0], user.id)
+    const nuevo = await createAcopiador(data as Parameters<typeof createAcopiador>[0], user.id, user.email ?? '')
     setAcopiadores((prev) => [nuevo, ...prev])
     return nuevo
   }
 
   const actualizar = async (id: string, data: AcopiadorFormData) => {
-    const actualizado = await updateAcopiador(id, data)
+    const actualizado = await updateAcopiador(id, data, user?.id ?? '', user?.email ?? '')
     setAcopiadores((prev) => prev.map((a) => (a.id === id ? actualizado : a)))
     return actualizado
   }
 
   const eliminar = async (id: string) => {
-    await deleteAcopiador(id)
+    await deleteAcopiador(id, user?.id ?? '', user?.email ?? '')
     setAcopiadores((prev) => prev.filter((a) => a.id !== id))
   }
 

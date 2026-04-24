@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import type { Agricultor, AgricultorInsert, AgricultorUpdate } from '@/types/models'
+import { logAudit } from './audit.service'
 
 const TABLE = 'agricultores' as const
 const SELECT_LISTA = `*`
@@ -28,7 +29,8 @@ export async function getAgricultor(id: string): Promise<Agricultor> {
 
 export async function createAgricultor(
   input: AgricultorInsert,
-  userId: string
+  userId: string,
+  userEmail = ''
 ): Promise<Agricultor> {
   const { codigo: _codigo, ...payload } = input
 
@@ -39,12 +41,26 @@ export async function createAgricultor(
     .single()
 
   if (error) throw new Error(error.message)
-  return data as Agricultor
+
+  const agricultor = data as Agricultor
+  void logAudit({
+    userId,
+    userEmail,
+    accion: 'crear',
+    modulo: 'agricultores',
+    registroId: agricultor.id,
+    descripcion: `Creó agricultor ${agricultor.apellido}, ${agricultor.nombre} (${agricultor.codigo})`,
+    datosNuevos: agricultor as unknown as Record<string, unknown>,
+  })
+
+  return agricultor
 }
 
 export async function updateAgricultor(
   id: string,
-  input: AgricultorUpdate
+  input: AgricultorUpdate,
+  userId = '',
+  userEmail = ''
 ): Promise<Agricultor> {
   const { codigo: _codigo, ...payload } = input
 
@@ -56,10 +72,43 @@ export async function updateAgricultor(
     .single()
 
   if (error) throw new Error(error.message)
-  return data as Agricultor
+
+  const agricultor = data as Agricultor
+  void logAudit({
+    userId,
+    userEmail,
+    accion: 'actualizar',
+    modulo: 'agricultores',
+    registroId: id,
+    descripcion: `Actualizó agricultor ${agricultor.apellido}, ${agricultor.nombre} (${agricultor.codigo})`,
+    datosNuevos: agricultor as unknown as Record<string, unknown>,
+  })
+
+  return agricultor
 }
 
-export async function deleteAgricultor(id: string): Promise<void> {
+export async function deleteAgricultor(id: string, userId = '', userEmail = ''): Promise<void> {
+  // Fetch before delete to capture data for the audit log
+  let descripcion = `Eliminó agricultor (${id})`
+  let datosAnteriores: Record<string, unknown> | null = null
+  try {
+    const agri = await getAgricultor(id)
+    descripcion = `Eliminó agricultor ${agri.apellido}, ${agri.nombre} (${agri.codigo})`
+    datosAnteriores = agri as unknown as Record<string, unknown>
+  } catch {
+    // If fetch fails, proceed with deletion anyway
+  }
+
   const { error } = await supabase.from(TABLE).delete().eq('id', id)
   if (error) throw new Error(error.message)
+
+  void logAudit({
+    userId,
+    userEmail,
+    accion: 'eliminar',
+    modulo: 'agricultores',
+    registroId: id,
+    descripcion,
+    datosAnteriores,
+  })
 }

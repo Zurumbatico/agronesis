@@ -452,6 +452,23 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['planilla_detalles']['Insert']>
         Relationships: []
       }
+      audit_logs: {
+        Row: {
+          id: string
+          created_at: string
+          user_id: string
+          user_email: string
+          accion: 'crear' | 'actualizar' | 'eliminar'
+          modulo: string
+          registro_id: string
+          descripcion: string
+          datos_anteriores: Record<string, unknown> | null
+          datos_nuevos: Record<string, unknown> | null
+        }
+        Insert: Omit<Database['public']['Tables']['audit_logs']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['audit_logs']['Insert']>
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

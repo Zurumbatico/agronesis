@@ -28,19 +28,19 @@ export function useColaboradores() {
 
   const crear = async (data: ColaboradorFormData) => {
     if (!user) throw new Error('No autenticado')
-    const nuevo = await createColaborador(data as Parameters<typeof createColaborador>[0], user.id)
+    const nuevo = await createColaborador(data as Parameters<typeof createColaborador>[0], user.id, user.email ?? '')
     setColaboradores((prev) => [nuevo, ...prev])
     return nuevo
   }
 
   const actualizar = async (id: string, data: ColaboradorFormData) => {
-    const actualizado = await updateColaborador(id, data)
+    const actualizado = await updateColaborador(id, data, user?.id ?? '', user?.email ?? '')
     setColaboradores((prev) => prev.map((c) => (c.id === id ? actualizado : c)))
     return actualizado
   }
 
   const eliminar = async (id: string) => {
-    await deleteColaborador(id)
+    await deleteColaborador(id, user?.id ?? '', user?.email ?? '')
     setColaboradores((prev) => prev.filter((c) => c.id !== id))
   }
 

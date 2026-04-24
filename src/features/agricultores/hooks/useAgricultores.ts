@@ -32,20 +32,20 @@ export function useAgricultores() {
 
   const crear = async (data: AgricultorFormData) => {
     if (!user) throw new Error('No autenticado')
-    const nuevo = await createAgricultor(data as Parameters<typeof createAgricultor>[0], user.id)
+    const nuevo = await createAgricultor(data as Parameters<typeof createAgricultor>[0], user.id, user.email ?? '')
     setAgricultores((prev) => [nuevo, ...prev])
     return nuevo
   }
 
   const actualizar = async (id: string, data: AgricultorFormData) => {
     if (!user) throw new Error('No autenticado')
-    const actualizado = await updateAgricultor(id, data)
+    const actualizado = await updateAgricultor(id, data, user.id, user.email ?? '')
     setAgricultores((prev) => prev.map((a) => (a.id === id ? actualizado : a)))
     return actualizado
   }
 
   const eliminar = async (id: string) => {
-    await deleteAgricultor(id)
+    await deleteAgricultor(id, user?.id ?? '', user?.email ?? '')
     setAgricultores((prev) => prev.filter((a) => a.id !== id))
   }
 
