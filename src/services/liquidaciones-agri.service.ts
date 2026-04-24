@@ -24,7 +24,18 @@ export async function getLiquidacionAgri(id: string): Promise<LiquidacionAgri> {
     .select(`
       *,
       agricultor:agricultores(*),
-      detalles:liquidacion_agri_detalle(*, lote:lotes(codigo, fecha_ingreso))
+      detalles:liquidacion_agri_detalle(
+        *,
+        lote:lotes(
+          codigo,
+          fecha_ingreso,
+          num_cubetas,
+          peso_neto_kg,
+          producto:productos(variedad),
+          acopiador:acopiadores(codigo, nombre, apellido),
+          acopiador_agricultor:agricultores!lotes_acopiador_agricultor_id_fkey(codigo, nombre, apellido)
+        )
+      )
     `)
     .eq('id', id)
     .single()

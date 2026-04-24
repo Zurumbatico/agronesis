@@ -93,6 +93,7 @@ export default function PlanillasPage() {
   const watchFin = watch('periodo_fin')
   const puedePagar = hasPermission(roles, APP_PERMISSIONS.PLANILLAS_PAY)
   const esTesoreria = roles.includes(APP_ROLES.TESORERIA)
+  const puedeDescargar = esTesoreria || roles.includes(APP_ROLES.ADMIN) || roles.includes(APP_ROLES.GERENCIA)
 
   const cargar = () => {
     setLoading(true)
@@ -596,7 +597,7 @@ export default function PlanillasPage() {
                     <Badge className={getPlanillaBadgeClassName(p.estado)}>
                       {getPlanillaEstadoLabel(p.estado)}
                     </Badge>
-                    {esTesoreria && (
+                    {puedeDescargar && (
                       <Button
                         size="sm"
                         variant="ghost"

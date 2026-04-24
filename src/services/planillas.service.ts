@@ -20,7 +20,7 @@ export async function getPlanillasQuincenales(): Promise<PlanillaQuincenal[]> {
 export async function getPlanillaConDetalles(id: string): Promise<PlanillaQuincenal> {
   const { data, error } = await supabase
     .from('planillas_quincenales')
-    .select('*, detalles:planilla_detalles(*, colaborador:colaboradores(id, nombre, apellido))')
+    .select('*, detalles:planilla_detalles(*, colaborador:colaboradores(id, dni, nombre, apellido, numero_cuenta))')
     .eq('id', id)
     .single()
 

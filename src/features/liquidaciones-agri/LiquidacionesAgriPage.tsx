@@ -25,6 +25,7 @@ export default function LiquidacionesAgriPage() {
   const { roles, user } = useAuthStore()
   const puedePagar = hasPermission(roles, APP_PERMISSIONS.LIQUIDACIONES_AGRI_PAY)
   const esTesoreria = roles.includes(APP_ROLES.TESORERIA)
+  const puedeDescargar = esTesoreria || roles.includes(APP_ROLES.ADMIN) || roles.includes(APP_ROLES.GERENCIA)
   
   const [liquidaciones, setLiquidaciones] = useState<LiquidacionAgri[]>([])
   const [loading, setLoading] = useState(true)
@@ -212,7 +213,7 @@ export default function LiquidacionesAgriPage() {
                   <div className="flex items-center gap-3 shrink-0">
                     <p className="font-bold text-sm">{formatMoneda(l.total_monto ?? 0)}</p>
                     <EstadoLiquidacionBadge estado={l.estado} />
-                    {esTesoreria && (
+                    {puedeDescargar && (
                       <Button
                         size="sm"
                         variant="ghost"
