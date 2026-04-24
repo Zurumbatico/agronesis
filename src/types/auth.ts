@@ -2,6 +2,7 @@ import type { User } from '@supabase/supabase-js'
 
 export const APP_ROLES = {
   ADMIN: 'admin',
+  GERENCIA: 'gerencia',
   ADMINISTRADOR_PLANTA: 'administrador_planta',
   TESORERIA: 'tesoreria',
   OPERATIVO_RECEPCION: 'operativo_recepcion',

@@ -29,6 +29,7 @@ const ALL_PERMISSIONS = Object.values(APP_PERMISSIONS)
 
 const ROLE_PERMISSIONS: Record<string, AppPermission[]> = {
   [APP_ROLES.ADMIN]: ALL_PERMISSIONS,
+  [APP_ROLES.GERENCIA]: ALL_PERMISSIONS,
   [APP_ROLES.ADMINISTRADOR_PLANTA]: [
     APP_PERMISSIONS.DASHBOARD_VIEW,
     APP_PERMISSIONS.LIQUIDACIONES_AGRI_VIEW,
@@ -103,7 +104,7 @@ const ROUTE_PERMISSIONS: Record<string, AppPermission> = {
 }
 
 export function hasPermission(roles: AppRole[], permission: AppPermission): boolean {
-  if (roles.includes(APP_ROLES.ADMIN)) {
+  if (roles.includes(APP_ROLES.ADMIN) || roles.includes(APP_ROLES.GERENCIA)) {
     return true
   }
 
