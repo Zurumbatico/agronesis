@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { Printer, Trash2 } from 'lucide-react'
 import { getLote, actualizarEstadoLote } from '@/services/lotes.service'
 import { getClasificacionesPorLote } from '@/services/clasificaciones.service'
+import { logAudit } from '@/services/audit.service'
 import { getColaboradores } from '@/services/colaboradores.service'
 import {
   createEmpaquetado,
@@ -153,6 +154,16 @@ export default function EmpaquetarLotePage() {
     if (lote.estado === 'clasificado') {
       const actualizado = await actualizarEstadoLote(lote.id, 'empaquetado')
       setLote(actualizado)
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'actualizar',
+        modulo: 'lotes',
+        registroId: lote.id,
+        descripcion: `Lote empaquetado: ${lote.codigo}`,
+        datosAnteriores: { estado: 'clasificado' },
+        datosNuevos: { estado: 'empaquetado' },
+      })
     }
 
     reset({

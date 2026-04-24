@@ -74,6 +74,7 @@ export default function LiquidacionesAgriPage() {
     if (!pagoPendienteId || !user) return
     setCambiando(true)
     try {
+      const full = await getLiquidacionAgri(pagoPendienteId)
       const liq = liquidaciones.find((l) => l.id === pagoPendienteId)
       await pagarLiquidacionAgri(pagoPendienteId, payload)
       void logAudit({
@@ -86,6 +87,22 @@ export default function LiquidacionesAgriPage() {
         datosAnteriores: { estado: 'confirmada' },
         datosNuevos: { estado: 'pagada', fecha_pago: payload.fecha_pago },
       })
+
+      const lotes = full.detalles ?? []
+      for (const detalle of lotes) {
+        const loteCodigo = detalle.lote?.codigo ?? detalle.lote_id
+        void logAudit({
+          userId: user.id,
+          userEmail: user.email ?? '',
+          accion: 'actualizar',
+          modulo: 'lotes',
+          registroId: detalle.lote_id,
+          descripcion: `Lote liquidado: ${loteCodigo}`,
+          datosAnteriores: { estado: 'despachado' },
+          datosNuevos: { estado: 'liquidado' },
+        })
+      }
+
       await cargar()
       setPagoPendienteId(null)
     } catch (e) {

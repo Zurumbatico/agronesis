@@ -7,6 +7,8 @@ import { useAuthStore } from '@/store/auth.store'
 import { despachoSchema, type DespachoFormData } from '@/utils/validators'
 import { CLAVE_PESO_CAJA_DESPACHO, getValorNumericoSistema } from '@/services/config-precios.service'
 import { createDespacho, getDespacho, getPalletsDisponiblesParaDespacho, updateDespachoCompleto, type PalletDisponibleDespacho } from '@/services/despachos.service'
+import { getLote } from '@/services/lotes.service'
+import { logAudit } from '@/services/audit.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -137,6 +139,25 @@ export default function NuevoDespachoPage() {
       const despacho = isEditMode && id
         ? await updateDespachoCompleto(id, payload, palletsPayload, user.id)
         : await createDespacho(payload, palletsPayload, user.id)
+
+      const loteIds = Array.from(new Set(palletsSeleccionados.map((item) => item.lote_id)))
+      if (loteIds.length > 0) {
+        const lotesActualizados = await Promise.all(loteIds.map((loteId) => getLote(loteId)))
+        for (const lote of lotesActualizados) {
+          if (lote.estado === 'despachado') {
+            void logAudit({
+              userId: user.id,
+              userEmail: user.email ?? '',
+              accion: 'actualizar',
+              modulo: 'lotes',
+              registroId: lote.id,
+              descripcion: `Lote despachado: ${lote.codigo}`,
+              datosAnteriores: { estado: 'en_despacho' },
+              datosNuevos: { estado: 'despachado' },
+            })
+          }
+        }
+      }
 
       navigate(`/despachos/${despacho.id}`)
     } catch (e) {

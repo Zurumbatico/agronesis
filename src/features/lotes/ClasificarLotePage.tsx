@@ -2,6 +2,7 @@ import { useState, useEffect, useId } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getLote, actualizarEstadoLote } from '@/services/lotes.service'
 import { getClasificacionesPorLote, guardarClasificacion } from '@/services/clasificaciones.service'
+import { logAudit } from '@/services/audit.service'
 import { getColaboradores } from '@/services/colaboradores.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
@@ -400,6 +401,16 @@ export default function ClasificarLotePage() {
 
       if (finalizarDespues) {
         await actualizarEstadoLote(lote.id, 'clasificado')
+        void logAudit({
+          userId: user.id,
+          userEmail: user.email ?? '',
+          accion: 'actualizar',
+          modulo: 'lotes',
+          registroId: lote.id,
+          descripcion: `Lote clasificado: ${lote.codigo}`,
+          datosAnteriores: { estado: lote.estado },
+          datosNuevos: { estado: 'clasificado' },
+        })
         navigate(`/lotes/${id}`)
       } else {
         toast('success', 'Borrador guardado')

@@ -160,6 +160,7 @@ async function verificarYActualizarEstadoLotes(loteIds: string[]): Promise<void>
   for (const loteId of loteIds) {
     const emp = palletsEmp[loteId] ?? new Set<string>()
     const des = palletsDes[loteId] ?? new Set<string>()
+    if (emp.size === 0) continue
     const todosEnDespacho = emp.size > 0 && [...emp].every(p => des.has(p))
     const nuevoEstado = todosEnDespacho ? 'despachado' : 'en_despacho'
 
@@ -167,7 +168,7 @@ async function verificarYActualizarEstadoLotes(loteIds: string[]): Promise<void>
       .from('lotes')
       .update({ estado: nuevoEstado, updated_at: new Date().toISOString() })
       .eq('id', loteId)
-      .in('estado', ['en_despacho', 'despachado'])
+      .in('estado', ['empaquetado', 'en_despacho', 'despachado'])
   }
 }
 

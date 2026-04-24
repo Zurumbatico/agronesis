@@ -17,6 +17,7 @@ const ACCION_CONFIG: Record<string, { label: string; className: string }> = {
 
 const MODULOS = [
   { value: 'all',                label: 'Todos los módulos' },
+  { value: 'lotes',              label: 'Lotes' },
   { value: 'agricultores',       label: 'Agricultores' },
   { value: 'acopiadores',        label: 'Acopiadores' },
   { value: 'colaboradores',      label: 'Colaboradores' },
@@ -32,6 +33,27 @@ const PAGE_SIZE = 10
 
 function getAccionDisplay(log: AuditLog): { label: string; className: string } {
   const descripcion = log.descripcion.toLowerCase()
+
+  if (log.modulo === 'lotes') {
+    if (descripcion.includes('liquidado')) {
+      return { label: 'Liquidado', className: 'bg-emerald-100 text-emerald-800' }
+    }
+    if (descripcion.includes('despachado')) {
+      return { label: 'Despachado', className: 'bg-orange-100 text-orange-800' }
+    }
+    if (descripcion.includes('empaquetado')) {
+      return { label: 'Empaquetado', className: 'bg-indigo-100 text-indigo-800' }
+    }
+    if (descripcion.includes('clasificado')) {
+      return { label: 'Clasificado', className: 'bg-blue-100 text-blue-800' }
+    }
+    if (descripcion.includes('creado') || log.accion === 'crear') {
+      return { label: 'Creado', className: 'bg-green-100 text-green-800' }
+    }
+    if (descripcion.includes('eliminado') || log.accion === 'eliminar') {
+      return { label: 'Eliminado', className: 'bg-red-100 text-red-800' }
+    }
+  }
 
   if (['liquidaciones_agri', 'planillas_quincenales'].includes(log.modulo)) {
     if (log.accion === 'eliminar') {
