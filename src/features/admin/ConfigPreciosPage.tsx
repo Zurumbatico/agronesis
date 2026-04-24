@@ -24,6 +24,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuthStore } from '@/store/auth.store'
+import { logAudit } from '@/services/audit.service'
 import type { ConfigPrecio } from '@/types/models'
 
 const configPrecioSchema = z.object({
@@ -123,9 +124,29 @@ export default function ConfigPreciosPage() {
       if (editando) {
         const updated = await updateConfigPrecio(editando.id, precioPendienteConfirmacion)
         setPrecios((prev) => prev.map((precio) => (precio.id === updated.id ? updated : precio)))
+        void logAudit({
+          userId: user.id,
+          userEmail: user.email ?? '',
+          accion: 'actualizar',
+          modulo: 'config_precios',
+          registroId: editando.id,
+          descripcion: `Precio actualizado: Sem ${updated.semana}/${updated.anio} — ${updated.variedad} ${updated.categoria}`,
+          datosAnteriores: { semana: editando.semana, anio: editando.anio, variedad: editando.variedad, categoria: editando.categoria, precio_kg_sol: editando.precio_kg_sol },
+          datosNuevos: { semana: updated.semana, anio: updated.anio, variedad: updated.variedad, categoria: updated.categoria, precio_kg_sol: updated.precio_kg_sol },
+        })
       } else {
         const nuevo = await createConfigPrecio(precioPendienteConfirmacion, user.id)
         setPrecios((prev) => [nuevo, ...prev])
+        void logAudit({
+          userId: user.id,
+          userEmail: user.email ?? '',
+          accion: 'crear',
+          modulo: 'config_precios',
+          registroId: nuevo.id,
+          descripcion: `Precio creado: Sem ${nuevo.semana}/${nuevo.anio} — ${nuevo.variedad} ${nuevo.categoria}`,
+          datosAnteriores: null,
+          datosNuevos: { semana: nuevo.semana, anio: nuevo.anio, variedad: nuevo.variedad, categoria: nuevo.categoria, precio_kg_sol: nuevo.precio_kg_sol },
+        })
       }
 
       setPrecioPendienteConfirmacion(null)
@@ -138,9 +159,20 @@ export default function ConfigPreciosPage() {
   }
 
   const eliminar = async (precio: ConfigPrecio) => {
+    if (!user) return
     try {
       await deleteConfigPrecio(precio.id)
       setPrecios((prev) => prev.filter((item) => item.id !== precio.id))
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'eliminar',
+        modulo: 'config_precios',
+        registroId: precio.id,
+        descripcion: `Precio eliminado: Sem ${precio.semana}/${precio.anio} — ${precio.variedad} ${precio.categoria}`,
+        datosAnteriores: { semana: precio.semana, anio: precio.anio, variedad: precio.variedad, categoria: precio.categoria, precio_kg_sol: precio.precio_kg_sol },
+        datosNuevos: null,
+      })
     } catch (e) {
       setError((e as Error).message)
     }

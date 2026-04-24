@@ -16,15 +16,43 @@ const ACCION_CONFIG: Record<string, { label: string; className: string }> = {
 }
 
 const MODULOS = [
-  { value: 'all',          label: 'Todos los módulos' },
-  { value: 'agricultores', label: 'Agricultores' },
-  { value: 'acopiadores',  label: 'Acopiadores' },
-  { value: 'colaboradores', label: 'Colaboradores' },
-  { value: 'productos',    label: 'Productos' },
-  { value: 'centros_acopio', label: 'Centros de Acopio' },
+  { value: 'all',                label: 'Todos los módulos' },
+  { value: 'agricultores',       label: 'Agricultores' },
+  { value: 'acopiadores',        label: 'Acopiadores' },
+  { value: 'colaboradores',      label: 'Colaboradores' },
+  { value: 'productos',          label: 'Productos' },
+  { value: 'centros_acopio',     label: 'Centros de Acopio' },
+  { value: 'config_parametros',  label: 'Parámetros del Sistema' },
+  { value: 'config_precios',     label: 'Precios del Sistema' },
+  { value: 'liquidaciones_agri', label: 'Liquidaciones – Agricultores' },
+  { value: 'planillas_quincenales', label: 'Planillas Quincenales' },
 ]
 
 const PAGE_SIZE = 10
+
+function getAccionDisplay(log: AuditLog): { label: string; className: string } {
+  const descripcion = log.descripcion.toLowerCase()
+
+  if (['liquidaciones_agri', 'planillas_quincenales'].includes(log.modulo)) {
+    if (log.accion === 'eliminar') {
+      return { label: 'Borrador Eliminado', className: 'bg-red-100 text-red-800' }
+    }
+    if (descripcion.includes('liquidada') || descripcion.includes('pagada')) {
+      return { label: 'Liquidado', className: 'bg-emerald-100 text-emerald-800' }
+    }
+    if (descripcion.includes('confirmada') || descripcion.includes('aceptada')) {
+      return { label: 'Borrador Aceptado', className: 'bg-amber-100 text-amber-800' }
+    }
+    if (log.accion === 'actualizar') {
+      return { label: 'Borrador Editado', className: 'bg-blue-100 text-blue-800' }
+    }
+    if (log.accion === 'crear') {
+      return { label: 'Borrador Creado', className: 'bg-green-100 text-green-800' }
+    }
+  }
+
+  return ACCION_CONFIG[log.accion] ?? { label: log.accion, className: 'bg-gray-100 text-gray-700' }
+}
 
 function formatFechaHora(fechaIso: string) {
   return new Intl.DateTimeFormat('es-PE', {
@@ -161,7 +189,7 @@ export default function AuditLogPage() {
               </TableHeader>
               <TableBody>
                 {logsPaginados.map((log) => {
-                  const accionCfg = ACCION_CONFIG[log.accion] ?? { label: log.accion, className: 'bg-gray-100 text-gray-700' }
+                  const accionCfg = getAccionDisplay(log)
                   return (
                     <TableRow key={log.id}>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">

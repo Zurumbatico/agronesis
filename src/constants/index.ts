@@ -19,7 +19,7 @@ export const ESTADO_LOTE_CONFIG = {
 export const ESTADO_LIQUIDACION_CONFIG = {
   borrador:   { label: 'Borrador',   color: 'bg-gray-100 text-gray-700' },
   confirmada: { label: 'Confirmada', color: 'bg-blue-100 text-blue-800' },
-  pagada:     { label: 'Pagada',     color: 'bg-green-100 text-green-800' },
+  pagada:     { label: 'Liquidado',  color: 'bg-green-100 text-green-800' },
 } as const
 
 export const VARIEDAD_PRODUCTO_CONFIG = {
@@ -100,6 +100,7 @@ export const ROUTES = {
   LIQUIDACIONES_AGRI:       '/liquidaciones/agricultores',
   LIQUIDACIONES_AGRI_NUEVA: '/liquidaciones/agricultores/nueva',
   LIQUIDACIONES_AGRI_DETALLE: '/liquidaciones/agricultores/:id',
+  LIQUIDACIONES_AGRI_EDITAR: '/liquidaciones/agricultores/:id/editar',
   PLANILLAS:                '/planillas',
   TAREO:                    '/tareo',
   CUBETAS:                  '/cubetas',

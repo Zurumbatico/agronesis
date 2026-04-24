@@ -8,7 +8,10 @@ import {
   getPlanillaConDetalles,
   getResumenColaboradoresPeriodo,
   getColaboradoresYaLiquidados,
+  updatePlanillaQuincenal,
+  deletePlanillaQuincenal,
 } from '@/services/planillas.service'
+import { logAudit } from '@/services/audit.service'
 import { CLAVE_PAGO_RECEPCION_KG, CLAVE_PAGO_EMPAQUETADO_CAJA, getValorNumericoSistema } from '@/services/config-precios.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { FormField } from '@/components/shared/FormField'
@@ -32,7 +35,7 @@ import { APP_ROLES } from '@/types/auth'
 import { formatFecha, formatMoneda } from '@/utils/formatters'
 import { generatePlanillaQuincenalExcel } from '@/utils/planilla-quincenal-excel'
 import { format } from 'date-fns'
-import { Eye, Download } from 'lucide-react'
+import { Eye, Download, Pencil, Trash2 } from 'lucide-react'
 import type { EstadoPlanilla, PlanillaQuincenal } from '@/types/models'
 import { DEFAULT_PAGO_RECEPCION_KG, DEFAULT_PAGO_EMPAQUETADO_CAJA } from '@/utils/business-rules'
 
@@ -70,6 +73,9 @@ export default function PlanillasPage() {
   const [accionPendiente, setAccionPendiente] = useState<{ id: string; estado: 'confirmada' } | null>(null)
   const [pagoPendienteId, setPagoPendienteId] = useState<string | null>(null)
   const [descargandoId, setDescargandoId] = useState<string | null>(null)
+  const [eliminarPendienteId, setEliminarPendienteId] = useState<string | null>(null)
+  const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [cargandoEdicion, setCargandoEdicion] = useState(false)
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
 
@@ -105,6 +111,56 @@ export default function PlanillasPage() {
   }
 
   useEffect(() => { cargar() }, [])
+
+  const resetFormulario = () => {
+    reset({
+      periodo_inicio: format(new Date(), 'yyyy-MM-01'),
+      periodo_fin: format(new Date(), 'yyyy-MM-15'),
+      observaciones: '',
+      detalles: [],
+    })
+    setExcluidos(0)
+    setEditandoId(null)
+  }
+
+  const handleEditar = async (id: string) => {
+    setCargandoEdicion(true)
+    setError(null)
+    try {
+      const full = await getPlanillaConDetalles(id)
+      if (full.estado !== 'borrador') {
+        throw new Error('Solo se puede editar una planilla en borrador')
+      }
+
+      const detallesForm: DetalleForm[] = (full.detalles ?? []).map((d) => ({
+        colaborador_id: d.colaborador_id,
+        nombre_display: d.colaborador ? `${d.colaborador.apellido}, ${d.colaborador.nombre}` : d.colaborador_id,
+        kg_bruto_recepcion: d.kg_bruto_recepcion,
+        pago_recepcion: d.pago_recepcion,
+        kg_cat1_seleccion: d.kg_cat1_seleccion,
+        kg_cat2_seleccion: d.kg_cat2_seleccion,
+        pago_seleccion: d.pago_seleccion,
+        n_cajas_empaquetado: d.n_cajas_empaquetado,
+        otros_montos: d.otros_montos,
+      }))
+
+      reset({
+        periodo_inicio: full.periodo_inicio,
+        periodo_fin: full.periodo_fin,
+        observaciones: full.observaciones ?? '',
+        detalles: detallesForm,
+      })
+
+      setExcluidos(0)
+      setEditandoId(id)
+      setCreando(true)
+      setDetallePlanilla(null)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setCargandoEdicion(false)
+    }
+  }
 
   const cargarResumen = async () => {
     if (!watchInicio || !watchFin) return
@@ -155,18 +211,64 @@ export default function PlanillasPage() {
       }
     })
     const total_monto = detalles.reduce((acc, d) => acc + d.total, 0)
-    await createPlanillaQuincenal(
-      {
-        periodo_inicio: data.periodo_inicio,
-        periodo_fin: data.periodo_fin,
-        total_monto,
-        estado: 'borrador',
-        observaciones: data.observaciones || null,
-      },
-      detalles,
-      user.id
-    )
-    reset()
+
+    if (editandoId) {
+      const previa = planillas.find((p) => p.id === editandoId)
+      const actualizada = await updatePlanillaQuincenal(
+        editandoId,
+        {
+          periodo_inicio: data.periodo_inicio,
+          periodo_fin: data.periodo_fin,
+          total_monto,
+          observaciones: data.observaciones || null,
+        },
+        detalles,
+        user.id
+      )
+
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'actualizar',
+        modulo: 'planillas_quincenales',
+        registroId: actualizada.id,
+        descripcion: `Planilla editada: ${formatFecha(actualizada.periodo_inicio)} - ${formatFecha(actualizada.periodo_fin)}`,
+        datosAnteriores: {
+          periodo_inicio: previa?.periodo_inicio,
+          periodo_fin: previa?.periodo_fin,
+          total_monto: previa?.total_monto,
+        },
+        datosNuevos: {
+          periodo_inicio: actualizada.periodo_inicio,
+          periodo_fin: actualizada.periodo_fin,
+          total_monto: actualizada.total_monto,
+        },
+      })
+    } else {
+      const creada = await createPlanillaQuincenal(
+        {
+          periodo_inicio: data.periodo_inicio,
+          periodo_fin: data.periodo_fin,
+          total_monto,
+          estado: 'borrador',
+          observaciones: data.observaciones || null,
+        },
+        detalles,
+        user.id
+      )
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'crear',
+        modulo: 'planillas_quincenales',
+        registroId: creada.id,
+        descripcion: `Planilla creada: ${formatFecha(creada.periodo_inicio)} - ${formatFecha(creada.periodo_fin)}`,
+        datosAnteriores: null,
+        datosNuevos: { periodo_inicio: creada.periodo_inicio, periodo_fin: creada.periodo_fin, total_monto: creada.total_monto },
+      })
+    }
+
+    resetFormulario()
     setCreando(false)
     cargar()
   }
@@ -185,9 +287,21 @@ export default function PlanillasPage() {
   }
 
   const handleCambiarEstado = async () => {
-    if (!accionPendiente) return
+    if (!accionPendiente || !user) return
+
+    const planilla = planillas.find((p) => p.id === accionPendiente.id)
 
     await actualizarEstadoPlanilla(accionPendiente.id, accionPendiente.estado)
+    void logAudit({
+      userId: user.id,
+      userEmail: user.email ?? '',
+      accion: 'actualizar',
+      modulo: 'planillas_quincenales',
+      registroId: accionPendiente.id,
+      descripcion: `Planilla confirmada: ${planilla ? `${formatFecha(planilla.periodo_inicio)} - ${formatFecha(planilla.periodo_fin)}` : accionPendiente.id}`,
+      datosAnteriores: { estado: 'borrador' },
+      datosNuevos: { estado: accionPendiente.estado },
+    })
 
     if (detallePlanilla?.id === accionPendiente.id) {
       const full = await getPlanillaConDetalles(accionPendiente.id)
@@ -199,10 +313,22 @@ export default function PlanillasPage() {
   }
 
   const handleRegistrarPago = async (payload: RegistroPagoPayload) => {
-    if (!pagoPendienteId) return
+    if (!pagoPendienteId || !user) return
     if (!puedePagar) return
 
+    const planilla = planillas.find((p) => p.id === pagoPendienteId)
+
     await pagarPlanilla(pagoPendienteId, payload)
+    void logAudit({
+      userId: user.id,
+      userEmail: user.email ?? '',
+      accion: 'actualizar',
+      modulo: 'planillas_quincenales',
+      registroId: pagoPendienteId,
+      descripcion: `Planilla liquidada: ${planilla ? `${formatFecha(planilla.periodo_inicio)} - ${formatFecha(planilla.periodo_fin)}` : pagoPendienteId}`,
+      datosAnteriores: { estado: 'confirmada' },
+      datosNuevos: { estado: 'pagada', fecha_pago: payload.fecha_pago },
+    })
 
     if (detallePlanilla?.id === pagoPendienteId) {
       const full = await getPlanillaConDetalles(pagoPendienteId)
@@ -222,6 +348,28 @@ export default function PlanillasPage() {
       setError((e as Error).message)
     } finally {
       setDescargandoId(null)
+    }
+  }
+
+  const handleEliminar = async (id: string) => {
+    if (!user) return
+    try {
+      const planilla = planillas.find(p => p.id === id)
+      await deletePlanillaQuincenal(id)
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'eliminar',
+        modulo: 'planillas_quincenales',
+        registroId: id,
+        descripcion: `Planilla eliminada: ${formatFecha(planilla?.periodo_inicio)} - ${formatFecha(planilla?.periodo_fin)}`,
+        datosAnteriores: { periodo_inicio: planilla?.periodo_inicio, total_monto: planilla?.total_monto },
+        datosNuevos: null,
+      })
+      cargar()
+      setEliminarPendienteId(null)
+    } catch (e) {
+      setError((e as Error).message)
     }
   }
 
@@ -256,7 +404,7 @@ export default function PlanillasPage() {
         description="Liquidación de trabajadores por selección y empaquetado"
         actions={
           !creando ? (
-            <Button onClick={() => setCreando(true)}>Nueva planilla</Button>
+            <Button onClick={() => { resetFormulario(); setCreando(true) }}>Nueva planilla</Button>
           ) : undefined
         }
       />
@@ -285,7 +433,7 @@ export default function PlanillasPage() {
       {creando && (
         <Card className="mb-6">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Nueva planilla quincenal</CardTitle>
+            <CardTitle className="text-base">{editandoId ? 'Editar planilla quincenal' : 'Nueva planilla quincenal'}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
@@ -403,9 +551,9 @@ export default function PlanillasPage() {
               )}
 
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => { setCreando(false); reset(); setExcluidos(0) }}>Cancelar</Button>
+                <Button type="button" variant="outline" onClick={() => { setCreando(false); resetFormulario() }}>Cancelar</Button>
                 <Button type="submit" disabled={isSubmitting || fields.length === 0}>
-                  {isSubmitting ? 'Guardando...' : 'Guardar borrador'}
+                  {isSubmitting ? 'Guardando...' : editandoId ? 'Guardar cambios' : 'Guardar borrador'}
                 </Button>
               </div>
             </form>
@@ -463,14 +611,35 @@ export default function PlanillasPage() {
                       <Eye className="h-4 w-4" />
                     </Button>
                     {p.estado === 'borrador' && (
-                      <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: p.id, estado: 'confirmada' })}>
-                        Confirmar
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={creando || cargandoEdicion}
+                          onClick={() => { void handleEditar(p.id) }}
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={creando}
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setEliminarPendienteId(p.id)}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: p.id, estado: 'confirmada' })}>
+                          Confirmar
+                        </Button>
+                      </>
                     )}
                     {p.estado === 'confirmada' && (
                       puedePagar ? (
                         <Button size="sm" variant="outline" onClick={() => setPagoPendienteId(p.id)}>
-                          Marcar pagada
+                          Marcar liquidada
                         </Button>
                       ) : (
                         <Button size="sm" variant="secondary" disabled>
@@ -578,6 +747,19 @@ export default function PlanillasPage() {
 
       {/* Confirmar acción */}
       <ConfirmDialog
+        open={!!eliminarPendienteId}
+        title="¿Eliminar planilla?"
+        description="Se eliminará la planilla. Esta acción es irreversible."
+        confirmLabel="Sí, eliminar"
+        variant="destructive"
+        loading={false}
+        onConfirm={() => {
+          if (eliminarPendienteId) void handleEliminar(eliminarPendienteId)
+        }}
+        onCancel={() => setEliminarPendienteId(null)}
+      />
+
+      <ConfirmDialog
         open={!!accionPendiente}
         title="¿Confirmar planilla?"
         description="La planilla saldrá de borrador y quedará confirmada."
@@ -589,7 +771,7 @@ export default function PlanillasPage() {
       <RegistrarPagoDialog
         open={!!pagoPendienteId}
         title="Registrar pago de planilla"
-        description="Ingresa los datos del pago para marcar la planilla como pagada."
+        description="Ingresa los datos del pago para marcar la planilla como liquidada."
         onConfirm={(payload) => handleRegistrarPago(payload)}
         onCancel={() => setPagoPendienteId(null)}
       />
@@ -600,7 +782,7 @@ export default function PlanillasPage() {
 function getPlanillaEstadoLabel(estado: EstadoPlanilla): string {
   if (estado === 'borrador') return 'Borrador'
   if (estado === 'confirmada') return 'Confirmada'
-  return 'Pagada'
+  return 'Liquidado'
 }
 
 function getPlanillaBadgeClassName(estado: EstadoPlanilla): string {

@@ -5,6 +5,16 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import type { Colaborador } from '@/types/models'
 
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 interface ColaboradorPickerProps {
   value: string
   onChange: (value: string) => void
@@ -29,12 +39,11 @@ export function ColaboradorPicker({
   )
 
   const filteredColaboradores = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = normalizeSearchText(search)
     if (!q) return colaboradores
 
     return colaboradores.filter((colaborador) => (
-      `${colaborador.apellido} ${colaborador.nombre} ${colaborador.codigo} ${colaborador.dni ?? ''}`
-        .toLowerCase()
+      normalizeSearchText(`${colaborador.apellido} ${colaborador.nombre} ${colaborador.codigo} ${colaborador.dni ?? ''}`)
         .includes(q)
     ))
   }, [colaboradores, search])

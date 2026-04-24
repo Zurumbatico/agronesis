@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { z } from 'zod'
+import { logAudit } from '@/services/audit.service'
 import {
   getConfigSistemaPorClave,
   upsertConfigSistemaNumerico,
@@ -95,6 +96,13 @@ export default function ConfigParametrosPage() {
   })
   const [parametroFieldErrors, setParametroFieldErrors] = useState<Partial<Record<ParametroKey, string>>>({})
   const [parametroPendienteConfirmacion, setParametroPendienteConfirmacion] = useState<ParametroKey | null>(null)
+  // Track last-saved values to use as datos_anteriores in audit
+  const parametrosGuardados = useRef<ParametroCajaFormData>({
+    peso_caja_exportacion_kg: DEFAULT_PESO_CAJA_EXPORTACION_KG,
+    peso_caja_despacho_kg: DEFAULT_PESO_CAJA_DESPACHO_KG,
+    pago_recepcion_kg: DEFAULT_PAGO_RECEPCION_KG,
+    pago_empaquetado_caja: DEFAULT_PAGO_EMPAQUETADO_CAJA,
+  })
 
   const cargar = async () => {
     setLoading(true); setError(null)
@@ -105,12 +113,14 @@ export default function ConfigParametrosPage() {
         getConfigSistemaPorClave(CLAVE_PAGO_RECEPCION_KG),
         getConfigSistemaPorClave(CLAVE_PAGO_EMPAQUETADO_CAJA),
       ])
-      setParametros({
+      const loaded: ParametroCajaFormData = {
         peso_caja_exportacion_kg: Number(p0?.valor_numerico ?? DEFAULT_PESO_CAJA_EXPORTACION_KG),
         peso_caja_despacho_kg: Number(p1?.valor_numerico ?? DEFAULT_PESO_CAJA_DESPACHO_KG),
         pago_recepcion_kg: Number(p2?.valor_numerico ?? DEFAULT_PAGO_RECEPCION_KG),
         pago_empaquetado_caja: Number(p3?.valor_numerico ?? DEFAULT_PAGO_EMPAQUETADO_CAJA),
-      })
+      }
+      setParametros(loaded)
+      parametrosGuardados.current = { ...loaded }
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -149,6 +159,19 @@ export default function ConfigParametrosPage() {
       }, user.id)
 
       const savedValue = Number(saved.valor_numerico ?? parametros[key])
+
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'actualizar',
+        modulo: 'config_parametros',
+        registroId: config.clave,
+        descripcion: `Parámetro actualizado: ${config.nombre}`,
+        datosAnteriores: { clave: config.clave, valor: parametrosGuardados.current[key] },
+        datosNuevos: { clave: config.clave, valor: savedValue },
+      })
+
+      parametrosGuardados.current = { ...parametrosGuardados.current, [key]: savedValue }
       setParametros((prev) => ({ ...prev, [key]: savedValue }))
       setParametroSuccess(`Guardado: ${config.label}`)
     } catch (e) {

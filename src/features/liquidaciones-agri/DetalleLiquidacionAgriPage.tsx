@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { getLiquidacionAgri, actualizarEstadoLiquidacionAgri, pagarLiquidacionAgri } from '@/services/liquidaciones-agri.service'
+import { useParams, useNavigate } from 'react-router-dom'
+import { getLiquidacionAgri, actualizarEstadoLiquidacionAgri, pagarLiquidacionAgri, deleteLiquidacionAgri } from '@/services/liquidaciones-agri.service'
+import { logAudit } from '@/services/audit.service'
 import { RegistrarPagoDialog, type RegistroPagoPayload } from '@/components/shared/RegistrarPagoDialog'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
@@ -11,11 +12,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAuthStore } from '@/store/auth.store'
+import { Pencil, Trash2 } from 'lucide-react'
 import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 import { formatFecha, formatMoneda, formatPeso } from '@/utils/formatters'
 import type { LiquidacionAgri } from '@/types/models'
 
 export default function DetalleLiquidacionAgriPage() {
+  const navigate = useNavigate()
+  const { user } = useAuthStore()
   const roles = useAuthStore((state) => state.roles)
   const { id } = useParams<{ id: string }>()
   const [liquidacion, setLiquidacion] = useState<LiquidacionAgri | null>(null)
@@ -24,6 +28,7 @@ export default function DetalleLiquidacionAgriPage() {
   const [cambiando, setCambiando] = useState(false)
   const [accionPendiente, setAccionPendiente] = useState<'confirmada' | null>(null)
   const [pagoDialogOpen, setPagoDialogOpen] = useState(false)
+  const [eliminarPendiente, setEliminarPendiente] = useState(false)
 
   const cargar = async () => {
     if (!id) return
@@ -42,10 +47,20 @@ export default function DetalleLiquidacionAgriPage() {
   useEffect(() => { cargar() }, [id])
 
   const cambiarEstado = async (nuevoEstado: 'confirmada') => {
-    if (!liquidacion) return
+    if (!liquidacion || !user) return
     setCambiando(true)
     try {
       await actualizarEstadoLiquidacionAgri(liquidacion.id, nuevoEstado)
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'actualizar',
+        modulo: 'liquidaciones_agri',
+        registroId: liquidacion.id,
+        descripcion: `Liquidación confirmada: ${liquidacion.codigo}`,
+        datosAnteriores: { estado: 'borrador' },
+        datosNuevos: { estado: nuevoEstado },
+      })
       await cargar()
     } finally {
       setCambiando(false)
@@ -53,14 +68,48 @@ export default function DetalleLiquidacionAgriPage() {
   }
 
   const handleRegistrarPago = async (payload: RegistroPagoPayload) => {
-    if (!liquidacion) return
+    if (!liquidacion || !user) return
     setCambiando(true)
     try {
       await pagarLiquidacionAgri(liquidacion.id, payload)
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'actualizar',
+        modulo: 'liquidaciones_agri',
+        registroId: liquidacion.id,
+        descripcion: `Liquidación liquidada: ${liquidacion.codigo}`,
+        datosAnteriores: { estado: 'confirmada' },
+        datosNuevos: { estado: 'pagada', fecha_pago: payload.fecha_pago },
+      })
       await cargar()
       setPagoDialogOpen(false)
     } finally {
       setCambiando(false)
+    }
+  }
+
+  const handleEliminar = async () => {
+    if (!user || !liquidacion) return
+    setCambiando(true)
+    try {
+      await deleteLiquidacionAgri(liquidacion.id)
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'eliminar',
+        modulo: 'liquidaciones_agri',
+        registroId: liquidacion.id,
+        descripcion: `Liquidación eliminada: ${liquidacion.codigo}`,
+        datosAnteriores: { codigo: liquidacion.codigo, total_monto: liquidacion.total_monto },
+        datosNuevos: null,
+      })
+      navigate('/liquidaciones/agricultores')
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setCambiando(false)
+      setEliminarPendiente(false)
     }
   }
 
@@ -80,6 +129,27 @@ export default function DetalleLiquidacionAgriPage() {
         actions={
           <div className="flex gap-2">
             {liquidacion.estado === 'borrador' && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={cambiando}
+                  onClick={() => navigate(`/liquidaciones/agricultores/${liquidacion.id}/editar`)}
+                >
+                  <Pencil className="h-4 w-4 mr-2" /> Editar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={cambiando}
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setEliminarPendiente(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Eliminar
+                </Button>
+              </>
+            )}
+            {liquidacion.estado === 'borrador' && (
               <Button variant="outline" disabled={cambiando} onClick={() => setAccionPendiente('confirmada')}>
                 Confirmar
               </Button>
@@ -87,7 +157,7 @@ export default function DetalleLiquidacionAgriPage() {
             {liquidacion.estado === 'confirmada' && (
               puedePagar ? (
                 <Button disabled={cambiando} onClick={() => setPagoDialogOpen(true)}>
-                  Marcar pagada
+                  Marcar liquidada
                 </Button>
               ) : (
                 <Button disabled variant="secondary">
@@ -164,6 +234,17 @@ export default function DetalleLiquidacionAgriPage() {
       </Card>
 
       <ConfirmDialog
+        open={eliminarPendiente}
+        title="¿Eliminar liquidación?"
+        description={`Se eliminará la liquidación ${liquidacion.codigo}. Esta acción es irreversible.`}
+        confirmLabel="Sí, eliminar"
+        variant="destructive"
+        loading={cambiando}
+        onConfirm={() => { void handleEliminar() }}
+        onCancel={() => setEliminarPendiente(false)}
+      />
+
+      <ConfirmDialog
         open={!!accionPendiente}
         title="¿Confirmar liquidación?"
         description="La liquidación saldrá de borrador y quedará confirmada."
@@ -180,7 +261,7 @@ export default function DetalleLiquidacionAgriPage() {
         open={pagoDialogOpen}
         loading={cambiando}
         title="Registrar pago de liquidación"
-        description="Ingresa los datos del pago para marcar la liquidación como pagada."
+        description="Ingresa los datos del pago para marcar la liquidación como liquidada."
         onConfirm={(payload) => handleRegistrarPago(payload)}
         onCancel={() => setPagoDialogOpen(false)}
       />

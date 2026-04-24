@@ -29,6 +29,14 @@ interface RegistrarPagoDialogProps {
   onConfirm: (payload: RegistroPagoPayload) => void | Promise<void>
 }
 
+function getTodayIsoLocal(): string {
+  const now = new Date()
+  const yyyy = String(now.getFullYear())
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
+}
+
 export function RegistrarPagoDialog({
   open,
   loading,
@@ -43,8 +51,8 @@ export function RegistrarPagoDialog({
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!open) {
-      setFechaPago('')
+    if (open) {
+      setFechaPago(getTodayIsoLocal())
       setNumeroOperacion('')
       setModalidadPago('')
       setError(null)

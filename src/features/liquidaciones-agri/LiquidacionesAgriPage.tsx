@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLiquidacionesAgri, getLiquidacionAgri, actualizarEstadoLiquidacionAgri, pagarLiquidacionAgri } from '@/services/liquidaciones-agri.service'
+import { getLiquidacionesAgri, getLiquidacionAgri, actualizarEstadoLiquidacionAgri, pagarLiquidacionAgri, deleteLiquidacionAgri } from '@/services/liquidaciones-agri.service'
+import { logAudit } from '@/services/audit.service'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingPage } from '@/components/shared/Spinner'
 import { ErrorMessage } from '@/components/shared/ErrorMessage'
@@ -13,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatFecha, formatMoneda } from '@/utils/formatters'
 import { generateLiquidacionAgriExcel } from '@/utils/liquidacion-agri-excel'
-import { Plus, FileText, Search, Download } from 'lucide-react'
+import { Plus, FileText, Search, Download, Pencil, Trash2 } from 'lucide-react'
 import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 import { useAuthStore } from '@/store/auth.store'
 import { APP_ROLES } from '@/types/auth'
@@ -21,7 +22,7 @@ import type { LiquidacionAgri } from '@/types/models'
 
 export default function LiquidacionesAgriPage() {
   const navigate = useNavigate()
-  const { roles } = useAuthStore()
+  const { roles, user } = useAuthStore()
   const puedePagar = hasPermission(roles, APP_PERMISSIONS.LIQUIDACIONES_AGRI_PAY)
   const esTesoreria = roles.includes(APP_ROLES.TESORERIA)
   
@@ -32,6 +33,7 @@ export default function LiquidacionesAgriPage() {
   const [accionPendiente, setAccionPendiente] = useState<{ id: string; estado: 'confirmada' } | null>(null)
   const [pagoPendienteId, setPagoPendienteId] = useState<string | null>(null)
   const [descargandoId, setDescargandoId] = useState<string | null>(null)
+  const [eliminarPendienteId, setEliminarPendienteId] = useState<string | null>(null)
   const [cambiando, setCambiando] = useState(false)
 
   const cargar = async () => {
@@ -44,10 +46,21 @@ export default function LiquidacionesAgriPage() {
   }
 
   const handleCambiarEstado = async () => {
-    if (!accionPendiente) return
+    if (!accionPendiente || !user) return
     setCambiando(true)
     try {
+      const liq = liquidaciones.find(l => l.id === accionPendiente.id)
       await actualizarEstadoLiquidacionAgri(accionPendiente.id, accionPendiente.estado)
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'actualizar',
+        modulo: 'liquidaciones_agri',
+        registroId: accionPendiente.id,
+        descripcion: `Liquidación confirmada: ${liq?.codigo}`,
+        datosAnteriores: { estado: 'borrador' },
+        datosNuevos: { estado: accionPendiente.estado },
+      })
       await cargar()
       setAccionPendiente(null)
     } catch (e) {
@@ -58,10 +71,21 @@ export default function LiquidacionesAgriPage() {
   }
 
   const handleRegistrarPago = async (payload: RegistroPagoPayload) => {
-    if (!pagoPendienteId) return
+    if (!pagoPendienteId || !user) return
     setCambiando(true)
     try {
+      const liq = liquidaciones.find((l) => l.id === pagoPendienteId)
       await pagarLiquidacionAgri(pagoPendienteId, payload)
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'actualizar',
+        modulo: 'liquidaciones_agri',
+        registroId: pagoPendienteId,
+        descripcion: `Liquidación liquidada: ${liq?.codigo}`,
+        datosAnteriores: { estado: 'confirmada' },
+        datosNuevos: { estado: 'pagada', fecha_pago: payload.fecha_pago },
+      })
       await cargar()
       setPagoPendienteId(null)
     } catch (e) {
@@ -80,6 +104,31 @@ export default function LiquidacionesAgriPage() {
       setError((e as Error).message)
     } finally {
       setDescargandoId(null)
+    }
+  }
+
+  const handleEliminar = async (id: string) => {
+    if (!user) return
+    setCambiando(true)
+    try {
+      const liq = liquidaciones.find(l => l.id === id)
+      await deleteLiquidacionAgri(id)
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'eliminar',
+        modulo: 'liquidaciones_agri',
+        registroId: id,
+        descripcion: `Liquidación eliminada: ${liq?.codigo}`,
+        datosAnteriores: { codigo: liq?.codigo, total_monto: liq?.total_monto },
+        datosNuevos: null,
+      })
+      await cargar()
+      setEliminarPendienteId(null)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setCambiando(false)
     }
   }
 
@@ -158,14 +207,36 @@ export default function LiquidacionesAgriPage() {
                       </Button>
                     )}
                     {l.estado === 'borrador' && (
-                      <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: l.id, estado: 'confirmada' })}>
-                        Confirmar
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={cambiando}
+                          onClick={() => navigate(`/liquidaciones/agricultores/${l.id}/editar`)}
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={cambiando}
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setEliminarPendienteId(l.id)}
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setAccionPendiente({ id: l.id, estado: 'confirmada' })}
+                        >
+                          Confirmar
+                        </Button>
+                      </>
                     )}
                     {l.estado === 'confirmada' && (
                       puedePagar ? (
                         <Button size="sm" variant="outline" onClick={() => setPagoPendienteId(l.id)}>
-                          Marcar pagada
+                          Marcar liquidada
                         </Button>
                       ) : (
                         <Button size="sm" variant="secondary" disabled>
@@ -183,6 +254,19 @@ export default function LiquidacionesAgriPage() {
       
       {/* Confirmar acción */}
       <ConfirmDialog
+        open={!!eliminarPendienteId}
+        title="¿Eliminar liquidación?"
+        description={`Se eliminará la liquidación. Esta acción es irreversible.`}
+        confirmLabel="Sí, eliminar"
+        variant="destructive"
+        loading={cambiando}
+        onConfirm={() => {
+          if (eliminarPendienteId) void handleEliminar(eliminarPendienteId)
+        }}
+        onCancel={() => setEliminarPendienteId(null)}
+      />
+
+      <ConfirmDialog
         open={!!accionPendiente}
         title="¿Confirmar liquidación?"
         description="La liquidación saldrá de borrador y quedará confirmada."
@@ -196,7 +280,7 @@ export default function LiquidacionesAgriPage() {
         open={!!pagoPendienteId}
         loading={cambiando}
         title="Registrar pago de liquidación"
-        description="Ingresa los datos del pago para marcar la liquidación como pagada."
+        description="Ingresa los datos del pago para marcar la liquidación como liquidada."
         onConfirm={(payload) => handleRegistrarPago(payload)}
         onCancel={() => setPagoPendienteId(null)}
       />

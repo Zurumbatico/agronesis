@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import { useForm, Controller, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { createLiquidacionAgri, getLoteIdsEnLiquidacionAgri } from '@/services/liquidaciones-agri.service'
+import { createLiquidacionAgri, getLiquidacionAgri, updateLiquidacionAgri, getLoteIdsEnLiquidacionAgri, getLoteIdsEnOtrasLiquidaciones } from '@/services/liquidaciones-agri.service'
+import { logAudit } from '@/services/audit.service'
 import { getClasificacionesPorLote } from '@/services/clasificaciones.service'
 import { getConfigPrecios } from '@/services/config-precios.service'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -22,6 +23,16 @@ import { generarCodigoLiquidacionAgri } from '@/utils/formatters'
 import { calcularTotalesClasificacion, calcularTotalLiquidacionAgri, calcularPesoAgricultor } from '@/utils/business-rules'
 import { format, getISOWeek, getISOWeekYear, parseISO } from 'date-fns'
 import type { CalidadProducto, CategoriaClasificacion, Clasificacion, ConfigPrecio, EstadoLote } from '@/types/models'
+
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 
 const ESTADOS_LOTE_LIQUIDABLES = new Set<EstadoLote>(['clasificado', 'empaquetado', 'en_despacho', 'despachado'])
 
@@ -47,29 +58,63 @@ type NuevaLiqFormData = z.infer<typeof nuevaLiqSchema>
 export default function NuevaLiquidacionAgriPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { id: liquidacionId } = useParams<{ id: string }>()
   const paramAgricultorId = searchParams.get('agricultor_id') ?? undefined
   const { user } = useAuthStore()
   const { agricultores } = useAgricultores()
   const { lotes } = useLotes()
+  const [liquidacionEditando, setLiquidacionEditando] = useState<any>(null)
+  const [cargandoEdicion, setCargandoEdicion] = useState(!!liquidacionId)
   const [clasificacionesPorLote, setClasificacionesPorLote] = useState<Record<string, Clasificacion[]>>({})
   const [cargandoClasif, setCargandoClasif] = useState(false)
   const [loteIdsYaLiquidados, setLoteIdsYaLiquidados] = useState<Set<string>>(new Set())
   const [configPrecios, setConfigPrecios] = useState<ConfigPrecio[]>([])
 
+  // Cargar liquidación si estamos editando
+  useEffect(() => {
+    if (liquidacionId) {
+      getLiquidacionAgri(liquidacionId)
+        .then(setLiquidacionEditando)
+        .catch(() => {/* error al cargar */})
+        .finally(() => setCargandoEdicion(false))
+    }
+  }, [liquidacionId])
+
   useEffect(() => {
     getConfigPrecios().then(setConfigPrecios).catch(() => {/* no bloquear si falla */})
   }, [])
 
-  const { register, handleSubmit, control, watch, setValue, formState: { errors, isSubmitting } } = useForm<NuevaLiqFormData>({
+  const { register, handleSubmit, control, watch, reset, setValue, formState: { errors, isSubmitting } } = useForm<NuevaLiqFormData>({
     resolver: zodResolver(nuevaLiqSchema),
     defaultValues: {
       codigo: generarCodigoLiquidacionAgri(),
-      agricultor_id: paramAgricultorId ?? '',
+      agricultor_id: '',
       fecha_inicio: format(new Date(), 'yyyy-MM-dd'),
       fecha_fin: format(new Date(), 'yyyy-MM-dd'),
       detalles: [],
+      observaciones: undefined,
     },
   })
+
+  // Cargar datos en el form cuando se carga liquidacionEditando
+  useEffect(() => {
+    if (liquidacionEditando) {
+      reset({
+        codigo: liquidacionEditando.codigo,
+        agricultor_id: liquidacionEditando.agricultor_id,
+        fecha_inicio: liquidacionEditando.fecha_inicio,
+        fecha_fin: liquidacionEditando.fecha_fin,
+        detalles: (liquidacionEditando.detalles ?? []).map((d: any) => ({
+          lote_id: d.lote_id,
+          categoria: d.categoria,
+          peso_kg: d.peso_kg,
+          precio_kg: d.precio_kg,
+          subtotal: d.subtotal,
+        })),
+        observaciones: liquidacionEditando.observaciones ?? undefined,
+      })
+    }
+  }, [liquidacionEditando, reset])
 
   // Estado local para el buscador de agricultor
   const [agricultorSearch, setAgricultorSearch] = useState('')
@@ -80,10 +125,10 @@ export default function NuevaLiquidacionAgriPage() {
 
   const agricultoresActivos = agricultores.filter((a) => a.estado === 'activo')
   const agricultoresFiltrados = useMemo(() => {
-    const q = agricultorSearch.trim().toLowerCase()
+    const q = normalizeSearchText(agricultorSearch)
     if (!q) return agricultoresActivos
     return agricultoresActivos.filter((a) =>
-      `${a.apellido} ${a.nombre} ${a.codigo} ${a.dni ?? ''}`.toLowerCase().includes(q)
+      normalizeSearchText(`${a.apellido} ${a.nombre} ${a.codigo} ${a.dni ?? ''}`).includes(q)
     )
   }, [agricultoresActivos, agricultorSearch])
 
@@ -120,14 +165,30 @@ export default function NuevaLiquidacionAgriPage() {
       setLoteIdsYaLiquidados(new Set())
     }
     prevAgricultorRef[0] = agricultorId
-  }, [agricultorId])
+  }, [agricultorId, setValue])
+
+  // Si estamos creando (no editando) y hay agricultor preseleccionado, cargarlo
+  useEffect(() => {
+    if (!liquidacionEditando && paramAgricultorId) {
+      reset((formValues) => ({
+        ...formValues,
+        agricultor_id: paramAgricultorId,
+      }))
+    }
+  }, [paramAgricultorId, liquidacionEditando, reset])
 
   useEffect(() => {
     if (agricultorId && lotes.length > 0) {
       cargarClasificaciones()
-      getLoteIdsEnLiquidacionAgri(agricultorId).then(setLoteIdsYaLiquidados).catch(() => {})
+      // Si estamos editando, excluir solo otros lotes en otras liquidaciones
+      // Si estamos creando, excluir lotes en cualquier liquidación
+      if (liquidacionEditando) {
+        getLoteIdsEnOtrasLiquidaciones(agricultorId, liquidacionEditando.id).then(setLoteIdsYaLiquidados).catch(() => {})
+      } else {
+        getLoteIdsEnLiquidacionAgri(agricultorId).then(setLoteIdsYaLiquidados).catch(() => {})
+      }
     }
-  }, [agricultorId, lotes.length])
+  }, [agricultorId, lotes.length, liquidacionEditando])
 
   const agregarDetalleLote = (loteId: string) => {
     const cls = clasificacionesPorLote[loteId] ?? []
@@ -165,12 +226,45 @@ export default function NuevaLiquidacionAgriPage() {
     // Recalcular subtotales
     const detalles = data.detalles.map((d) => ({ ...d, subtotal: (Number(d.peso_kg) || 0) * (Number(d.precio_kg) || 0) }))
     const { total_kg, total_monto } = calcularTotalLiquidacionAgri(detalles)
-    const liq = await createLiquidacionAgri(
-      { codigo: data.codigo, agricultor_id: data.agricultor_id, fecha_inicio: data.fecha_inicio, fecha_fin: data.fecha_fin, total_kg, total_monto, estado: 'borrador', observaciones: data.observaciones ?? null },
-      detalles as any,
-      user.id
-    )
-    navigate(`/liquidaciones/agricultores/${liq.id}`)
+    
+    if (liquidacionEditando) {
+      // Editar
+      const updated = await updateLiquidacionAgri(
+        liquidacionEditando.id,
+        { codigo: data.codigo, agricultor_id: data.agricultor_id, fecha_inicio: data.fecha_inicio, fecha_fin: data.fecha_fin, total_kg, total_monto, observaciones: data.observaciones ?? null },
+        detalles as any,
+        user.id
+      )
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'actualizar',
+        modulo: 'liquidaciones_agri',
+        registroId: updated.id,
+        descripcion: `Liquidación editada: ${updated.codigo}`,
+        datosAnteriores: { codigo: liquidacionEditando.codigo, total_monto: liquidacionEditando.total_monto },
+        datosNuevos: { codigo: updated.codigo, total_monto: updated.total_monto },
+      })
+      navigate(`/liquidaciones/agricultores/${updated.id}`)
+    } else {
+      // Crear
+      const liq = await createLiquidacionAgri(
+        { codigo: data.codigo, agricultor_id: data.agricultor_id, fecha_inicio: data.fecha_inicio, fecha_fin: data.fecha_fin, total_kg, total_monto, estado: 'borrador', observaciones: data.observaciones ?? null },
+        detalles as any,
+        user.id
+      )
+      void logAudit({
+        userId: user.id,
+        userEmail: user.email ?? '',
+        accion: 'crear',
+        modulo: 'liquidaciones_agri',
+        registroId: liq.id,
+        descripcion: `Liquidación creada: ${liq.codigo}`,
+        datosAnteriores: null,
+        datosNuevos: { codigo: liq.codigo, total_monto: liq.total_monto },
+      })
+      navigate(`/liquidaciones/agricultores/${liq.id}`)
+    }
   }
 
   const totalEstimado = fields.reduce((acc, _field, i) => {
@@ -179,9 +273,20 @@ export default function NuevaLiquidacionAgriPage() {
     return acc + (precio * peso)
   }, 0)
 
+  const pageTitle = liquidacionEditando ? `Editar liquidación - ${liquidacionEditando.codigo}` : 'Nueva liquidación – Agricultor'
+  const submitLabel = liquidacionEditando ? 'Guardar cambios' : 'Crear liquidación'
+
+  if (cargandoEdicion) {
+    return (
+      <div className="max-w-3xl mx-auto">
+        <PageHeader title="Cargando..." backHref="/liquidaciones/agricultores" />
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-3xl mx-auto">
-      <PageHeader title="Nueva liquidación – Agricultor" backHref="/liquidaciones/agricultores" />
+      <PageHeader title={pageTitle} backHref="/liquidaciones/agricultores" />
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
         <Card>
@@ -316,6 +421,11 @@ export default function NuevaLiquidacionAgriPage() {
                         step="0.01"
                         min="0"
                         placeholder="0.00"
+                        onFocus={(e) => {
+                          if (e.currentTarget.value === '0') {
+                            e.currentTarget.value = ''
+                          }
+                        }}
                         {...register(`detalles.${index}.precio_kg`, {
                           valueAsNumber: true,
                           setValueAs: (v) => (v === '' || isNaN(Number(v)) ? 0 : Number(v)),
@@ -336,7 +446,7 @@ export default function NuevaLiquidacionAgriPage() {
 
         <div className="flex justify-end gap-2">
           <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancelar</Button>
-          <Button type="submit" loading={isSubmitting}>Crear liquidación</Button>
+          <Button type="submit" loading={isSubmitting}>{submitLabel}</Button>
         </div>
       </form>
     </div>

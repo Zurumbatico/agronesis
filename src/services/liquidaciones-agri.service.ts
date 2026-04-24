@@ -134,3 +134,108 @@ export async function getLoteIdsEnLiquidacionAgri(agricultorId: string): Promise
 
   return new Set((detalles ?? []).map((d) => d.lote_id as string))
 }
+
+/**
+ * Retorna los lote_ids que están en OTRAS liquidaciones (no la especificada).
+ * Usado al editar una liquidación para no excluir los lotes de la misma liquidación.
+ */
+export async function getLoteIdsEnOtrasLiquidaciones(agricultorId: string, liquidacionIdActual: string): Promise<Set<string>> {
+  const { data: liquidaciones, error: errLiq } = await supabase
+    .from(TABLE)
+    .select('id')
+    .eq('agricultor_id', agricultorId)
+    .neq('id', liquidacionIdActual)
+
+  if (errLiq) throw new Error(errLiq.message)
+  if (!liquidaciones || liquidaciones.length === 0) return new Set()
+
+  const ids = liquidaciones.map((l) => l.id)
+
+  const { data: detalles, error: errDet } = await supabase
+    .from('liquidacion_agri_detalle')
+    .select('lote_id')
+    .in('liquidacion_id', ids)
+
+  if (errDet) throw new Error(errDet.message)
+
+  return new Set((detalles ?? []).map((d) => d.lote_id as string))
+}
+
+/**
+ * Actualiza una liquidación en estado borrador (código, fechas, observaciones, detalles).
+ * Solo permite actualizar si la liquidación está en borrador.
+ */
+export async function updateLiquidacionAgri(
+  id: string,
+  input: Partial<LiquidacionAgriInsert>,
+  detalles: LiquidacionAgriDetalleInsert[] | undefined,
+  userId: string
+): Promise<LiquidacionAgri> {
+  // Verificar que esté en borrador
+  const current = await getLiquidacionAgri(id)
+  if (current.estado !== 'borrador') {
+    throw new Error('No se puede editar una liquidación que no está en borrador')
+  }
+
+  // Actualizar liquidación
+  const updateData: Record<string, unknown> = {
+    ...input,
+    updated_at: new Date().toISOString(),
+  }
+  const { error: updateError } = await supabase
+    .from(TABLE)
+    .update(updateData)
+    .eq('id', id)
+
+  if (updateError) throw new Error(updateError.message)
+
+  // Si se proporciona detalles, actualizar
+  if (detalles !== undefined) {
+    // Eliminar detalles anteriores
+    const { error: deleteError } = await supabase
+      .from('liquidacion_agri_detalle')
+      .delete()
+      .eq('liquidacion_id', id)
+
+    if (deleteError) throw new Error(deleteError.message)
+
+    // Insertar nuevos detalles
+    if (detalles.length > 0) {
+      const { error: insertError } = await supabase
+        .from('liquidacion_agri_detalle')
+        .insert(detalles.map((d) => ({ ...d, liquidacion_id: id, created_by: userId })))
+
+      if (insertError) throw new Error(insertError.message)
+    }
+  }
+
+  return getLiquidacionAgri(id)
+}
+
+/**
+ * Elimina una liquidación en estado borrador.
+ * Nota: No restaura estado de lotes porque nunca fueron modificados al crear en borrador.
+ */
+export async function deleteLiquidacionAgri(id: string): Promise<void> {
+  // Verificar que esté en borrador
+  const current = await getLiquidacionAgri(id)
+  if (current.estado !== 'borrador') {
+    throw new Error('No se puede eliminar una liquidación que no está en borrador')
+  }
+
+  // Eliminar detalles primero
+  const { error: detError } = await supabase
+    .from('liquidacion_agri_detalle')
+    .delete()
+    .eq('liquidacion_id', id)
+
+  if (detError) throw new Error(detError.message)
+
+  // Eliminar liquidación
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+}

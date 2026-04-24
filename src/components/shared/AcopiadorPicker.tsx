@@ -6,6 +6,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import type { Acopiador, Agricultor } from '@/types/models'
 
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 interface AcopiadorPickerProps {
   value: string
   onChange: (value: string) => void
@@ -35,15 +45,15 @@ export function AcopiadorPicker({ value, onChange, acopiadores, agricultores, er
     return null
   }, [value, acopiadores, agricultores])
 
-  const q = search.toLowerCase()
+  const q = normalizeSearchText(search)
 
   const filteredAcopiadores = useMemo(
-    () => acopiadores.filter((a) => `${a.apellido} ${a.nombre} ${a.codigo}`.toLowerCase().includes(q)),
+    () => acopiadores.filter((a) => normalizeSearchText(`${a.apellido} ${a.nombre} ${a.codigo}`).includes(q)),
     [acopiadores, q]
   )
 
   const filteredAgricultores = useMemo(
-    () => agricultores.filter((a) => `${a.apellido} ${a.nombre} ${a.codigo}`.toLowerCase().includes(q)),
+    () => agricultores.filter((a) => normalizeSearchText(`${a.apellido} ${a.nombre} ${a.codigo}`).includes(q)),
     [agricultores, q]
   )
 

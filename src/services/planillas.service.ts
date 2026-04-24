@@ -88,6 +88,84 @@ export async function pagarPlanilla(
 }
 
 /**
+ * Actualiza una planilla en estado borrador.
+ * Solo permite actualizar si la planilla está en borrador.
+ */
+export async function updatePlanillaQuincenal(
+  id: string,
+  input: Partial<PlanillaQuincenalInsert>,
+  detalles: PlanillaDetalleInsert[] | undefined,
+  userId: string
+): Promise<PlanillaQuincenal> {
+  // Verificar que esté en borrador
+  const current = await getPlanillaConDetalles(id)
+  if (current.estado !== 'borrador') {
+    throw new Error('No se puede editar una planilla que no está en borrador')
+  }
+
+  // Actualizar planilla
+  const updateData: Record<string, unknown> = {
+    ...input,
+    updated_at: new Date().toISOString(),
+  }
+  const { error: updateError } = await supabase
+    .from('planillas_quincenales')
+    .update(updateData)
+    .eq('id', id)
+
+  if (updateError) throw new Error(updateError.message)
+
+  // Si se proporciona detalles, actualizar
+  if (detalles !== undefined) {
+    // Eliminar detalles anteriores
+    const { error: deleteError } = await supabase
+      .from('planilla_detalles')
+      .delete()
+      .eq('planilla_id', id)
+
+    if (deleteError) throw new Error(deleteError.message)
+
+    // Insertar nuevos detalles
+    if (detalles.length > 0) {
+      const { error: insertError } = await supabase
+        .from('planilla_detalles')
+        .insert(detalles.map((d) => ({ ...d, planilla_id: id, created_by: userId })))
+
+      if (insertError) throw new Error(insertError.message)
+    }
+  }
+
+  return getPlanillaConDetalles(id)
+}
+
+/**
+ * Elimina una planilla en estado borrador.
+ */
+export async function deletePlanillaQuincenal(id: string): Promise<void> {
+  // Verificar que esté en borrador
+  const current = await getPlanillaConDetalles(id)
+  if (current.estado !== 'borrador') {
+    throw new Error('No se puede eliminar una planilla que no está en borrador')
+  }
+
+  // Eliminar detalles primero
+  const { error: detError } = await supabase
+    .from('planilla_detalles')
+    .delete()
+    .eq('planilla_id', id)
+
+  if (detError) throw new Error(detError.message)
+
+  // Eliminar planilla
+  const { error } = await supabase
+    .from('planillas_quincenales')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+}
+
+/**
  * Retorna los colaborador_id que ya aparecen en planillas cuyo período
  * se solapa con [fechaInicio, fechaFin], para evitar doble conteo.
  */
