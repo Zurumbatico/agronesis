@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatFecha, formatMoneda } from '@/utils/formatters'
-import { generateLiquidacionAgriExcel } from '@/utils/liquidacion-agri-excel'
+import { generateLiquidacionesAgriConsolidadoExcel } from '@/utils/liquidacion-agri-excel'
 import { Plus, FileText, Search, Download, Pencil, Trash2 } from 'lucide-react'
 import { APP_PERMISSIONS, hasPermission } from '@/lib/permissions'
 import { useAuthStore } from '@/store/auth.store'
@@ -33,9 +33,14 @@ export default function LiquidacionesAgriPage() {
   const [busqueda, setBusqueda] = useState('')
   const [accionPendiente, setAccionPendiente] = useState<{ id: string; estado: 'confirmada' } | null>(null)
   const [pagoPendienteId, setPagoPendienteId] = useState<string | null>(null)
-  const [descargandoId, setDescargandoId] = useState<string | null>(null)
+  const [descargandoConsolidado, setDescargandoConsolidado] = useState(false)
   const [eliminarPendienteId, setEliminarPendienteId] = useState<string | null>(null)
   const [cambiando, setCambiando] = useState(false)
+  const [fechaDesde, setFechaDesde] = useState(() => getInicioSemanaLaboralISO())
+  const [fechaHasta, setFechaHasta] = useState(() => getFinSemanaLaboralISO())
+  const [pagina, setPagina] = useState(1)
+
+  const itemsPorPagina = 10
 
   const cargar = async () => {
     setLoading(true)
@@ -113,15 +118,31 @@ export default function LiquidacionesAgriPage() {
     }
   }
 
-  const handleDescargar = async (id: string) => {
-    setDescargandoId(id)
+  const handleDescargarConsolidado = () => {
+    if (!fechaDesde || !fechaHasta) return
+    if (fechaDesde > fechaHasta) {
+      window.alert('El rango de fechas es invalido: "Desde" no puede ser mayor a "Hasta".')
+      return
+    }
+
+    setDescargandoConsolidado(true)
     try {
-      const full = await getLiquidacionAgri(id)
-      generateLiquidacionAgriExcel(full)
-    } catch (e) {
-      setError((e as Error).message)
+      const enRango = liquidaciones.filter((l) =>
+        l.estado === 'pagada' && l.fecha_inicio <= fechaHasta && l.fecha_fin >= fechaDesde
+      )
+
+      if (enRango.length === 0) {
+        window.alert('No hay liquidaciones liquidadas en el rango de fechas seleccionado.')
+        return
+      }
+
+      generateLiquidacionesAgriConsolidadoExcel({
+        fechaDesde,
+        fechaHasta,
+        liquidaciones: enRango,
+      })
     } finally {
-      setDescargandoId(null)
+      setDescargandoConsolidado(false)
     }
   }
 
@@ -162,6 +183,22 @@ export default function LiquidacionesAgriPage() {
       (l.agricultor as any)?.nombre?.toLowerCase().includes(q)
   })
 
+  const totalPaginas = Math.max(1, Math.ceil(filtradas.length / itemsPorPagina))
+  const paginaActual = Math.min(pagina, totalPaginas)
+  const inicioPagina = (paginaActual - 1) * itemsPorPagina
+  const finPagina = inicioPagina + itemsPorPagina
+  const filtradasPaginadas = filtradas.slice(inicioPagina, finPagina)
+
+  useEffect(() => {
+    setPagina(1)
+  }, [busqueda])
+
+  useEffect(() => {
+    if (pagina > totalPaginas) {
+      setPagina(totalPaginas)
+    }
+  }, [pagina, totalPaginas])
+
   if (loading) return <LoadingPage />
   if (error) return <ErrorMessage message={error} onRetry={cargar} />
 
@@ -182,11 +219,40 @@ export default function LiquidacionesAgriPage() {
         <Input className="pl-9" placeholder="Buscar por código o agricultor..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
       </div>
 
+      <Card className="mb-4">
+        <CardContent className="pt-4">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="w-full sm:w-[200px]">
+              <label className="text-xs text-muted-foreground">Desde</label>
+              <Input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
+            </div>
+            <div className="w-full sm:w-[200px]">
+              <label className="text-xs text-muted-foreground">Hasta</label>
+              <Input type="date" value={fechaHasta} onChange={(e) => setFechaHasta(e.target.value)} />
+            </div>
+            {puedeDescargar && (
+              <Button
+                className="sm:ml-auto"
+                variant="outline"
+                disabled={descargandoConsolidado}
+                onClick={handleDescargarConsolidado}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Descargar consolidado
+              </Button>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            El consolidado agrupa por agricultor todas las liquidaciones del rango seleccionado.
+          </p>
+        </CardContent>
+      </Card>
+
       {filtradas.length === 0 ? (
         <EmptyState icon={<FileText className="h-8 w-8" />} title="Sin liquidaciones" description="Crea la primera liquidación para un agricultor." />
       ) : (
         <div className="flex flex-col gap-2">
-          {filtradas.map((l) => (
+          {filtradasPaginadas.map((l) => (
             <Card key={l.id}>
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between gap-4">
@@ -213,17 +279,6 @@ export default function LiquidacionesAgriPage() {
                   <div className="flex items-center gap-3 shrink-0">
                     <p className="font-bold text-sm">{formatMoneda(l.total_monto ?? 0)}</p>
                     <EstadoLiquidacionBadge estado={l.estado} />
-                    {puedeDescargar && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={descargandoId === l.id}
-                        onClick={() => { void handleDescargar(l.id) }}
-                        title="Descargar reporte"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    )}
                     {l.estado === 'borrador' && (
                       <>
                         <Button
@@ -267,6 +322,33 @@ export default function LiquidacionesAgriPage() {
               </CardContent>
             </Card>
           ))}
+
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-xs text-muted-foreground">
+              Mostrando {inicioPagina + 1}-{Math.min(finPagina, filtradas.length)} de {filtradas.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={paginaActual <= 1}
+                onClick={() => setPagina((prev) => Math.max(1, prev - 1))}
+              >
+                Anterior
+              </Button>
+              <span className="text-xs text-muted-foreground min-w-[90px] text-center">
+                Pagina {paginaActual} de {totalPaginas}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={paginaActual >= totalPaginas}
+                onClick={() => setPagina((prev) => Math.min(totalPaginas, prev + 1))}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
         </div>
       )}
       
@@ -304,4 +386,29 @@ export default function LiquidacionesAgriPage() {
       />
     </div>
   )
+}
+
+function toISODate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function getInicioSemanaLaboralISO(): string {
+  const now = new Date()
+  const day = now.getDay()
+  const diffToMonday = day === 0 ? -6 : 1 - day
+  const monday = new Date(now)
+  monday.setDate(now.getDate() + diffToMonday)
+  return toISODate(monday)
+}
+
+function getFinSemanaLaboralISO(): string {
+  const now = new Date()
+  const day = now.getDay()
+  const diffToFriday = day === 0 ? -2 : 5 - day
+  const friday = new Date(now)
+  friday.setDate(now.getDate() + diffToFriday)
+  return toISODate(friday)
 }

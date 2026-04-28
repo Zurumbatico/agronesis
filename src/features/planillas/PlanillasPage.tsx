@@ -8,6 +8,7 @@ import {
   getPlanillaConDetalles,
   getResumenColaboradoresPeriodo,
   getColaboradoresYaLiquidados,
+  existePlanillaSolapada,
   updatePlanillaQuincenal,
   deletePlanillaQuincenal,
 } from '@/services/planillas.service'
@@ -78,11 +79,14 @@ export default function PlanillasPage() {
   const [cargandoEdicion, setCargandoEdicion] = useState(false)
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
+  const [pagina, setPagina] = useState(1)
+  const defaultsQuincena = getDefaultQuincenaRange()
+  const itemsPorPagina = 10
 
   const { register, handleSubmit, watch, reset, control, formState: { errors, isSubmitting } } = useForm<PlanillaForm>({
     defaultValues: {
-      periodo_inicio: format(new Date(), 'yyyy-MM-01'),
-      periodo_fin: format(new Date(), 'yyyy-MM-15'),
+      periodo_inicio: defaultsQuincena.inicio,
+      periodo_fin: defaultsQuincena.fin,
       observaciones: '',
       detalles: [],
     },
@@ -114,9 +118,10 @@ export default function PlanillasPage() {
   useEffect(() => { cargar() }, [])
 
   const resetFormulario = () => {
+    const defaults = getDefaultQuincenaRange()
     reset({
-      periodo_inicio: format(new Date(), 'yyyy-MM-01'),
-      periodo_fin: format(new Date(), 'yyyy-MM-15'),
+      periodo_inicio: defaults.inicio,
+      periodo_fin: defaults.fin,
       observaciones: '',
       detalles: [],
     })
@@ -165,12 +170,20 @@ export default function PlanillasPage() {
 
   const cargarResumen = async () => {
     if (!watchInicio || !watchFin) return
+
+    const quincenaValidation = validateQuincenaRange(watchInicio, watchFin)
+    if (!quincenaValidation.ok) {
+      setError(quincenaValidation.message)
+      return
+    }
+
     setCargandoResumen(true)
     setExcluidos(0)
+    setError(null)
     try {
       const [resumen, yaLiquidados] = await Promise.all([
         getResumenColaboradoresPeriodo(watchInicio, watchFin, pagoRecepcionKg, pagoEmpaquetadoCaja),
-        getColaboradoresYaLiquidados(watchInicio, watchFin),
+        getColaboradoresYaLiquidados(watchInicio, watchFin, editandoId ?? undefined),
       ])
       const filtrado = resumen.filter((r) => !yaLiquidados.has(r.colaborador_id))
       setExcluidos(resumen.length - filtrado.length)
@@ -194,6 +207,19 @@ export default function PlanillasPage() {
 
   const onSubmit = async (data: PlanillaForm) => {
     if (!user) return
+
+    const quincenaValidation = validateQuincenaRange(data.periodo_inicio, data.periodo_fin)
+    if (!quincenaValidation.ok) {
+      setError(quincenaValidation.message)
+      return
+    }
+
+    const haySolape = await existePlanillaSolapada(data.periodo_inicio, data.periodo_fin, editandoId ?? undefined)
+    if (haySolape) {
+      setError('Ya existe una planilla para ese corte quincenal. Debes editar la existente o elegir otra quincena.')
+      return
+    }
+
     const detalles = data.detalles.map((d) => {
       const monto_empaquetado = d.n_cajas_empaquetado * pagoEmpaquetadoCaja
       const total = d.pago_recepcion + d.pago_seleccion + monto_empaquetado + (d.otros_montos ?? 0)
@@ -344,6 +370,10 @@ export default function PlanillasPage() {
     setDescargandoId(planillaId)
     try {
       const full = await getPlanillaConDetalles(planillaId)
+      if (full.estado === 'borrador') {
+        setError('No se puede descargar Excel de una planilla en borrador.')
+        return
+      }
       generatePlanillaQuincenalExcel(full)
     } catch (e) {
       setError((e as Error).message)
@@ -396,6 +426,22 @@ export default function PlanillasPage() {
       return true
     })
 
+  const totalPaginas = Math.max(1, Math.ceil(planillasFiltradas.length / itemsPorPagina))
+  const paginaActual = Math.min(pagina, totalPaginas)
+  const inicioPagina = (paginaActual - 1) * itemsPorPagina
+  const finPagina = inicioPagina + itemsPorPagina
+  const planillasPaginadas = planillasFiltradas.slice(inicioPagina, finPagina)
+
+  useEffect(() => {
+    setPagina(1)
+  }, [filtroDesde, filtroHasta])
+
+  useEffect(() => {
+    if (pagina > totalPaginas) {
+      setPagina(totalPaginas)
+    }
+  }, [pagina, totalPaginas])
+
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando...</div>
 
   return (
@@ -438,6 +484,9 @@ export default function PlanillasPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+              <p className="text-xs text-muted-foreground">
+                El corte quincenal debe ser exactamente del 1 al 15 o del 16 al fin de mes.
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Período inicio" error={errors.periodo_inicio?.message} required>
                   <Input type="date" {...register('periodo_inicio', { required: true })} />
@@ -466,7 +515,7 @@ export default function PlanillasPage() {
                 )}
                 {excluidos > 0 && (
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                    {excluidos} trabajador{excluidos > 1 ? 'es' : ''} excluido{excluidos > 1 ? 's' : ''} — ya están en una planilla del período
+                    {excluidos} trabajador{excluidos > 1 ? 'es' : ''} excluido{excluidos > 1 ? 's' : ''} — ya están considerados en otra planilla del período
                   </p>
                 )}
               </div>
@@ -567,7 +616,7 @@ export default function PlanillasPage() {
         <p className="text-center text-muted-foreground py-12">No hay planillas registradas.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {planillasFiltradas.map((p) => (
+          {planillasPaginadas.map((p) => (
             <Card key={p.id}>
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between gap-4">
@@ -597,7 +646,7 @@ export default function PlanillasPage() {
                     <Badge className={getPlanillaBadgeClassName(p.estado)}>
                       {getPlanillaEstadoLabel(p.estado)}
                     </Badge>
-                    {puedeDescargar && (
+                    {puedeDescargar && p.estado !== 'borrador' && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -653,6 +702,35 @@ export default function PlanillasPage() {
               </CardContent>
             </Card>
           ))}
+
+          {planillasFiltradas.length > 0 && (
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs text-muted-foreground">
+                Mostrando {inicioPagina + 1}-{Math.min(finPagina, planillasFiltradas.length)} de {planillasFiltradas.length}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={paginaActual <= 1}
+                  onClick={() => setPagina((prev) => Math.max(1, prev - 1))}
+                >
+                  Anterior
+                </Button>
+                <span className="text-xs text-muted-foreground min-w-[90px] text-center">
+                  Pagina {paginaActual} de {totalPaginas}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={paginaActual >= totalPaginas}
+                  onClick={() => setPagina((prev) => Math.min(totalPaginas, prev + 1))}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {/* Detail Dialog */}
@@ -790,4 +868,56 @@ function getPlanillaBadgeClassName(estado: EstadoPlanilla): string {
   if (estado === 'borrador') return 'bg-gray-100 text-gray-700'
   if (estado === 'confirmada') return 'bg-amber-100 text-amber-800'
   return 'bg-green-100 text-green-800'
+}
+
+function getDefaultQuincenaRange(): { inicio: string; fin: string } {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = now.getMonth()
+  const day = now.getDate()
+  const ultimoDia = new Date(y, m + 1, 0).getDate()
+
+  if (day <= 15) {
+    return {
+      inicio: format(new Date(y, m, 1), 'yyyy-MM-dd'),
+      fin: format(new Date(y, m, 15), 'yyyy-MM-dd'),
+    }
+  }
+
+  return {
+    inicio: format(new Date(y, m, 16), 'yyyy-MM-dd'),
+    fin: format(new Date(y, m, ultimoDia), 'yyyy-MM-dd'),
+  }
+}
+
+function validateQuincenaRange(inicioIso: string, finIso: string): { ok: true } | { ok: false; message: string } {
+  if (!inicioIso || !finIso) {
+    return { ok: false, message: 'Debes seleccionar el periodo de inicio y fin.' }
+  }
+  if (inicioIso > finIso) {
+    return { ok: false, message: 'El periodo es invalido: la fecha inicio no puede ser mayor que la fecha fin.' }
+  }
+
+  const inicio = new Date(`${inicioIso}T00:00:00`)
+  const fin = new Date(`${finIso}T00:00:00`)
+
+  if (inicio.getFullYear() !== fin.getFullYear() || inicio.getMonth() !== fin.getMonth()) {
+    return { ok: false, message: 'La planilla quincenal debe estar dentro del mismo mes.' }
+  }
+
+  const ultimoDiaMes = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 0).getDate()
+  const inicioDia = inicio.getDate()
+  const finDia = fin.getDate()
+
+  const primeraQuincena = inicioDia === 1 && finDia === 15
+  const segundaQuincena = inicioDia === 16 && finDia === ultimoDiaMes
+
+  if (!primeraQuincena && !segundaQuincena) {
+    return {
+      ok: false,
+      message: `El rango debe ser 1-15 o 16-${ultimoDiaMes} del mismo mes para respetar el corte quincenal.`,
+    }
+  }
+
+  return { ok: true }
 }

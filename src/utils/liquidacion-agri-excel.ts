@@ -3,6 +3,146 @@ import type { LiquidacionAgri } from '@/types/models'
 import { formatFecha } from './formatters'
 import { getISOWeek, parseISO } from 'date-fns'
 
+export function generateLiquidacionesAgriConsolidadoExcel(params: {
+  fechaDesde: string
+  fechaHasta: string
+  liquidaciones: LiquidacionAgri[]
+}): void {
+  const { fechaDesde, fechaHasta, liquidaciones } = params
+
+  type AgriAgg = {
+    codigoAgricultor: string
+    agricultorNombre: string
+    cantidadLiquidaciones: number
+    semanasIso: Set<number>
+    totalKg: number
+    totalMonto: number
+  }
+
+  const agriMap = new Map<string, AgriAgg>()
+
+  for (const liq of liquidaciones) {
+    const key = liq.agricultor_id
+    const codigoAgricultor = liq.agricultor?.codigo ?? liq.agricultor_id
+    const agricultorNombre = liq.agricultor
+      ? `${liq.agricultor.apellido}, ${liq.agricultor.nombre}`
+      : liq.agricultor_id
+
+    const current = agriMap.get(key) ?? {
+      codigoAgricultor,
+      agricultorNombre,
+      cantidadLiquidaciones: 0,
+      semanasIso: new Set<number>(),
+      totalKg: 0,
+      totalMonto: 0,
+    }
+
+    current.cantidadLiquidaciones += 1
+    current.totalKg += Number(liq.total_kg ?? 0)
+    current.totalMonto += Number(liq.total_monto ?? 0)
+    current.semanasIso.add(safeIsoWeek(liq.fecha_inicio))
+    current.semanasIso.add(safeIsoWeek(liq.fecha_fin))
+
+    agriMap.set(key, current)
+  }
+
+  const rows: Array<Array<string | number>> = [
+    ['Consolidado semanal de liquidaciones de agricultores'],
+    ['Rango', `${formatFecha(fechaDesde)} - ${formatFecha(fechaHasta)}`],
+    ['Total agricultores', agriMap.size],
+    ['Total liquidaciones', liquidaciones.length],
+    [],
+    [
+      '#',
+      'Codigo agricultor',
+      'Apellidos y Nombres',
+      'Semanas ISO',
+      'N° liquidaciones',
+      'Kg total',
+      'Monto total S/',
+      'Precio promedio S/kg',
+    ],
+  ]
+
+  const agriRows = Array.from(agriMap.values())
+    .sort((a, b) => a.agricultorNombre.localeCompare(b.agricultorNombre))
+    .map((agri, index) => {
+      const precioPromedio = agri.totalKg > 0 ? agri.totalMonto / agri.totalKg : 0
+
+      return [
+        index + 1,
+        agri.codigoAgricultor,
+        agri.agricultorNombre,
+        Array.from(agri.semanasIso).filter((w) => w > 0).sort((a, b) => a - b).join(', ') || '-',
+        agri.cantidadLiquidaciones,
+        round2(agri.totalKg),
+        round2(agri.totalMonto),
+        round4(precioPromedio),
+      ] as Array<string | number>
+    })
+
+  rows.push(...agriRows)
+
+  if (agriRows.length > 0) {
+    const totalKg = agriRows.reduce((acc, row) => acc + Number(row[5] ?? 0), 0)
+    const totalMonto = agriRows.reduce((acc, row) => acc + Number(row[6] ?? 0), 0)
+    const precioPromedio = totalKg > 0 ? totalMonto / totalKg : 0
+
+    rows.push([])
+    rows.push([
+      '',
+      '',
+      'TOTAL GENERAL',
+      '',
+      liquidaciones.length,
+      round2(totalKg),
+      round2(totalMonto),
+      round4(precioPromedio),
+    ])
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(rows)
+  ws['!cols'] = [
+    { wch: 5 },
+    { wch: 18 },
+    { wch: 32 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 18 },
+  ]
+
+  const headerStyle = {
+    font: { bold: true, color: { rgb: 'FFFFFF' } },
+    fill: { fgColor: { rgb: '1F4E3D' } },
+    alignment: { horizontal: 'center' },
+  }
+
+  for (let c = 0; c <= 7; c++) {
+    const ref = XLSX.utils.encode_cell({ r: 5, c })
+    if (ws[ref]) ws[ref].s = headerStyle
+  }
+
+  const range = XLSX.utils.decode_range(ws['!ref'] ?? 'A1:A1')
+  for (let r = 6; r <= range.e.r; r++) {
+    const labelRef = XLSX.utils.encode_cell({ r, c: 2 })
+    const label = ws[labelRef]?.v
+    if (label !== 'TOTAL GENERAL') continue
+
+    for (let c = 0; c <= 7; c++) {
+      const ref = XLSX.utils.encode_cell({ r, c })
+      if (ws[ref]) {
+        ws[ref].s = { font: { bold: true, color: { rgb: '1F4E3D' } } }
+      }
+    }
+  }
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Consolidado semanal')
+  XLSX.writeFile(wb, `liquidaciones-agricultores-${fechaDesde}-${fechaHasta}.xlsx`)
+}
+
 export function generateLiquidacionAgriExcel(liquidacion: LiquidacionAgri): void {
   const agricultorCodigo = liquidacion.agricultor?.codigo ?? liquidacion.agricultor_id
   const agricultorNombre = liquidacion.agricultor

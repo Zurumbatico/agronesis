@@ -171,14 +171,21 @@ export async function deletePlanillaQuincenal(id: string): Promise<void> {
  */
 export async function getColaboradoresYaLiquidados(
   fechaInicio: string,
-  fechaFin: string
+  fechaFin: string,
+  planillaIdExcluir?: string
 ): Promise<Set<string>> {
   // Planillas con rango solapado: periodo_fin >= fechaInicio AND periodo_inicio <= fechaFin
-  const { data: planillas, error: errP } = await supabase
+  let query = supabase
     .from('planillas_quincenales')
     .select('id')
     .lte('periodo_inicio', fechaFin)
     .gte('periodo_fin', fechaInicio)
+
+  if (planillaIdExcluir) {
+    query = query.neq('id', planillaIdExcluir)
+  }
+
+  const { data: planillas, error: errP } = await query
 
   if (errP) throw new Error(errP.message)
   if (!planillas || planillas.length === 0) return new Set()
@@ -193,6 +200,26 @@ export async function getColaboradoresYaLiquidados(
   if (errD) throw new Error(errD.message)
 
   return new Set((detalles ?? []).map((d) => d.colaborador_id as string))
+}
+
+export async function existePlanillaSolapada(
+  fechaInicio: string,
+  fechaFin: string,
+  planillaIdExcluir?: string
+): Promise<boolean> {
+  let query = supabase
+    .from('planillas_quincenales')
+    .select('id', { count: 'exact', head: true })
+    .lte('periodo_inicio', fechaFin)
+    .gte('periodo_fin', fechaInicio)
+
+  if (planillaIdExcluir) {
+    query = query.neq('id', planillaIdExcluir)
+  }
+
+  const { count, error } = await query
+  if (error) throw new Error(error.message)
+  return (count ?? 0) > 0
 }
 
 // ─── Resumen por colaborador para pre-llenar planilla ─────────────────────────
