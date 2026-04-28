@@ -12,6 +12,7 @@ import { RegistrarPagoDialog, type RegistroPagoPayload } from '@/components/shar
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatFecha, formatMoneda } from '@/utils/formatters'
 import { generateLiquidacionesAgriConsolidadoExcel } from '@/utils/liquidacion-agri-excel'
 import { Plus, FileText, Search, Download, Pencil, Trash2 } from 'lucide-react'
@@ -39,8 +40,7 @@ export default function LiquidacionesAgriPage() {
   const [fechaDesde, setFechaDesde] = useState(() => getInicioSemanaLaboralISO())
   const [fechaHasta, setFechaHasta] = useState(() => getFinSemanaLaboralISO())
   const [pagina, setPagina] = useState(1)
-
-  const itemsPorPagina = 10
+  const [itemsPorPagina, setItemsPorPagina] = useState(10)
 
   const cargar = async () => {
     setLoading(true)
@@ -191,7 +191,7 @@ export default function LiquidacionesAgriPage() {
 
   useEffect(() => {
     setPagina(1)
-  }, [busqueda])
+  }, [busqueda, itemsPorPagina])
 
   useEffect(() => {
     if (pagina > totalPaginas) {
@@ -323,11 +323,26 @@ export default function LiquidacionesAgriPage() {
             </Card>
           ))}
 
-          <div className="flex items-center justify-between pt-2">
-            <p className="text-xs text-muted-foreground">
-              Mostrando {inicioPagina + 1}-{Math.min(finPagina, filtradas.length)} de {filtradas.length}
-            </p>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-[96px]">
+                <Select value={String(itemsPorPagina)} onValueChange={(value) => setItemsPorPagina(Number(value))}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="/ pag" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="5">5 / pag</SelectItem>
+                    <SelectItem value="10">10 / pag</SelectItem>
+                    <SelectItem value="20">20 / pag</SelectItem>
+                    <SelectItem value="50">50 / pag</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {filtradas.length} resultado{filtradas.length === 1 ? '' : 's'} filtrado{filtradas.length === 1 ? '' : 's'} · Mostrando {inicioPagina + 1}-{Math.min(finPagina, filtradas.length)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               <Button
                 size="sm"
                 variant="outline"

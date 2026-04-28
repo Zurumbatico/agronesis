@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Dialog,
   DialogContent,
@@ -80,8 +81,8 @@ export default function PlanillasPage() {
   const [filtroDesde, setFiltroDesde] = useState('')
   const [filtroHasta, setFiltroHasta] = useState('')
   const [pagina, setPagina] = useState(1)
+  const [itemsPorPagina, setItemsPorPagina] = useState(10)
   const defaultsQuincena = getDefaultQuincenaRange()
-  const itemsPorPagina = 10
 
   const { register, handleSubmit, watch, reset, control, formState: { errors, isSubmitting } } = useForm<PlanillaForm>({
     defaultValues: {
@@ -434,7 +435,7 @@ export default function PlanillasPage() {
 
   useEffect(() => {
     setPagina(1)
-  }, [filtroDesde, filtroHasta])
+  }, [filtroDesde, filtroHasta, itemsPorPagina])
 
   useEffect(() => {
     if (pagina > totalPaginas) {
@@ -704,11 +705,26 @@ export default function PlanillasPage() {
           ))}
 
           {planillasFiltradas.length > 0 && (
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-xs text-muted-foreground">
-                Mostrando {inicioPagina + 1}-{Math.min(finPagina, planillasFiltradas.length)} de {planillasFiltradas.length}
-              </p>
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-[96px]">
+                  <Select value={String(itemsPorPagina)} onValueChange={(value) => setItemsPorPagina(Number(value))}>
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="/ pag" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5 / pag</SelectItem>
+                      <SelectItem value="10">10 / pag</SelectItem>
+                      <SelectItem value="20">20 / pag</SelectItem>
+                      <SelectItem value="50">50 / pag</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {planillasFiltradas.length} resultado{planillasFiltradas.length === 1 ? '' : 's'} filtrado{planillasFiltradas.length === 1 ? '' : 's'} · Mostrando {inicioPagina + 1}-{Math.min(finPagina, planillasFiltradas.length)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <Button
                   size="sm"
                   variant="outline"
